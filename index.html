@@ -194,6 +194,10 @@
     $('endSound').onchange=()=>{data.settings.sound=$('endSound').checked;save();if(data.settings.sound){unlockEndTone();playEndTone();}};
     document.addEventListener('pointerdown',unlockEndTone,{once:true});
   </script>
+  <script>
+    const completionWithBreak=complete;
+    complete=(manual=false)=>{if(mode!=='focus')return completionWithBreak(manual);const previousSetMode=setMode,todayFocusCount=data.records.filter(record=>dateKey(record.at||record.date)===dateKey()&&counted(record)).length,nextBreak=(todayFocusCount+1)%4===0?'long':'short';setMode=(next)=>previousSetMode(next==='long'||next==='short'?nextBreak:next);completionWithBreak(manual);setMode=previousSetMode;if(mode===nextBreak&&!running)start();};
+  </script>
   <script>document.getElementById('closeEndNotice').onclick=()=>document.getElementById('endNotice').close();</script>
 </body>
 </html>

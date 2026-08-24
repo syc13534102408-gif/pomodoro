@@ -167,7 +167,8 @@
   </script>
   <script>
     const base64UrlToBytes=value=>{const normalized=value.replace(/-/g,'+').replace(/_/g,'/');const padded=normalized+'='.repeat((4-normalized.length%4)%4);return Uint8Array.from(atob(padded),character=>character.charCodeAt(0));};
-    const pushWorkerUrl=()=>data.push?.workerUrl?.replace(/\/$/,'');
+    const DEFAULT_PUSH_WORKER_URL='https://pine-pomodoro-reminders.syc13534102408.workers.dev';
+    const pushWorkerUrl=()=>data.push?.workerUrl?.replace(/\/$/,'')||DEFAULT_PUSH_WORKER_URL;
     const pushStatus=(text,state='')=>{const status=$('pushStatus');status.textContent=text;status.className=`push-status ${state}`;};
     const pushApi=async(path,options={})=>{const response=await fetch(`${pushWorkerUrl()}${path}`,{...options,headers:{'content-type':'application/json',...(options.headers||{})}});const result=await response.json().catch(()=>({}));if(!response.ok)throw new Error(result.error||'后台提醒服务暂时不可用');return result;};
     function renderPushStatus(){if(!pushWorkerUrl())return pushStatus('后台提醒尚未配置');if(data.push?.subscription)return pushStatus('后台提醒已开启：Safari 在后台或关闭页面时也会通知。','ready');pushStatus('已配置后台服务，等待开启通知权限。');}

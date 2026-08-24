@@ -152,6 +152,17 @@
     render=()=>{todoRender();renderTodos();};
     save();render();
   </script>
+  <script>
+    /* Persist the active timer so a refresh can resume the same Pomodoro. */
+    const sessionStart=start,sessionStop=stop,sessionInterrupt=interruptLive;
+    const sessionRecordId=()=>globalThis.crypto?.randomUUID?.()||`${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const persistActiveSession=()=>{const record=liveSession&&data.records[liveSession.recordIndex];if(!record||mode!=='focus')return;record.id=record.id||sessionRecordId();data.activeSession={recordId:record.id,mode,deadline:running?deadline:null,remaining:left,running};save();};
+    start=()=>{sessionStart();persistActiveSession();};
+    stop=()=>{sessionStop();persistActiveSession();};
+    interruptLive=()=>{sessionInterrupt();data.activeSession=null;save();};
+    $('reset').addEventListener('click',()=>{data.activeSession=null;save();});
+    (function restoreActiveSession(){let active=data.activeSession,record=active&&data.records.find(item=>item.id===active.recordId);if(!record){record=data.records.find(item=>item.status==='in_progress');if(!record)return;record.id=record.id||sessionRecordId();active={recordId:record.id,mode:'focus',remaining:Math.max(0,secondsFor('focus')-Math.floor(record.minutes||0)*60),running:true,deadline:null};data.activeSession=active;}const taskIndex=data.tasks.findIndex(task=>task.name===record.name);if(taskIndex>=0)data.selected=taskIndex;else{data.tasks.unshift({name:record.name,count:0});data.selected=0;}mode='focus';liveSession={recordIndex:data.records.indexOf(record),recordedMinutes:Math.floor(record.minutes||0)};if(active.running){$('play').innerHTML='<svg width="23" height="23" viewBox="0 0 24 24" fill="currentColor"><path d="M7 5h4v14H7zm6 0h4v14h-4z"/></svg>';$('play').setAttribute('aria-label','暂停');}if(active.running&&active.deadline&&active.deadline>Date.now()){running=true;deadline=active.deadline;timer=setInterval(tick,1000);tick();}else if(active.running){running=true;deadline=Date.now()+Math.max(0,active.remaining||0)*1000;if(left=Math.max(0,active.remaining||0),left>0){timer=setInterval(tick,1000);tick();}else complete(false);}else{running=false;left=Math.max(0,active.remaining||0);record.status='paused';}save();render();})();
+  </script>
   <script>document.getElementById('closeEndNotice').onclick=()=>document.getElementById('endNotice').close();</script>
 </body>
 </html>

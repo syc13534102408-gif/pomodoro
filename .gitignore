@@ -1,2 +1,7 @@
 .DS_Store
 cloudflare-reminders/node_modules/
+tools/
+outputs/
+pomodoro_app/android/local.properties
+pomodoro_app/android/.gradle/
+pomodoro_app/build-arm64.log

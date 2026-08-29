@@ -1,0 +1,35 @@
+name: pomodoro_app
+description: Local-first Pomodoro timer for Android.
+publish_to: 'none'
+version: 1.1.0+3
+
+environment:
+  sdk: '>=3.3.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  shared_preferences: ^2.2.3
+  fl_chart: ^0.68.0
+  intl: ^0.19.0
+  flutter_local_notifications: ^17.2.1+2
+  timezone: ^0.9.4
+  flutter_foreground_task: ^11.0.1
+  http: ^1.6.0
+  audioplayers: ^6.8.1
+
+# path_provider_android 2.3.x 引入了 jni 原生模块，其 CMake 产物会写回只读的
+# pub 缓存目录导致构建失败。2.2.x 不含该依赖，功能一致。
+dependency_overrides:
+  path_provider_android: 2.2.23
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/sounds/

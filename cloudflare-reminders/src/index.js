@@ -31,13 +31,18 @@ export default {
       const body = await request.json().catch(() => null);
       const deviceCode = body?.deviceCode;
       const payload = body?.payload;
+      const baseUpdatedAt = body?.baseUpdatedAt;
       if (typeof deviceCode !== 'string' || !/^[A-Za-z0-9_-]{16,128}$/.test(deviceCode) || !payload || typeof payload !== 'object' || Array.isArray(payload)) {
         return withCors(request, env, json({ error: '同步参数无效' }, { status: 400 }));
       }
       const serialized = JSON.stringify(payload);
       if (serialized.length > 1024 * 1024) return withCors(request, env, json({ error: '备份数据超过 1MB 限制' }, { status: 413 }));
       const updatedAt = new Date().toISOString();
-      await env.DB.prepare(`INSERT INTO sync_backups (device_code, payload, updated_at) VALUES (?, ?, ?) ON CONFLICT(device_code) DO UPDATE SET payload = excluded.payload, updated_at = excluded.updated_at`).bind(deviceCode, serialized, updatedAt).run();
+      const statement = typeof baseUpdatedAt === 'string'
+        ? env.DB.prepare(`INSERT INTO sync_backups (device_code, payload, updated_at) VALUES (?, ?, ?) ON CONFLICT(device_code) DO UPDATE SET payload = excluded.payload, updated_at = excluded.updated_at WHERE sync_backups.updated_at = ?`).bind(deviceCode, serialized, updatedAt, baseUpdatedAt)
+        : env.DB.prepare(`INSERT INTO sync_backups (device_code, payload, updated_at) VALUES (?, ?, ?) ON CONFLICT(device_code) DO UPDATE SET payload = excluded.payload, updated_at = excluded.updated_at`).bind(deviceCode, serialized, updatedAt);
+      const result = await statement.run();
+      if (typeof baseUpdatedAt === 'string' && result.meta.changes === 0) return withCors(request, env, json({ error: '云端数据已在另一台设备更新，请重新同步', conflict: true }, { status: 409 }));
       return withCors(request, env, json({ updatedAt }));
     }
     if (request.method === 'GET' && url.pathname === '/sync/download') {

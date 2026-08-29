@@ -26,6 +26,20 @@ export default {
       const response = await object.fetch('https://timer.internal/schedule', { method: 'POST', body: JSON.stringify({ ...reminder, id, endsAt }) });
       return withCors(request, env, response);
     }
+    if (request.method === 'POST' && url.pathname === '/sync/upload') {
+      if (!env.DB) return withCors(request, env, json({ error: '云端同步数据库尚未配置' }, { status: 503 }));
+      const body = await request.json().catch(() => null);
+      const deviceCode = body?.deviceCode;
+      const payload = body?.payload;
+      if (typeof deviceCode !== 'string' || !/^[A-Za-z0-9_-]{16,128}$/.test(deviceCode) || !payload || typeof payload !== 'object' || Array.isArray(payload)) {
+        return withCors(request, env, json({ error: '同步参数无效' }, { status: 400 }));
+      }
+      const serialized = JSON.stringify(payload);
+      if (serialized.length > 1024 * 1024) return withCors(request, env, json({ error: '备份数据超过 1MB 限制' }, { status: 413 }));
+      const updatedAt = new Date().toISOString();
+      await env.DB.prepare(`INSERT INTO sync_backups (device_code, payload, updated_at) VALUES (?, ?, ?) ON CONFLICT(device_code) DO UPDATE SET payload = excluded.payload, updated_at = excluded.updated_at`).bind(deviceCode, serialized, updatedAt).run();
+      return withCors(request, env, json({ updatedAt }));
+    }
     const match = url.pathname.match(/^\/reminders\/([\w-]+)\/cancel$/);
     if (request.method === 'POST' && match) {
       const object = env.TIMER.get(env.TIMER.idFromName(match[1]));

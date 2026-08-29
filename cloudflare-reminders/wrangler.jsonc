@@ -8,6 +8,13 @@
       { "name": "TIMER", "class_name": "TimerReminder" }
     ]
   },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "pine-pomodoro-sync",
+      "database_id": "5320717c-a1f7-45a6-b50b-ca7a0359bf30"
+    }
+  ],
   "migrations": [
     { "tag": "v1", "new_sqlite_classes": ["TimerReminder"] }
   ]

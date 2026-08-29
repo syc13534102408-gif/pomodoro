@@ -1,6 +1,6 @@
 # 松果后台提醒与云端备份 Worker
 
-这个 Worker 使用 Durable Object Alarm 在番茄钟结束时发送标准 Web Push，并使用 D1 保存用户手动上传的松果数据备份。网页继续部署在 GitHub Pages；本机数据不会因上传而删除。
+这个 Worker 使用 Durable Object Alarm 在番茄钟结束时发送标准 Web Push，并使用 D1 保存用户手动上传的松果数据备份。网页继续部署在 GitHub Pages；本机数据不会因上传或恢复前的备份而删除。
 
 ## 部署
 

@@ -40,6 +40,16 @@ export default {
       await env.DB.prepare(`INSERT INTO sync_backups (device_code, payload, updated_at) VALUES (?, ?, ?) ON CONFLICT(device_code) DO UPDATE SET payload = excluded.payload, updated_at = excluded.updated_at`).bind(deviceCode, serialized, updatedAt).run();
       return withCors(request, env, json({ updatedAt }));
     }
+    if (request.method === 'GET' && url.pathname === '/sync/download') {
+      if (!env.DB) return withCors(request, env, json({ error: '云端同步数据库尚未配置' }, { status: 503 }));
+      const deviceCode = url.searchParams.get('deviceCode');
+      if (typeof deviceCode !== 'string' || !/^[A-Za-z0-9_-]{16,128}$/.test(deviceCode)) return withCors(request, env, json({ error: '同步码无效' }, { status: 400 }));
+      const row = await env.DB.prepare('SELECT payload, updated_at AS updatedAt FROM sync_backups WHERE device_code = ?').bind(deviceCode).first();
+      if (!row) return withCors(request, env, json({ error: '没有找到云端备份' }, { status: 404 }));
+      let payload;
+      try { payload = JSON.parse(row.payload); } catch { return withCors(request, env, json({ error: '云端备份已损坏' }, { status: 500 })); }
+      return withCors(request, env, json({ payload, updatedAt: row.updatedAt }));
+    }
     const match = url.pathname.match(/^\/reminders\/([\w-]+)\/cancel$/);
     if (request.method === 'POST' && match) {
       const object = env.TIMER.get(env.TIMER.idFromName(match[1]));

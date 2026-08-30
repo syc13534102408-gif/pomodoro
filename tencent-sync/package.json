@@ -1,0 +1,9 @@
+{
+  "name": "pine-sync-scf",
+  "version": "1.0.0",
+  "private": true,
+  "description": "松果番茄钟云端同步（腾讯云函数 + COS）",
+  "dependencies": {
+    "cos-nodejs-sdk-v5": "^2.14.5"
+  }
+}

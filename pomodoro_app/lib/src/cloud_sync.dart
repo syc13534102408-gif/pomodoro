@@ -27,7 +27,10 @@ class CloudBackup {
   }
 }
 
-/// 与网页端共用的 Cloudflare Worker 同步接口。
+/// 与网页端共用的云端同步接口。
+///
+/// 同步后端部署在腾讯云函数（SCF）+ COS 上，国内网络可直连；
+/// 后台提醒的 Cloudflare Worker 只服务网页端推送，与本类无关。
 class CloudSync {
   CloudSync({String? baseUrl})
       : baseUrl = (baseUrl == null || baseUrl.trim().isEmpty)
@@ -35,7 +38,7 @@ class CloudSync {
             : baseUrl.trim().replaceAll(RegExp(r'/+$'), '');
 
   static const String defaultBaseUrl =
-      'https://pine-pomodoro-reminders.pine-pomodoro-reminders.workers.dev';
+      'https://1478270344-dtbqag7t8b.ap-guangzhou.tencentscf.com';
 
   static const Duration timeout = Duration(seconds: 20);
 

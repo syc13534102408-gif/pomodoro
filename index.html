@@ -170,12 +170,15 @@
   <script>
     const base64UrlToBytes=value=>{const normalized=value.replace(/-/g,'+').replace(/_/g,'/');const padded=normalized+'='.repeat((4-normalized.length%4)%4);return Uint8Array.from(atob(padded),character=>character.charCodeAt(0));};
     const DEFAULT_PUSH_WORKER_URL='https://pine-pomodoro-reminders.pine-pomodoro-reminders.workers.dev';
+    // 云端同步走腾讯云函数（国内网络可直连）；后台提醒仍走 Cloudflare（依赖 Durable Objects 做精确定时）。
+    const DEFAULT_SYNC_URL='https://1478270344-dtbqag7t8b.ap-guangzhou.tencentscf.com';
     const LEGACY_PUSH_WORKER_HOSTS=['pine-pomodoro-reminders.syc13534102408.workers.dev'];
 const normalizeWorkerUrl=raw=>{try{const parsed=new URL(String(raw||'').trim());if(parsed.protocol!=='https:')return '';if(LEGACY_PUSH_WORKER_HOSTS.includes(parsed.hostname))return DEFAULT_PUSH_WORKER_URL;return parsed.href.replace(/\/$/,'');}catch{return '';}};
 const pushWorkerUrl=()=>normalizeWorkerUrl(data.push?.workerUrl)||DEFAULT_PUSH_WORKER_URL;
+const syncWorkerUrl=()=>normalizeWorkerUrl(data.sync?.workerUrl)||DEFAULT_SYNC_URL;
     const pushStatus=(text,state='')=>{const status=$('pushStatus');status.textContent=text;status.className=`push-status ${state}`;};
     const pushApi=async(path,options={})=>{const response=await fetch(`${pushWorkerUrl()}${path}`,{...options,headers:{'content-type':'application/json',...(options.headers||{})}});const result=await response.json().catch(()=>({}));if(!response.ok)throw new Error(result.error||'后台提醒服务暂时不可用');return result;};
-    const syncApi=async(path,options={})=>{const response=await fetch(`${pushWorkerUrl()}${path}`,{...options,headers:{'content-type':'application/json',...(options.headers||{})}});const result=await response.json().catch(()=>({}));if(!response.ok){const error=new Error(result.error||'云端同步服务暂时不可用');error.conflict=result.conflict;throw error;}return result;};
+    const syncApi=async(path,options={})=>{const response=await fetch(`${syncWorkerUrl()}${path}`,{...options,headers:{'content-type':'application/json',...(options.headers||{})}});const result=await response.json().catch(()=>({}));if(!response.ok){const error=new Error(result.error||'云端同步服务暂时不可用');error.conflict=result.conflict;throw error;}return result;};
     const syncDeviceCode=()=>{data.sync=data.sync||{};if(!data.sync.deviceCode)data.sync.deviceCode=(globalThis.crypto?.randomUUID?.()||`${Date.now()}-${Math.random().toString(36).slice(2)}`).replace(/-/g,'');return data.sync.deviceCode;};
     const cloudPayload=()=>{const copy=JSON.parse(JSON.stringify(data));delete copy.push;delete copy.activeSession;delete copy.sync;return copy;};
     const cloudFingerprint=()=>JSON.stringify(cloudPayload());

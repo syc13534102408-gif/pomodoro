@@ -7,7 +7,7 @@
 ```
 网页端 / 安卓端
       ↓ HTTPS
-腾讯云 API 网关   https://{serviceId}.gz.apigw.tencentcs.com/release
+腾讯云函数 URL    https://...scf.tencentcs.com/...（SCF 自带 HTTP 触发器）
       ↓
 云函数 SCF        Node.js 18，内存 128MB，超时 20s
       ↓
@@ -27,10 +27,12 @@ COS 对象存储      sync/{deviceCode}.json
 ## 前置条件
 
 1. 腾讯云账号并**完成实名认证**
-2. 开通三项服务（控制台里搜名字即可，均有免费额度）：
+2. 开通两项服务（控制台里搜名字即可，均有免费额度）：
    - 云函数 SCF
    - 对象存储 COS
-   - API 网关
+
+> **注意**：腾讯云 API 网关已于 2025-06-30 停止服务。本项目改用 SCF 自带的
+> **函数 URL**（HTTP 触发器）暴露接口，不需要也不应该再开通 API 网关。
 3. 在「访问管理 → 访问密钥 → API 密钥管理」创建一对 `SecretId` / `SecretKey`
 
 ## 配置密钥（不要让密钥出现在聊天里）
@@ -77,7 +79,7 @@ https://service-xxxx.gz.apigw.tencentcs.com/release/ping
 |---|---|
 | 云函数 SCF | 每月 100 万次请求 + 40 万 GBs 资源使用量 |
 | COS 存储 | 新用户 6 个月 50GB 标准存储 + 若干外网下行流量 |
-| API 网关 | 每月 100 万次调用 |
+| 函数 URL | 随云函数免费额度，不单独计费 |
 
 额度政策由腾讯云调整，以控制台「费用中心」为准。建议设置一个费用告警。
 

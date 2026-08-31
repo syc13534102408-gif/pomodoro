@@ -108,49 +108,58 @@ else
 fi
 
 if [ "$MODE" != "--update" ]; then
-  say "创建 API 网关"
-  SERVICE_ID=$(tccli apigw DescribeServicesStatus --Region "$REGION" --Limit 100 --output json 2>/dev/null \
+  say "创建 HTTP 触发器（函数 URL）"
+  echo "注意：腾讯云 API 网关已于 2025-06-30 停服，改用 SCF 自带的函数 URL。"
+
+  # 先查是否已有 http 触发器
+  EXISTING=$(tccli scf ListTriggers --Region "$REGION" --FunctionName "$FUNCTION_NAME" --output json 2>/dev/null \
     | python3 -c "
 import sys,json
 try:
     d=json.load(sys.stdin)
-    for s in d.get('ServiceSet',[]):
-        if s.get('ServiceName')=='$SERVICE_NAME':
-            print(s.get('ServiceId','')); break
+    for t in d.get('Triggers',[]):
+        if t.get('Type')=='http':
+            print(t.get('TriggerName',''))
 except Exception: pass
 " 2>/dev/null || echo "")
 
-  if [ -z "$SERVICE_ID" ]; then
-    SERVICE_ID=$(tccli apigw CreateService --Region "$REGION" \
-      --ServiceName "$SERVICE_NAME" \
-      --Protocol "http&https" --ServiceDesc "松果番茄钟同步" \
-      --output json 2>/dev/null | python3 -c "import sys,json;print(json.load(sys.stdin).get('ServiceId',''))" 2>/dev/null || echo "")
-    echo "已创建服务: $SERVICE_ID"
+  if [ -z "$EXISTING" ]; then
+    tccli scf CreateTrigger \
+      --Region "$REGION" \
+      --FunctionName "$FUNCTION_NAME" \
+      --Type http \
+      --Qualifier '$DEFAULT' \
+      --TriggerDesc '{"netConfig":{"enableIntranet":false,"enableExtranet":true},"authType":"NONE"}' \
+      --output json 2>/dev/null | python3 -c "
+import sys,json
+try:
+    d=json.load(sys.stdin)
+    print('  ✅ 触发器已创建:', d.get('TriggerInfo',{}).get('TriggerName','ok'))
+except Exception:
+    print('  触发器创建返回无法解析，请在控制台确认')
+" || echo "  自动创建失败，请改用控制台手动添加"
   else
-    echo "服务已存在: $SERVICE_ID"
+    echo "  触发器已存在: $EXISTING"
   fi
 
-  if [ -n "$SERVICE_ID" ]; then
-    for API in "/sync/upload:POST" "/sync/download:GET" "/ping:GET"; do
-      P="${API%%:*}"; M="${API##*:}"
-      tccli apigw CreateApi --Region "$REGION" --ServiceId "$SERVICE_ID" \
-        --ApiName "sync${P//\//_}" --ApiType NORMAL --ApiBusinessType NORMAL \
-        --AuthType NONE --Protocol HTTP --RequestConfig "{\"Path\":\"$P\",\"Method\":\"$M\"}" \
-        --ServiceType SCF --ServiceTimeout 20 \
-        --ServiceScfFunctionName "$FUNCTION_NAME" \
-        --ServiceScfFunctionNamespace default --ServiceScfFunctionQualifier '$DEFAULT' \
-        >/dev/null 2>&1 && echo "  接口已注册: $M $P" || echo "  接口可能已存在: $M $P"
-    done
+  say "获取公网地址"
+  URL=$(tccli scf GetFunctionAddress --Region "$REGION" --FunctionName "$FUNCTION_NAME" --Qualifier '$DEFAULT' --output json 2>/dev/null \
+    | python3 -c "import sys,json;print(json.load(sys.stdin).get('Url',''))" 2>/dev/null || echo "")
 
-    tccli apigw ReleaseService --Region "$REGION" \
-      --ServiceId "$SERVICE_ID" --EnvironmentName release --ReleaseDesc "首次发布" \
-      >/dev/null 2>&1 && echo "✅ 网关已发布" || echo "发布可能已完成"
-
-    echo
-    echo "访问地址（发布后约 1 分钟生效）："
-    echo "  https://${SERVICE_ID}.gz.apigw.tencentcs.com/release/ping"
+  if [ -n "$URL" ]; then
+    echo "  $URL"
+    echo "$URL" > "$HERE/.last-url"
+  else
+    echo "  自动获取失败。请在控制台获取："
+    echo "    云函数 → $FUNCTION_NAME → 触发管理 → HTTP 触发器"
+    echo "    复制「访问路径」后执行："
+    echo "      echo '你的URL' > $HERE/.last-url"
   fi
 fi
 
 say "完成"
-echo "下一步：把上面 /ping 的地址（去掉 /ping）填进网页端和安卓端的同步服务地址。"
+if [ -f "$HERE/.last-url" ]; then
+  echo "同步服务地址：$(cat "$HERE/.last-url")"
+  echo "（已保存到 $HERE/.last-url）"
+fi
+echo "下一步：把该地址填进网页端和安卓端的同步服务地址，然后验证 /ping 返回 provider=tencent-scf。"

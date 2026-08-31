@@ -5,3 +5,8 @@ outputs/
 pomodoro_app/android/local.properties
 pomodoro_app/android/.gradle/
 pomodoro_app/build-arm64.log
+tencent-sync/node_modules/
+tencent-sync/.deploy/
+tencent-sync/function.zip
+tencent-sync/.last-url
+tencent-sync/__pycache__/

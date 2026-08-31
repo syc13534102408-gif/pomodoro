@@ -11,11 +11,36 @@ const withCors = (request, env, response) => { const headers = new Headers(respo
 const validSubscription = subscription => subscription && typeof subscription.endpoint === 'string' && subscription.keys && typeof subscription.keys.p256dh === 'string' && typeof subscription.keys.auth === 'string';
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
+    const url0 = new URL(request.url);
+    const origin0 = request.headers.get('origin');
+    let response;
+    try {
+      response = await route(request, env);
+    } catch (error) {
+      response = json({ error: `服务内部错误：${error?.message || error}` }, { status: 500 });
+    }
+    ctx.waitUntil(recordRequest(env, request, url0, origin0, response.status).catch(() => {}));
+    return response;
+  }
+};
+
+async function route(request, env) {
     if (request.method === 'OPTIONS') return new Response(null, { headers: cors(request, env) });
     const origin = request.headers.get('origin');
     if (origin && origin !== env.ALLOWED_ORIGIN) return json({ error: '来源未授权' }, { status: 403 });
     const url = new URL(request.url);
+    // 自检端点：用于确认线上跑的是哪一份代码，以及各项绑定是否就绪。
+    if (request.method === 'GET' && url.pathname === '/ping')
+      return withCors(request, env, json({
+        ok: true,
+        build: '2026-08-30-sync-diagnostics',
+        hasSyncRoutes: true,
+        dbBound: Boolean(env.DB),
+        timerBound: Boolean(env.TIMER),
+        allowedOrigin: env.ALLOWED_ORIGIN || null,
+        now: new Date().toISOString()
+      }));
     if (request.method === 'GET' && url.pathname === '/vapid-public-key') return withCors(request, env, json({ publicKey: env.VAPID_PUBLIC_KEY }));
     if (request.method === 'POST' && url.pathname === '/reminders') {
       const reminder = await request.json().catch(() => null);
@@ -61,9 +86,33 @@ export default {
       const response = await object.fetch('https://timer.internal/cancel', { method: 'POST' });
       return withCors(request, env, response);
     }
-    return withCors(request, env, json({ error: '未找到接口' }, { status: 404 }));
+    return withCors(request, env, json({
+      error: `未找到接口：${request.method} ${url.pathname}`,
+      receivedMethod: request.method,
+      receivedPath: url.pathname,
+      available: ['GET /ping', 'GET /vapid-public-key', 'POST /reminders', 'POST /sync/upload', 'GET /sync/download', 'POST /reminders/:id/cancel']
+    }, { status: 404 }));
+}
+
+async function recordRequest(env, request, url, origin, status) {
+  if (!env.DB) return;
+  try {
+    await env.DB.prepare(
+      'INSERT INTO request_log (ts, method, path, status, origin, ua) VALUES (?, ?, ?, ?, ?, ?)'
+    )
+      .bind(
+        new Date().toISOString(),
+        request.method,
+        url.pathname,
+        status,
+        origin || null,
+        (request.headers.get('user-agent') || '').slice(0, 180)
+      )
+      .run();
+  } catch (_) {
+    // 日志失败不能影响主流程
   }
-};
+}
 
 export class TimerReminder {
   constructor(state, env) { this.state = state; this.env = env; }

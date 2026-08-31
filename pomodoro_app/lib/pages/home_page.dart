@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../src/cloud_auto.dart';
+import '../src/cloud_sync.dart';
 import '../src/engine.dart';
 import '../src/models.dart';
 import '../src/notifications.dart';
@@ -26,11 +28,19 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   bool _syncingForeground = false;
   String _foregroundKey = '';
   DateTime _lastPersist = DateTime.fromMillisecondsSinceEpoch(0);
+  late final AutoCloudSync _autoSync;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _autoSync = AutoCloudSync(
+      sync: CloudSync(),
+      apply: (data) async {
+        if (!mounted) return;
+        _apply(data, force: true);
+      },
+    );
     unawaited(_bootstrap());
   }
 
@@ -45,6 +55,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       _tick(forcePersist: true);
+      // 回到前台：拉取网页端可能刚上传的更新。
+      unawaited(_autoSync.onResume(context, _data));
     } else if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.detached) {
       _persist(force: true);
@@ -75,6 +87,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     _persist(force: true);
     _startTicker();
     await _syncForeground();
+    // 启动时拉取一次云端更新（已绑定同步码的情况下）。
+    if (mounted) unawaited(_autoSync.onResume(context, _data));
   }
 
   void _startTicker() {
@@ -185,6 +199,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     }
     unawaited(Notifier.cancel());
     _apply(next, force: true);
+    // 完成专注（写入了记录）后自动上传，让网页端尽快看到。
+    unawaited(_autoSync.afterFocus(context, next));
   }
 
   void _discard() {

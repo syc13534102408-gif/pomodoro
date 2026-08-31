@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../src/cloud_auto.dart';
 import '../src/cloud_sync.dart';
 import '../src/models.dart';
 import '../src/notifications.dart';
@@ -112,7 +113,11 @@ class _SettingsPageState extends State<SettingsPage> {
       baseUpdatedAt: data.sync.lastSyncedAt,
     );
     _emit(data.copyWith(
-      sync: data.sync.copyWith(lastUploadedAt: updatedAt, lastSyncedAt: updatedAt),
+      sync: data.sync.copyWith(
+        lastUploadedAt: updatedAt,
+        lastSyncedAt: updatedAt,
+        lastSyncedHash: cloudFingerprint(data),
+      ),
     ));
     setState(() => _syncMessage = '已上传到云端');
   }
@@ -121,11 +126,12 @@ class _SettingsPageState extends State<SettingsPage> {
     final code = await _askCode();
     if (code == null) return;
     final backup = await _sync.download(code);
-    final merged = mergeFromCloud(widget.data, backup.payload)
-        .copyWith(
+    final mergedBase = mergeFromCloud(widget.data, backup.payload);
+    final merged = mergedBase.copyWith(
       sync: widget.data.sync.copyWith(
         deviceCode: code,
         lastSyncedAt: backup.updatedAt,
+        lastSyncedHash: cloudFingerprint(mergedBase),
       ),
     );
     _emit(merged);
@@ -338,6 +344,11 @@ class _SettingsPageState extends State<SettingsPage> {
                 Text(
                   '最近上传：${_formatStamp(data.sync.lastUploadedAt)}',
                   style: const TextStyle(color: PineColors.muted, fontSize: 11),
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  '绑定同步码后：完成专注自动上传，回到 App 自动拉取',
+                  style: TextStyle(color: PineColors.muted, fontSize: 11),
                 ),
                 const SizedBox(height: 12),
                 Row(

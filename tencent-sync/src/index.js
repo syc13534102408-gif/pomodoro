@@ -10,13 +10,15 @@ const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS ||
 const MAX_PAYLOAD = 1024 * 1024; // 1MB
 const CODE_RE = /^[A-Za-z0-9_-]{16,128}$/;
 
+// 注意：云函数保留 SCF_ / QCLOUD_ / TENCENTCLOUD_ 前缀，自定义变量不能用，
+// 所以用 PINE_ 前缀。
+const SECRET_ID = process.env.PINE_SECRET_ID;
+const SECRET_KEY = process.env.PINE_SECRET_KEY;
+
 let cosClient = null;
 function cos() {
   if (!cosClient) {
-    cosClient = new COS({
-      SecretId: process.env.TENCENTCLOUD_SECRET_ID,
-      SecretKey: process.env.TENCENTCLOUD_SECRET_KEY,
-    });
+    cosClient = new COS({ SecretId: SECRET_ID, SecretKey: SECRET_KEY });
   }
   return cosClient;
 }
@@ -142,6 +144,7 @@ exports.main_handler = async (event) => {
         ok: true,
         provider: 'tencent-scf',
         bucketBound: Boolean(BUCKET),
+        secretBound: Boolean(SECRET_ID && SECRET_KEY),
         region: REGION,
         now: new Date().toISOString(),
       }, origin);

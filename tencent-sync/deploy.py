@@ -19,6 +19,7 @@ import os
 import shutil
 import subprocess
 import sys
+import time
 import zipfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -34,6 +35,48 @@ ALLOWED_ORIGINS = os.environ.get(
 
 def say(msg):
     print(f"\n\033[1m==> {msg}\033[0m")
+
+
+def variable(key, value):
+    """构造环境变量对象。
+
+    本 SDK 版本的模型构造函数不接受关键字参数（只有无参 __init__ + property），
+    因此必须创建后逐个赋值。写成 helper 是为了在两种 SDK 版本下都能工作。
+    """
+    from tencentcloud.scf.v20180416 import models
+
+    var = models.Variable()
+    var.Key = key
+    var.Value = value
+    return var
+
+
+def wait_until_active(client, models, timeout=90):
+    """函数刚创建时状态是 Creating，此时建触发器/取地址都会失败，需要等就绪。"""
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        try:
+            req = models.GetFunctionRequest()
+            req.FunctionName = FUNCTION_NAME
+            resp = client.GetFunction(req)
+            status = getattr(resp, "Status", "") or ""
+            if status not in ("Creating", "Updating", ""):
+                print(f"  函数状态: {status}")
+                return True
+        except Exception:  # noqa: BLE001
+            pass
+        print("  等待函数就绪…")
+        time.sleep(3)
+    print("  （等待超时，继续尝试）")
+    return False
+
+
+def env_object(vars_list):
+    from tencentcloud.scf.v20180416 import models
+
+    env = models.Environment()
+    env.Variables = vars_list
+    return env
 
 
 def die(msg):
@@ -69,43 +112,47 @@ def load_credentials():
 
 
 def build_zip():
+    """打包函数代码。
+
+    直接把 src/ 和 node_modules/ 写进 zip，不走暂存目录：
+    本机有删除保护，清理上千个暂存文件会被拦截。
+    """
     say("打包函数代码")
-    deploy_dir = os.path.join(HERE, ".deploy")
     zip_path = os.path.join(HERE, "function.zip")
 
-    if os.path.isdir(deploy_dir):
-        shutil.rmtree(deploy_dir, ignore_errors=True)
-    os.makedirs(deploy_dir, exist_ok=True)
-
-    for name in ("index.js",):
-        src = os.path.join(HERE, "src", name)
-        if os.path.isfile(src):
-            shutil.copy2(src, os.path.join(deploy_dir, name))
-
     node_modules = os.path.join(HERE, "node_modules")
-    if os.path.isdir(node_modules):
-        shutil.copytree(node_modules, os.path.join(deploy_dir, "node_modules"))
-    else:
+    if not os.path.isdir(node_modules):
         print("  未找到 node_modules，尝试安装依赖…")
         subprocess.run(
             ["npm", "install", "--omit=dev", "--silent"],
             cwd=HERE,
             check=False,
         )
-        if os.path.isdir(node_modules):
-            shutil.copytree(node_modules, os.path.join(deploy_dir, "node_modules"))
-        else:
+        if not os.path.isdir(node_modules):
             die("依赖安装失败，请手动执行 npm install 后重试")
 
-    if os.path.exists(zip_path):
-        os.remove(zip_path)
+    entries = []  # (绝对路径, zip 内相对路径)
+    for name in ("index.js", "package.json"):
+        src = os.path.join(HERE, "src", name)
+        if os.path.isfile(src):
+            entries.append((src, name))
+    if not any(arc == "index.js" for _, arc in entries):
+        die("src/index.js 不存在")
+
+    for root, dirs, files in os.walk(node_modules):
+        dirs[:] = [d for d in dirs if d not in (".bin", "__pycache__")]
+        for name in files:
+            if name.endswith((".md", ".map", ".ts")):
+                continue
+            full = os.path.join(root, name)
+            entries.append((full, os.path.relpath(full, HERE)))
+
     with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as archive:
-        for root, _, files in os.walk(deploy_dir):
-            for name in files:
-                full = os.path.join(root, name)
-                archive.write(full, os.path.relpath(full, deploy_dir))
+        for full, arc in entries:
+            archive.write(full, arc)
+
     size_mb = os.path.getsize(zip_path) / 1024 / 1024
-    print(f"  打包完成: function.zip ({size_mb:.1f} MB)")
+    print(f"  打包完成: function.zip ({size_mb:.1f} MB, {len(entries)} 个文件)")
     return zip_path
 
 
@@ -163,23 +210,38 @@ def main():
         code_b64 = base64.b64encode(handle.read()).decode("utf-8")
 
     env_vars = [
-        models.Variable(Key="COS_BUCKET", Value=bucket),
-        models.Variable(Key="COS_REGION", Value=REGION),
-        models.Variable(Key="ALLOWED_ORIGINS", Value=ALLOWED_ORIGINS),
+        variable("COS_BUCKET", bucket),
+        variable("COS_REGION", REGION),
+        variable("ALLOWED_ORIGINS", ALLOWED_ORIGINS),
     ]
-    if not update_only:
-        env_vars += [
-            models.Variable(Key="TENCENTCLOUD_SECRET_ID", Value=secret_id),
-            models.Variable(Key="TENCENTCLOUD_SECRET_KEY", Value=secret_key),
-        ]
+    # 注意：SCF 保留 TENCENTCLOUD_ 前缀，自定义变量必须用别的名字（函数代码读 PINE_ 前缀）。
+    # 创建和更新都要带上密钥：UpdateFunctionConfiguration 是整体替换环境变量，
+    # 更新时若只传 3 个业务变量会把 PINE_SECRET_* 抹掉。
+    env_vars += [
+        variable("PINE_SECRET_ID", secret_id),
+        variable("PINE_SECRET_KEY", secret_key),
+    ]
 
     exists = False
     try:
         req = models.GetFunctionRequest()
         req.FunctionName = FUNCTION_NAME
-        client.GetFunction(req)
-        exists = True
-        print(f"  函数已存在: {FUNCTION_NAME}")
+        resp = client.GetFunction(req)
+        status = getattr(resp, "Status", "") or ""
+        if status == "CreateFailed":
+            # 处于失败态的函数无法更新，只能删掉重建。常见原因是未开通 CLS 日志服务。
+            print(f"  函数处于 CreateFailed，删除后重建")
+            for reason in getattr(resp, "StatusReasons", []) or []:
+                msg = getattr(reason, "ErrorMessage", "") or ""
+                if msg:
+                    print(f"    原因: {msg}")
+            del_req = models.DeleteFunctionRequest()
+            del_req.FunctionName = FUNCTION_NAME
+            client.DeleteFunction(del_req)
+            time.sleep(2)
+        else:
+            exists = True
+            print(f"  函数已存在: {FUNCTION_NAME}（{status or '未知状态'}）")
     except Exception:  # noqa: BLE001
         exists = False
 
@@ -194,7 +256,7 @@ def main():
 
         cfg = models.UpdateFunctionConfigurationRequest()
         cfg.FunctionName = FUNCTION_NAME
-        cfg.Environment = models.Environment(Variables=env_vars)
+        cfg.Environment = env_object(env_vars)
         cfg.Timeout = 20
         cfg.MemorySize = 128
         try:
@@ -209,7 +271,7 @@ def main():
         req.Handler = "index.main_handler"
         req.Timeout = 20
         req.MemorySize = 128
-        req.Environment = models.Environment(Variables=env_vars)
+        req.Environment = env_object(env_vars)
         req.Code = models.Code()
         req.Code.ZipFile = code_b64
         client.CreateFunction(req)
@@ -236,28 +298,43 @@ def main():
                 "authType": "NONE",
             }
         )
+        wait_until_active(client, models)
         trig = models.CreateTriggerRequest()
         trig.FunctionName = FUNCTION_NAME
+        trig.TriggerName = "pine-http"          # 必传，否则报 MissingParameter
         trig.Type = "http"
         trig.TriggerDesc = trigger_desc
         trig.Qualifier = "$DEFAULT"
         try:
             client.CreateTrigger(trig)
             print("  ✅ 触发器已创建")
+            time.sleep(3)
         except Exception as exc:  # noqa: BLE001
             print(f"  自动创建失败: {exc}")
             print("  请在控制台手动添加：函数详情 → 触发管理 → 创建触发器 → HTTP 触发器")
 
     say("获取公网地址")
+    # 注意：GetFunctionAddress 返回的是「代码包下载地址」，不是触发器公网 URL。
+    # 真正的访问地址在 HTTP 触发器的 TriggerDesc.NetConfig.ExtranetUrl 里。
+    wait_until_active(client, models)
     url = ""
-    try:
-        addr_req = models.GetFunctionAddressRequest()
-        addr_req.FunctionName = FUNCTION_NAME
-        addr_req.Qualifier = "$DEFAULT"
-        addr_resp = client.GetFunctionAddress(addr_req)
-        url = getattr(addr_resp, "Url", "") or ""
-    except Exception as exc:  # noqa: BLE001
-        print(f"  自动获取失败: {exc}")
+    for attempt in range(5):
+        try:
+            list_req = models.ListTriggersRequest()
+            list_req.FunctionName = FUNCTION_NAME
+            resp = client.ListTriggers(list_req)
+            for trigger in resp.Triggers or []:
+                if getattr(trigger, "Type", "") != "http":
+                    continue
+                desc = json.loads(getattr(trigger, "TriggerDesc", "") or "{}")
+                url = (desc.get("NetConfig") or {}).get("ExtranetUrl", "") or ""
+                if url:
+                    break
+            if url:
+                break
+        except Exception as exc:  # noqa: BLE001
+            print(f"  第 {attempt + 1} 次获取失败: {exc}")
+        time.sleep(3)
 
     if url:
         print(f"\n  \033[32m{url}\033[0m")

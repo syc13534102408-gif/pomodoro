@@ -1,7 +1,9 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:pomodoro_app/main.dart';
+import 'package:pomodoro_app/pages/stats_page.dart';
 import 'package:pomodoro_app/src/engine.dart';
 import 'package:pomodoro_app/src/models.dart';
 
@@ -39,6 +41,30 @@ void main() {
       'settings': {'focus': 25},
     });
     expect(modern.goalMinutes, 150);
+  });
+
+  testWidgets('统计页渲染本月回顾（含记录与空态两种路径）', (tester) async {
+    final now = DateTime.now();
+    final withData = AppData(
+      records: [
+        FocusRecord(
+          taskName: '数学真题',
+          minutes: 25,
+          dayKey:
+              '${now.year}-${now.month.toString().padLeft(2, '0')}-01',
+          status: RecordStatus.completed,
+          at: now.subtract(const Duration(days: 1)),
+        ),
+      ],
+      settings: const TimerSettings(focus: 25, short: 5, long: 15),
+    );
+    await tester.pumpWidget(MaterialApp(home: StatsPage(data: withData)));
+    expect(find.text('本月回顾'), findsOneWidget);
+    expect(find.text('本月累计'), findsOneWidget);
+
+    await tester.pumpWidget(MaterialApp(home: StatsPage(data: AppData())));
+    expect(find.text('本月回顾'), findsOneWidget);
+    expect(find.text('本月还没有专注记录'), findsOneWidget);
   });
 
   test('计划时长到点后继续累计，不自动结束', () {

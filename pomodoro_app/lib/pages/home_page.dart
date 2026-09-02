@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import '../src/cloud_auto.dart';
 import '../src/cloud_sync.dart';
 import '../src/engine.dart';
+import '../src/menu_bar_timer.dart';
 import '../src/models.dart';
 import '../src/notifications.dart';
 import '../src/sheets.dart';
@@ -112,7 +113,28 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     next = TimerEngine.syncMinutes(next, now);
     setState(() => _data = next);
     _persist(force: forcePersist);
+    // macOS 菜单栏剩余时间：每秒跟随本地计时走表。
+    _syncMenuBar(next, now);
     unawaited(_syncForeground());
+  }
+
+  void _syncMenuBar(AppData data, DateTime now) {
+    if (!_desktop) return;
+    final view = SessionView.of(data, now);
+    if (view == null || !view.running) {
+      MenuBarTimer.show(running: false, title: '');
+      return;
+    }
+    final label = switch (view.mode) {
+      SessionMode.focus => '专注',
+      SessionMode.shortBreak => '短休',
+      SessionMode.longBreak => '长休',
+    };
+    MenuBarTimer.show(
+      running: true,
+      // clockText 超时时自带 '+' 前缀，直接展示。
+      title: view.targetReached ? view.clockText : '$label ${view.clockText}',
+    );
   }
 
   void _persist({bool force = false}) {
@@ -336,8 +358,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             child: CallbackShortcuts(
               bindings: {
                 const SingleActivator(LogicalKeyboardKey.keyR): _desktopReset,
-                const SingleActivator(LogicalKeyboardKey.space):
-                    _desktopToggle,
+                const SingleActivator(LogicalKeyboardKey.space): _desktopToggle,
               },
               child: IndexedStack(
                 index: _desktopTab,

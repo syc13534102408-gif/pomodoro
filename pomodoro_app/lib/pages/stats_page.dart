@@ -239,6 +239,8 @@ class StatsPage extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 14),
+          _MonthlyReview(data: data),
+          const SizedBox(height: 14),
           PanelCard(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -310,6 +312,147 @@ class StatsPage extends StatelessWidget {
       if (value <= step * 0.8) return step;
     }
     return (value * 1.25);
+  }
+}
+
+/// 本月回顾：累计/次数/日均 + 本月逐日条 + 按事件分布。
+/// 直接在统计页内计算，不改动 engine 的周聚合逻辑。
+class _MonthlyReview extends StatelessWidget {
+  const _MonthlyReview({required this.data});
+
+  final AppData data;
+
+  @override
+  Widget build(BuildContext context) {
+    final now = DateTime.now();
+    final monthRecords = data.records.where((record) =>
+        record.counted &&
+        record.at.year == now.year &&
+        record.at.month == now.month);
+    final minutes = monthRecords.fold<double>(0, (sum, r) => sum + r.minutes);
+    final count = monthRecords.length;
+    final activeDays = monthRecords.map((r) => r.at.day).toSet().length;
+    final daysInMonth = DateTime(now.year, now.month + 1, 0).day;
+    final dayValues = List<double>.filled(daysInMonth, 0);
+    final byTask = <String, double>{};
+    for (final record in monthRecords) {
+      dayValues[record.at.day - 1] += record.minutes;
+      byTask[record.taskName] = (byTask[record.taskName] ?? 0) + record.minutes;
+    }
+    final monthName = '${now.year}年${now.month}月';
+    final peak = dayValues.reduce((a, b) => a > b ? a : b);
+    final tasks = byTask.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+    final taskPeak = tasks.isEmpty ? 1.0 : tasks.first.value;
+
+    return PanelCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SectionHeader(
+            title: '本月回顾',
+            trailing: Text(
+              monthName,
+              style: const TextStyle(color: PineColors.muted, fontSize: 11),
+            ),
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Expanded(
+                child: MetricTile(
+                  value: formatMinutes(minutes),
+                  label: '本月累计',
+                  accent: PineColors.tomato,
+                ),
+              ),
+              Expanded(
+                child: MetricTile(
+                  value: '$count 次',
+                  label: '完成次数',
+                  accent: PineColors.gold,
+                ),
+              ),
+              Expanded(
+                child: MetricTile(
+                  value:
+                      '${(minutes / (now.day == 0 ? 1 : now.day)).round()} 分',
+                  label: '日均(本月)',
+                  accent: PineColors.mint,
+                ),
+              ),
+              Expanded(
+                child: MetricTile(
+                  value: '$activeDays 天',
+                  label: '专注天数',
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Text(
+            '$monthName 逐日',
+            style: const TextStyle(color: PineColors.muted, fontSize: 11),
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            height: 56,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                for (var day = 0; day < daysInMonth; day++) ...[
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 1),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: dayValues[day] > 0
+                              ? PineColors.tomato
+                              : PineColors.line.withValues(alpha: 0.35),
+                          borderRadius: BorderRadius.circular(1.5),
+                        ),
+                        height:
+                            peak <= 0 ? 3 : 4 + (dayValues[day] / peak) * 48,
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          if (tasks.isNotEmpty) ...[
+            const SizedBox(height: 18),
+            Text(
+              '$monthName 按事件',
+              style: const TextStyle(color: PineColors.muted, fontSize: 11),
+            ),
+            const SizedBox(height: 10),
+            for (final entry in tasks) ...[
+              _TaskBar(
+                name: entry.key,
+                minutes: entry.value,
+                max: taskPeak,
+                color: _colorFor(entry.key),
+              ),
+              const SizedBox(height: 8),
+            ],
+          ] else ...[
+            const SizedBox(height: 14),
+            const Text(
+              '本月还没有专注记录',
+              style: TextStyle(color: PineColors.muted, fontSize: 12),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Color _colorFor(String taskName) {
+    for (final task in data.tasks) {
+      if (task.name == taskName) return task.swatch;
+    }
+    return PineColors.muted;
   }
 }
 

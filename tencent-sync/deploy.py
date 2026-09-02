@@ -188,6 +188,25 @@ def confirm_bucket(secret_id, secret_key):
     return COS_BUCKET
 
 
+def detach_cls_logs(client):
+    """关闭函数日志投递到 CLS。
+
+    函数日志投递到 CLS 后，日志主题即使几乎无写入也会持续产生费用
+    （分区/存储按天计费，无免费额度），本服务不需要 CLS 排障，直接关闭。
+    2026-09-01 实测：UpdateFunctionConfiguration 接受顶层 ClsLogsetId /
+    ClsTopicId 传空字符串来关闭投递；旧版 SDK 模型没有这两个字段，
+    因此用 call_json 裸调。失败不中断部署。
+    """
+    try:
+        client.call_json(
+            "UpdateFunctionConfiguration",
+            {"FunctionName": FUNCTION_NAME, "ClsLogsetId": "", "ClsTopicId": ""},
+        )
+        print("  ✅ 已关闭日志投递到 CLS（不再产生日志服务费用）")
+    except Exception as exc:  # noqa: BLE001
+        print(f"  （关闭日志投递失败，可在控制台函数配置里手动关闭: {exc}）")
+
+
 def main():
     update_only = "--update" in sys.argv
     secret_id, secret_key = load_credentials()
@@ -317,6 +336,8 @@ def main():
     # 注意：GetFunctionAddress 返回的是「代码包下载地址」，不是触发器公网 URL。
     # 真正的访问地址在 HTTP 触发器的 TriggerDesc.NetConfig.ExtranetUrl 里。
     wait_until_active(client, models)
+    detach_cls_logs(client)
+    time.sleep(3)
     url = ""
     for attempt in range(5):
         try:

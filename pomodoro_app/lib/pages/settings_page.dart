@@ -39,7 +39,7 @@ class _SettingsPageState extends State<SettingsPage> {
     _focus = TextEditingController(text: widget.data.settings.focus.toString());
     _short = TextEditingController(text: widget.data.settings.short.toString());
     _long = TextEditingController(text: widget.data.settings.long.toString());
-    _goal = TextEditingController(text: widget.data.goalTarget.toString());
+    _goal = TextEditingController(text: widget.data.goalMinutes.toString());
     _weekGoal = TextEditingController(text: widget.data.weekGoal.toString());
     _worker = TextEditingController(text: CloudSync.defaultBaseUrl);
   }
@@ -72,7 +72,7 @@ class _SettingsPageState extends State<SettingsPage> {
         short: read(_short, 10, 1, 120),
         long: read(_long, 25, 1, 180),
       ),
-      goalTarget: read(_goal, 8, 1, 99),
+      goalMinutes: read(_goal, 200, 1, 999),
       weekGoal: read(_weekGoal, 20, 1, 999),
     );
     _emit(next);
@@ -203,11 +203,14 @@ class _SettingsPageState extends State<SettingsPage> {
     final code = data.sync.deviceCode;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('设置')),
+      appBar: AppBar(title: const Text('偏好设置')),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(18, 8, 18, 28),
         children: [
-          const SectionHeader(title: '计时'),
+          const _SettingsHeading(
+            icon: Icons.timer_outlined,
+            title: '计时与目标',
+          ),
           const SizedBox(height: 8),
           PanelCard(
             child: Column(
@@ -224,7 +227,7 @@ class _SettingsPageState extends State<SettingsPage> {
                 const SizedBox(height: 12),
                 Row(
                   children: [
-                    Expanded(child: _numberField('今日目标（次）', _goal)),
+                    Expanded(child: _numberField('今日目标（分钟）', _goal)),
                     const SizedBox(width: 10),
                     Expanded(child: _numberField('本周目标（次）', _weekGoal)),
                   ],
@@ -241,7 +244,10 @@ class _SettingsPageState extends State<SettingsPage> {
             ),
           ),
           const SizedBox(height: 20),
-          const SectionHeader(title: '提醒'),
+          const _SettingsHeading(
+            icon: Icons.notifications_none_rounded,
+            title: '提醒',
+          ),
           const SizedBox(height: 8),
           PanelCard(
             child: Column(
@@ -292,10 +298,12 @@ class _SettingsPageState extends State<SettingsPage> {
                   const Divider(),
                   ListTile(
                     contentPadding: EdgeInsets.zero,
-                    title: const Text('后台常驻通知',
-                        style: TextStyle(color: PineColors.paper, fontSize: 14)),
-                    subtitle: const Text('OPPO 等机型需要允许后台运行与电池优化放行',
-                        style: TextStyle(color: PineColors.muted, fontSize: 11)),
+                    title: const Text('锁屏剩余时间',
+                        style:
+                            TextStyle(color: PineColors.paper, fontSize: 14)),
+                    subtitle: const Text('计时运行时显示；OPPO 需允许锁屏通知与后台运行',
+                        style:
+                            TextStyle(color: PineColors.muted, fontSize: 11)),
                     trailing: const Icon(Icons.chevron_right, size: 18),
                     onTap: () => ForegroundRunner.requestBatteryExemption(),
                   ),
@@ -304,7 +312,10 @@ class _SettingsPageState extends State<SettingsPage> {
             ),
           ),
           const SizedBox(height: 20),
-          const SectionHeader(title: '云端同步'),
+          const _SettingsHeading(
+            icon: Icons.cloud_outlined,
+            title: '云端同步',
+          ),
           const SizedBox(height: 8),
           PanelCard(
             child: Column(
@@ -328,7 +339,8 @@ class _SettingsPageState extends State<SettingsPage> {
                       onPressed: code.isEmpty
                           ? null
                           : () async {
-                              await Clipboard.setData(ClipboardData(text: code));
+                              await Clipboard.setData(
+                                  ClipboardData(text: code));
                               if (!context.mounted) return;
                               if (!mounted) return;
                               if (mounted) {
@@ -355,16 +367,14 @@ class _SettingsPageState extends State<SettingsPage> {
                   children: [
                     Expanded(
                       child: OutlinedButton(
-                        onPressed:
-                            _syncBusy ? null : () => _runSync(_upload),
+                        onPressed: _syncBusy ? null : () => _runSync(_upload),
                         child: const Text('上传本机数据'),
                       ),
                     ),
                     const SizedBox(width: 10),
                     Expanded(
                       child: OutlinedButton(
-                        onPressed:
-                            _syncBusy ? null : () => _runSync(_restore),
+                        onPressed: _syncBusy ? null : () => _runSync(_restore),
                         child: const Text('从云端恢复'),
                       ),
                     ),
@@ -378,7 +388,8 @@ class _SettingsPageState extends State<SettingsPage> {
                   const SizedBox(height: 10),
                   Text(
                     _syncMessage,
-                    style: const TextStyle(color: PineColors.gold, fontSize: 12),
+                    style:
+                        const TextStyle(color: PineColors.gold, fontSize: 12),
                   ),
                 ],
                 const SizedBox(height: 8),
@@ -395,7 +406,10 @@ class _SettingsPageState extends State<SettingsPage> {
             ),
           ),
           const SizedBox(height: 20),
-          const SectionHeader(title: '数据'),
+          const _SettingsHeading(
+            icon: Icons.storage_outlined,
+            title: '本机数据',
+          ),
           const SizedBox(height: 8),
           PanelCard(
             child: ListTile(
@@ -413,7 +427,8 @@ class _SettingsPageState extends State<SettingsPage> {
     );
   }
 
-  Widget _numberField(String label, TextEditingController controller) => TextField(
+  Widget _numberField(String label, TextEditingController controller) =>
+      TextField(
         controller: controller,
         keyboardType: TextInputType.number,
         style: const TextStyle(color: PineColors.ink, fontSize: 14),
@@ -422,5 +437,28 @@ class _SettingsPageState extends State<SettingsPage> {
           isDense: true,
           suffixText: label.contains('次') ? null : '分',
         ),
+      );
+}
+
+class _SettingsHeading extends StatelessWidget {
+  const _SettingsHeading({required this.icon, required this.title});
+
+  final IconData icon;
+  final String title;
+
+  @override
+  Widget build(BuildContext context) => Row(
+        children: [
+          Icon(icon, size: 17, color: PineColors.gold),
+          const SizedBox(width: 8),
+          Text(
+            title,
+            style: const TextStyle(
+              color: PineColors.ink,
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
       );
 }

@@ -23,39 +23,52 @@ class RingTimer extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final size = math.min(constraints.maxWidth, constraints.maxHeight);
-        return SizedBox(
-          width: size,
-          height: size,
-          child: CustomPaint(
-            painter: _RingPainter(
-              progress: view.progress,
-              accent: accent,
-              overtime: view.targetReached,
-            ),
-            child: Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    view.clockText,
-                    style: TextStyle(
-                      color: PineColors.ink,
-                      fontSize: size * 0.20,
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: 1.5,
-                      fontFeatures: const [FontFeature.tabularFigures()],
+        return Semantics(
+          label: '$caption，${view.clockText}',
+          child: SizedBox(
+            width: size,
+            height: size,
+            child: CustomPaint(
+              painter: _RingPainter(
+                progress: view.progress,
+                accent: accent,
+                overtime: view.targetReached,
+              ),
+              child: Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 180),
+                      transitionBuilder: (child, animation) => FadeTransition(
+                        opacity: animation,
+                        child: child,
+                      ),
+                      child: Text(
+                        view.clockText,
+                        key: ValueKey(view.clockText),
+                        style: TextStyle(
+                          color: PineColors.ink,
+                          fontSize: size * 0.205,
+                          height: 1,
+                          fontWeight: FontWeight.w300,
+                          letterSpacing: 0,
+                          fontFeatures: const [FontFeature.tabularFigures()],
+                        ),
+                      ),
                     ),
-                  ),
-                  SizedBox(height: size * 0.035),
-                  Text(
-                    caption,
-                    style: TextStyle(
-                      color: PineColors.muted,
-                      fontSize: size * 0.062,
-                      letterSpacing: 1.2,
+                    SizedBox(height: size * 0.035),
+                    Text(
+                      caption,
+                      style: TextStyle(
+                        color: PineColors.muted,
+                        fontSize: size * 0.062,
+                        letterSpacing: 0,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
@@ -79,7 +92,7 @@ class _RingPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
-    final radius = size.width / 2 - 12;
+    final radius = size.width / 2 - 15;
     const start = -math.pi / 2;
 
     canvas.drawCircle(
@@ -87,13 +100,13 @@ class _RingPainter extends CustomPainter {
       radius,
       Paint()
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 10
-        ..color = PineColors.ink.withValues(alpha: 0.10),
+        ..strokeWidth = 2
+        ..color = PineColors.ink.withValues(alpha: 0.13),
     );
 
     final arcPaint = Paint()
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 10
+      ..strokeWidth = 7
       ..strokeCap = StrokeCap.round
       ..color = accent;
 
@@ -120,6 +133,16 @@ class _RingPainter extends CustomPainter {
       false,
       arcPaint,
     );
+
+    if (progress > 0) {
+      final angle = start + math.pi * 2 * progress.clamp(0.0, 1.0);
+      final marker = Offset(
+        center.dx + radius * math.cos(angle),
+        center.dy + radius * math.sin(angle),
+      );
+      canvas.drawCircle(marker, 4.5, Paint()..color = PineColors.deep);
+      canvas.drawCircle(marker, 2.5, Paint()..color = accent);
+    }
   }
 
   @override
@@ -144,21 +167,28 @@ class ModeSwitcher extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        for (final mode in SessionMode.values) ...[
-          Expanded(
-            child: _ModeChip(
-              label: mode.label,
-              minutes: minutesFor(mode),
-              selected: mode == current,
-              accent: mode.color,
-              onTap: () => onChanged(mode),
+    return Container(
+      height: 42,
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(
+        color: PineColors.dark,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: PineColors.line),
+      ),
+      child: Row(
+        children: [
+          for (final mode in SessionMode.values)
+            Expanded(
+              child: _ModeChip(
+                label: mode.label,
+                minutes: minutesFor(mode),
+                selected: mode == current,
+                accent: mode.color,
+                onTap: () => onChanged(mode),
+              ),
             ),
-          ),
-          if (mode != SessionMode.longBreak) const SizedBox(width: 8),
         ],
-      ],
+      ),
     );
   }
 }
@@ -181,34 +211,37 @@ class _ModeChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return InkWell(
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(6),
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 160),
-        padding: const EdgeInsets.symmetric(vertical: 10),
+        height: 34,
+        alignment: Alignment.center,
         decoration: BoxDecoration(
-          color: selected ? accent.withValues(alpha: 0.16) : PineColors.dark,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: selected ? accent.withValues(alpha: 0.75) : PineColors.line,
-          ),
+          color: selected ? PineColors.raised : Colors.transparent,
+          borderRadius: BorderRadius.circular(6),
         ),
-        child: Column(
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Text(
               label,
+              maxLines: 1,
               style: TextStyle(
                 color: selected ? PineColors.ink : PineColors.muted,
-                fontSize: 13,
+                fontSize: 12,
                 fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+                letterSpacing: 0,
               ),
             ),
-            const SizedBox(height: 2),
+            const SizedBox(width: 5),
             Text(
-              '$minutes 分',
+              '$minutes',
+              maxLines: 1,
               style: TextStyle(
                 color: selected ? accent : PineColors.muted,
                 fontSize: 11,
+                letterSpacing: 0,
               ),
             ),
           ],
@@ -233,7 +266,7 @@ class SectionHeader extends StatelessWidget {
             style: const TextStyle(
               color: PineColors.muted,
               fontSize: 12,
-              letterSpacing: 1.4,
+              letterSpacing: 0,
               fontWeight: FontWeight.w600,
             ),
           ),
@@ -264,20 +297,24 @@ class MetricTile extends StatelessWidget {
             value,
             style: TextStyle(
               color: accent ?? PineColors.ink,
-              fontSize: 17,
+              fontSize: 18,
               fontWeight: FontWeight.w600,
               fontFeatures: const [FontFeature.tabularFigures()],
             ),
           ),
           const SizedBox(height: 2),
-          Text(label, style: const TextStyle(color: PineColors.muted, fontSize: 11)),
+          Text(label,
+              style: const TextStyle(color: PineColors.muted, fontSize: 11)),
         ],
       );
 }
 
 /// 通用分组卡片。
 class PanelCard extends StatelessWidget {
-  const PanelCard({super.key, required this.child, this.padding = const EdgeInsets.all(14)});
+  const PanelCard(
+      {super.key,
+      required this.child,
+      this.padding = const EdgeInsets.all(14)});
 
   final Widget child;
   final EdgeInsetsGeometry padding;
@@ -288,24 +325,21 @@ class PanelCard extends StatelessWidget {
         padding: padding,
         decoration: BoxDecoration(
           color: PineColors.dark,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(8),
           border: Border.all(color: PineColors.line),
         ),
         child: child,
       );
 }
 
-/// 分钟数格式化：整数显示整数，否则保留一位。
+/// 分钟数格式化：统一保留到整数分钟。
 String formatMinutes(double minutes) {
-  if (minutes >= 60) {
-    final hours = minutes ~/ 60;
-    final rest = minutes - hours * 60;
-    final restText = rest == 0 ? '' : ' ${formatMinutes(rest)}分';
+  final total = minutes.round();
+  if (total >= 60) {
+    final hours = total ~/ 60;
+    final rest = total - hours * 60;
+    final restText = rest == 0 ? '' : ' $rest分';
     return '$hours 小时$restText';
   }
-  final rounded = (minutes * 10).round() / 10;
-  if (rounded == rounded.roundToDouble()) {
-    return '${rounded.toStringAsFixed(0)} 分钟';
-  }
-  return '${rounded.toStringAsFixed(1)} 分钟';
+  return '$total 分钟';
 }

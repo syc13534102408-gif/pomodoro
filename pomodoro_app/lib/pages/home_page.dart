@@ -129,7 +129,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     final body = mode == SessionMode.focus
         ? '这一轮计划时长已到，继续专注会累计更多时长。'
         : '休息结束，可以开始下一轮专注。';
-    if (_data.notifyEnabled) unawaited(Notifier.alert(title: title, body: body));
+    if (_data.notifyEnabled) {
+      unawaited(Notifier.alert(title: title, body: body));
+    }
     if (_data.soundEnabled) unawaited(Notifier.chime());
   }
 
@@ -145,16 +147,19 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         }
         return;
       }
-      final title = view.mode.isFocus
-          ? '专注中 · ${_data.selectedTask.name}'
-          : '${view.mode.label}进行中';
-      final text = view.targetReached
-          ? '已超出计划时长 ${view.clockText}'
-          : '剩余 ${view.clockText}';
-      final key = '$title|$text';
+      // 只在状态切换（模式/运行/超时）时更新通知：倒计时由系统 Chronometer
+      // 走表，逐秒重发反而会与系统渲染互相覆盖。
+      final key =
+          '${_data.activeSession?.mode.key}|${view.running}|${view.targetReached}';
       if (key == _foregroundKey) return;
       _foregroundKey = key;
-      await ForegroundRunner.start(title: title, text: text);
+      final active = _data.activeSession;
+      await ForegroundRunner.start(
+        remainingTime: view.clockText,
+        deadlineMs: active?.deadline?.millisecondsSinceEpoch,
+        overtimeStartedAtMs: active?.overtimeStartedAt?.millisecondsSinceEpoch,
+        targetReached: view.targetReached,
+      );
     } catch (_) {
       // 前台服务不可用时不应影响计时。
     } finally {
@@ -191,8 +196,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         at: now,
       );
       final count = StatsView.of(next, now).todayCount;
-      final breakMode =
-          count > 0 && count % 4 == 0 ? SessionMode.longBreak : SessionMode.shortBreak;
+      final breakMode = count > 0 && count % 4 == 0
+          ? SessionMode.longBreak
+          : SessionMode.shortBreak;
       next = TimerEngine.start(next, breakMode, now);
     } else {
       next = TimerEngine.complete(next, now);
@@ -261,38 +267,49 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
     return Scaffold(
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(18, 6, 18, 12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              _header(),
-              const SizedBox(height: 6),
-              Expanded(
-                flex: 5,
-                child: Center(
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxHeight: 268, maxWidth: 300),
-                    child: RingTimer(view: view, caption: _caption(session, view)),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final compact = constraints.maxHeight < 720;
+            return Padding(
+              padding: EdgeInsets.fromLTRB(18, compact ? 2 : 8, 18, 10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _header(),
+                  SizedBox(height: compact ? 6 : 12),
+                  ModeSwitcher(
+                    current: view.mode,
+                    minutesFor: _data.settings.forMode,
+                    onChanged: _switchMode,
                   ),
-                ),
+                  SizedBox(height: compact ? 8 : 14),
+                  _taskPicker(),
+                  Expanded(
+                    flex: compact ? 4 : 5,
+                    child: Center(
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(
+                          maxHeight: compact ? 210 : 280,
+                          maxWidth: compact ? 232 : 292,
+                        ),
+                        child: RingTimer(
+                          view: view,
+                          caption: _caption(session, view),
+                        ),
+                      ),
+                    ),
+                  ),
+                  _controls(session, view),
+                  SizedBox(height: compact ? 8 : 12),
+                  _metrics(stats),
+                  SizedBox(height: compact ? 5 : 8),
+                  _todoRow(),
+                  SizedBox(height: compact ? 4 : 8),
+                  Expanded(flex: compact ? 2 : 3, child: _recent()),
+                ],
               ),
-              const SizedBox(height: 10),
-              ModeSwitcher(
-                current: view.mode,
-                minutesFor: _data.settings.forMode,
-                onChanged: _switchMode,
-              ),
-              const SizedBox(height: 12),
-              _controls(session, view),
-              const SizedBox(height: 12),
-              _metrics(stats),
-              const SizedBox(height: 10),
-              _todoRow(),
-              const SizedBox(height: 8),
-              Expanded(flex: 3, child: _recent()),
-            ],
-          ),
+            );
+          },
         ),
       ),
     );
@@ -306,94 +323,156 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   }
 
   Widget _header() {
-    final task = _data.selectedTask;
-    return Row(
-      children: [
-        InkWell(
-          borderRadius: BorderRadius.circular(10),
-          onTap: () => showTaskSheet(context, data: _data, onChanged: _replace),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
-            child: Row(
-              children: [
-                Container(
-                  width: 10,
-                  height: 10,
-                  decoration: BoxDecoration(color: task.swatch, shape: BoxShape.circle),
-                ),
-                const SizedBox(width: 8),
-                ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 150),
-                  child: Text(
-                    task.name,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: PineColors.ink,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 2),
-                const Icon(Icons.expand_more, size: 18, color: PineColors.muted),
-              ],
+    return SizedBox(
+      height: 44,
+      child: Row(
+        children: [
+          Container(
+            width: 30,
+            height: 30,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: PineColors.tomato,
+              borderRadius: BorderRadius.circular(7),
+            ),
+            child: const Text(
+              '松',
+              style: TextStyle(
+                color: PineColors.deep,
+                fontSize: 15,
+                fontWeight: FontWeight.w800,
+              ),
             ),
           ),
+          const SizedBox(width: 10),
+          const Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '松果',
+                style: TextStyle(
+                  color: PineColors.ink,
+                  fontSize: 17,
+                  height: 1,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              SizedBox(height: 4),
+              Text(
+                '专注时光',
+                style: TextStyle(color: PineColors.muted, fontSize: 10),
+              ),
+            ],
+          ),
+          const Spacer(),
+          IconButton(
+            tooltip: '统计详情',
+            icon: const Icon(Icons.bar_chart_rounded),
+            onPressed: _openStats,
+          ),
+          IconButton(
+            tooltip: '设置',
+            icon: const Icon(Icons.tune_rounded),
+            onPressed: _openSettings,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _taskPicker() {
+    final task = _data.selectedTask;
+    return Align(
+      alignment: Alignment.center,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(8),
+        onTap: () => showTaskSheet(context, data: _data, onChanged: _replace),
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 240),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: PineColors.dark,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: PineColors.line),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 4,
+                height: 18,
+                decoration: BoxDecoration(
+                  color: task.swatch,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Flexible(
+                child: Text(
+                  task.name,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: PineColors.ink,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 2),
+              const Icon(Icons.unfold_more_rounded,
+                  size: 15, color: PineColors.muted),
+            ],
+          ),
         ),
-        const Spacer(),
-        IconButton(
-          tooltip: '统计详情',
-          icon: const Icon(Icons.insights_outlined),
-          onPressed: _openStats,
-        ),
-        IconButton(
-          tooltip: '设置',
-          icon: const Icon(Icons.settings_outlined),
-          onPressed: _openSettings,
-        ),
-      ],
+      ),
     );
   }
 
   Widget _controls(ActiveSession? session, SessionView view) {
-    final primary = session == null
-        ? '开始'
-        : (session.running ? '暂停' : '继续');
-    final confirm = session == null
-        ? '直接记录'
-        : (view.mode.isFocus ? '完成并开始休息' : '结束休息');
+    final primary = session == null ? '开始' : (session.running ? '暂停' : '继续');
+    final confirm =
+        session == null ? '直接记录' : (view.mode.isFocus ? '完成并开始休息' : '结束休息');
 
     return Row(
       children: [
         Expanded(
           flex: 4,
-          child: FilledButton(
+          child: FilledButton.icon(
             onPressed: _toggleRun,
             style: FilledButton.styleFrom(
               backgroundColor: view.mode.color,
               foregroundColor: PineColors.deep,
             ),
-            child: Text(primary),
+            icon: Icon(
+              session?.running == true
+                  ? Icons.pause_rounded
+                  : Icons.play_arrow_rounded,
+              size: 20,
+            ),
+            label: Text(primary),
           ),
         ),
         const SizedBox(width: 8),
         Expanded(
           flex: 6,
-          child: OutlinedButton(
+          child: OutlinedButton.icon(
             onPressed: _confirm,
             style: OutlinedButton.styleFrom(
               foregroundColor: PineColors.gold,
               side: const BorderSide(color: PineColors.gold),
-              minimumSize: const Size.fromHeight(46),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              minimumSize: const Size.fromHeight(50),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8)),
             ),
-            child: Text(confirm, style: const TextStyle(fontSize: 14)),
+            icon: const Icon(Icons.check_rounded, size: 18),
+            label: Text(confirm, style: const TextStyle(fontSize: 13)),
           ),
         ),
         const SizedBox(width: 8),
         SizedBox(
-          height: 46,
-          width: 46,
+          height: 50,
+          width: 50,
           child: IconButton.filledTonal(
             tooltip: '重置（不记录）',
             style: IconButton.styleFrom(
@@ -409,19 +488,23 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   }
 
   Widget _metrics(StatsView stats) {
-    final goal = _data.goalTarget <= 0 ? 1 : _data.goalTarget;
-    final progress = (stats.todayCount / goal).clamp(0.0, 1.0);
-    return PanelCard(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+    final goal = _data.goalMinutes <= 0 ? 1 : _data.goalMinutes;
+    final progress = (stats.todayMinutes / goal).clamp(0.0, 1.0);
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 11),
+      decoration: const BoxDecoration(
+        border:
+            Border.symmetric(horizontal: BorderSide(color: PineColors.line)),
+      ),
       child: Column(
         children: [
           Row(
             children: [
               const Text('今日目标',
-                  style: TextStyle(color: PineColors.muted, fontSize: 12)),
+                  style: TextStyle(color: PineColors.muted, fontSize: 11)),
               const Spacer(),
               Text(
-                '${stats.todayCount} / ${_data.goalTarget} 次',
+                '${stats.todayMinutes.round()} / ${_data.goalMinutes} 分钟',
                 style: const TextStyle(color: PineColors.ink, fontSize: 13),
               ),
             ],
@@ -436,7 +519,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               valueColor: const AlwaysStoppedAnimation(PineColors.tomato),
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 10),
           Row(
             children: [
               Expanded(
@@ -470,18 +553,18 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     final items = _data.todos[dateKey(DateTime.now())] ?? [];
     final done = items.where((item) => item.done).length;
     return InkWell(
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(8),
       onTap: () => showTodoSheet(context, data: _data, onChanged: _replace),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
         decoration: BoxDecoration(
-          color: PineColors.dark,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: PineColors.line),
+          color: Colors.transparent,
+          borderRadius: BorderRadius.circular(8),
         ),
         child: Row(
           children: [
-            const Icon(Icons.checklist, size: 17, color: PineColors.mint),
+            const Icon(Icons.checklist_rounded,
+                size: 17, color: PineColors.mint),
             const SizedBox(width: 9),
             const Text('今日清单',
                 style: TextStyle(color: PineColors.paper, fontSize: 13)),
@@ -499,14 +582,16 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   }
 
   Widget _recent() {
-    final items = _data.records.where((record) => record.counted).take(30).toList();
+    final items =
+        _data.records.where((record) => record.counted).take(30).toList();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         SectionHeader(
           title: '最近完成',
           trailing: TextButton.icon(
-            onPressed: () => showManualSheet(context, data: _data, onChanged: _replace),
+            onPressed: () =>
+                showManualSheet(context, data: _data, onChanged: _replace),
             icon: const Icon(Icons.add, size: 15),
             label: const Text('补记', style: TextStyle(fontSize: 12)),
           ),
@@ -533,15 +618,18 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                       leading: Container(
                         width: 8,
                         height: 8,
-                        decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+                        decoration:
+                            BoxDecoration(color: color, shape: BoxShape.circle),
                       ),
                       title: Text(
                         record.taskName,
-                        style: const TextStyle(color: PineColors.paper, fontSize: 13),
+                        style: const TextStyle(
+                            color: PineColors.paper, fontSize: 13),
                       ),
                       subtitle: Text(
                         '${record.status.label} · ${record.at.hour.toString().padLeft(2, '0')}:${record.at.minute.toString().padLeft(2, '0')}',
-                        style: const TextStyle(color: PineColors.muted, fontSize: 11),
+                        style: const TextStyle(
+                            color: PineColors.muted, fontSize: 11),
                       ),
                       trailing: Row(
                         mainAxisSize: MainAxisSize.min,
@@ -580,7 +668,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('删除这条记录？'),
-        content: Text('「${record.taskName}」${formatMinutes(record.minutes)} 会从统计中移除。'),
+        content: Text(
+            '「${record.taskName}」${formatMinutes(record.minutes)} 会从统计中移除。'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),

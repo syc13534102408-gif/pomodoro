@@ -24,6 +24,23 @@ void main() {
     expect(find.text('专注'), findsWidgets);
   });
 
+  test('旧版今日目标（次）自动迁移为专注分钟', () {
+    // 旧数据只有 goalTarget（次），按 次数 × 专注时长 换算。
+    final legacy = AppData.fromMap(<String, dynamic>{
+      'goalTarget': 8,
+      'settings': {'focus': 25, 'short': 5, 'long': 15},
+    });
+    expect(legacy.goalMinutes, 200);
+
+    // 新数据优先，旧字段被忽略。
+    final modern = AppData.fromMap(<String, dynamic>{
+      'goalMinutes': 150,
+      'goalTarget': 8,
+      'settings': {'focus': 25},
+    });
+    expect(modern.goalMinutes, 150);
+  });
+
   test('计划时长到点后继续累计，不自动结束', () {
     final start = DateTime(2026, 8, 29, 9, 0);
     var data = TimerEngine.start(_base(), SessionMode.focus, start);

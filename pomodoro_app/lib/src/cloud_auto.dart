@@ -34,7 +34,7 @@ String cloudFingerprint(AppData data) {
     },
     'settings': data.settings.toMap(),
     'selected': data.selectedIndex,
-    'goalTarget': data.goalTarget,
+    'goalMinutes': data.goalMinutes,
     'weekGoal': data.weekGoal,
     'soundEnabled': data.soundEnabled,
     'notifyEnabled': data.notifyEnabled,

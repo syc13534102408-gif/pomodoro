@@ -4,17 +4,18 @@ import 'package:flutter/material.dart';
 class PineColors {
   const PineColors._();
 
-  static const deep = Color(0xFF141A19);
-  static const dark = Color(0xFF1D2423);
-  static const panel = Color(0xFF212A28);
-  static const ink = Color(0xFFE9E4D7);
-  static const paper = Color(0xFFD7D1C1);
-  static const muted = Color(0xFFA8AEA5);
-  static const tomato = Color(0xFFE8664C);
-  static const mint = Color(0xFF80B8A0);
-  static const gold = Color(0xFFE1B75D);
-  static const line = Color(0x2BE9E4D7);
-  static const lineStrong = Color(0x59E9E4D7);
+  static const deep = Color(0xFF101513);
+  static const dark = Color(0xFF181F1C);
+  static const panel = Color(0xFF202824);
+  static const raised = Color(0xFF29322E);
+  static const ink = Color(0xFFF4F0E6);
+  static const paper = Color(0xFFD9D7CE);
+  static const muted = Color(0xFF939C96);
+  static const tomato = Color(0xFFFF765D);
+  static const mint = Color(0xFF79C7A4);
+  static const gold = Color(0xFFF0BC62);
+  static const line = Color(0x24F4F0E6);
+  static const lineStrong = Color(0x45F4F0E6);
 }
 
 /// 任务可选配色，取自网页端调色板。
@@ -39,9 +40,9 @@ ThemeData buildPineTheme() {
     canvasColor: PineColors.deep,
     colorScheme: const ColorScheme.dark(
       primary: PineColors.tomato,
-      onPrimary: Color(0xFF141A19),
+      onPrimary: PineColors.deep,
       secondary: PineColors.mint,
-      onSecondary: Color(0xFF141A19),
+      onSecondary: PineColors.deep,
       tertiary: PineColors.gold,
       surface: PineColors.dark,
       onSurface: ink,
@@ -51,7 +52,24 @@ ThemeData buildPineTheme() {
   );
 
   return base.copyWith(
-    textTheme: base.textTheme.apply(bodyColor: paper, displayColor: ink),
+    textTheme: base.textTheme
+        .apply(bodyColor: paper, displayColor: ink)
+        .copyWith(
+          headlineSmall: const TextStyle(
+            color: ink,
+            fontSize: 24,
+            height: 1.15,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0,
+          ),
+          titleLarge: const TextStyle(
+            color: ink,
+            fontSize: 19,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0,
+          ),
+          bodyMedium: const TextStyle(color: paper, fontSize: 14, height: 1.45),
+        ),
     appBarTheme: const AppBarTheme(
       backgroundColor: PineColors.deep,
       surfaceTintColor: Colors.transparent,
@@ -61,8 +79,8 @@ ThemeData buildPineTheme() {
       titleTextStyle: TextStyle(
         color: ink,
         fontSize: 19,
-        fontWeight: FontWeight.w600,
-        letterSpacing: 0.3,
+        fontWeight: FontWeight.w700,
+        letterSpacing: 0,
       ),
     ),
     cardTheme: const CardThemeData(
@@ -71,7 +89,7 @@ ThemeData buildPineTheme() {
       elevation: 0,
       margin: EdgeInsets.zero,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.all(Radius.circular(18)),
+        borderRadius: BorderRadius.all(Radius.circular(8)),
         side: BorderSide(color: PineColors.line),
       ),
     ),
@@ -83,17 +101,17 @@ ThemeData buildPineTheme() {
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
       fillColor: PineColors.panel,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
       border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(8),
         borderSide: const BorderSide(color: PineColors.line),
       ),
       enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(8),
         borderSide: const BorderSide(color: PineColors.line),
       ),
       focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(8),
         borderSide: const BorderSide(color: PineColors.gold),
       ),
       labelStyle: const TextStyle(color: PineColors.muted, fontSize: 13),
@@ -103,9 +121,9 @@ ThemeData buildPineTheme() {
       style: FilledButton.styleFrom(
         backgroundColor: PineColors.tomato,
         foregroundColor: const Color(0xFF141A19),
-        minimumSize: const Size.fromHeight(46),
+        minimumSize: const Size.fromHeight(50),
         textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       ),
     ),
     textButtonTheme: TextButtonThemeData(
@@ -122,17 +140,18 @@ ThemeData buildPineTheme() {
       backgroundColor: PineColors.dark,
       surfaceTintColor: Colors.transparent,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.all(Radius.circular(20)),
+        borderRadius: BorderRadius.all(Radius.circular(8)),
         side: BorderSide(color: PineColors.line),
       ),
-      titleTextStyle: TextStyle(color: ink, fontSize: 17, fontWeight: FontWeight.w600),
+      titleTextStyle:
+          TextStyle(color: ink, fontSize: 17, fontWeight: FontWeight.w600),
       contentTextStyle: TextStyle(color: paper, fontSize: 14),
     ),
     bottomSheetTheme: const BottomSheetThemeData(
       backgroundColor: PineColors.dark,
       surfaceTintColor: Colors.transparent,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
       ),
     ),
     snackBarTheme: const SnackBarThemeData(

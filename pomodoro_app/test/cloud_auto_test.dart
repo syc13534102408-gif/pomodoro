@@ -80,7 +80,7 @@ Map<String, dynamic> _webPayload() => {
         }
       ],
       'selected': 0,
-      'goalTarget': 8,
+      'goalMinutes': 200,
       'weekGoal': 12,
       'settings': {'focus': 25, 'short': 5, 'long': 15},
     };

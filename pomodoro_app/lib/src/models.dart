@@ -401,7 +401,7 @@ class AppData {
     TimerSettings? settings,
     this.idleMode = SessionMode.focus,
     this.selectedIndex = 0,
-    this.goalTarget = 8,
+    this.goalMinutes = 200,
     this.weekGoal = 20,
     this.soundEnabled = true,
     this.notifyEnabled = true,
@@ -421,7 +421,9 @@ class AppData {
   /// 未开始计时时展示的阶段。仅保存在本机，不进入云端净荷。
   final SessionMode idleMode;
   final int selectedIndex;
-  final int goalTarget;
+
+  /// 今日目标：按专注分钟计（旧版本按「次」计，读取时自动迁移）。
+  final int goalMinutes;
   final int weekGoal;
   final bool soundEnabled;
   final bool notifyEnabled;
@@ -447,7 +449,7 @@ class AppData {
         },
         'settings': settings.toMap(),
         'selected': selectedIndex,
-        'goalTarget': goalTarget,
+        'goalMinutes': goalMinutes,
         'weekGoal': weekGoal,
         'soundEnabled': soundEnabled,
         'notifyEnabled': notifyEnabled,
@@ -467,7 +469,7 @@ class AppData {
     Map<String, List<TodoItem>>? todos,
     TimerSettings? settings,
     int? selectedIndex,
-    int? goalTarget,
+    int? goalMinutes,
     int? weekGoal,
     bool? soundEnabled,
     bool? notifyEnabled,
@@ -482,7 +484,7 @@ class AppData {
         todos: todos ?? this.todos,
         settings: settings ?? this.settings,
         selectedIndex: selectedIndex ?? this.selectedIndex,
-        goalTarget: goalTarget ?? this.goalTarget,
+        goalMinutes: goalMinutes ?? this.goalMinutes,
         weekGoal: weekGoal ?? this.weekGoal,
         soundEnabled: soundEnabled ?? this.soundEnabled,
         notifyEnabled: notifyEnabled ?? this.notifyEnabled,
@@ -531,14 +533,21 @@ class AppData {
       settings: settings,
       idleMode: SessionModeX.from(map['idleMode']),
       selectedIndex: selected.clamp(0, tasks.isEmpty ? 0 : tasks.length - 1),
-      goalTarget: (map['goalTarget'] as num?)?.toInt() ??
-          (map['goal'] as num?)?.toInt() ??
-          8,
+      goalMinutes: (map['goalMinutes'] as num?)?.toInt() ??
+          _migrateLegacyGoal(map['goalTarget'] ?? map['goal'], settings.focus),
       weekGoal: (map['weekGoal'] as num?)?.toInt() ?? 20,
       soundEnabled: map['soundEnabled'] != false,
       notifyEnabled: map['notifyEnabled'] != false,
       activeSession: ActiveSession.fromMap(map['activeSession']),
       sync: SyncState.fromMap(map['sync']),
     );
+  }
+
+  /// 旧版今日目标按「完成几个专注」存储，迁移为分钟：次数 × 单次专注时长。
+  static int _migrateLegacyGoal(dynamic legacyCount, int focusMinutes) {
+    final count = (legacyCount as num?)?.toInt() ?? 0;
+    if (count <= 0) return 200;
+    final perFocus = focusMinutes > 0 ? focusMinutes : 25;
+    return (count * perFocus).clamp(1, 9999);
   }
 }

@@ -29,28 +29,66 @@ class StatsPage extends StatelessWidget {
     final legend = stats.tasksInWeek();
 
     return Scaffold(
-      appBar: AppBar(title: const Text('统计详情')),
+      appBar: AppBar(title: const Text('专注报告')),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(18, 8, 18, 24),
         children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      '本周累计',
+                      style: TextStyle(color: PineColors.muted, fontSize: 12),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      formatMinutes(stats.weekMinutes),
+                      style: const TextStyle(
+                        color: PineColors.ink,
+                        fontSize: 30,
+                        height: 1.1,
+                        fontWeight: FontWeight.w300,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Text(
+                '${stats.weekCount} / ${data.weekGoal} 次',
+                style: const TextStyle(
+                  color: PineColors.gold,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(3),
+            child: LinearProgressIndicator(
+              value: data.weekGoal <= 0
+                  ? 0
+                  : (stats.weekCount / data.weekGoal).clamp(0.0, 1.0),
+              minHeight: 6,
+              backgroundColor: PineColors.ink.withValues(alpha: 0.09),
+              valueColor: const AlwaysStoppedAnimation(PineColors.gold),
+            ),
+          ),
+          const SizedBox(height: 22),
           PanelCard(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                SectionHeader(
+                const SectionHeader(
                   title: '本周专注时长',
                   trailing: Text(
-                    '周目标 ${data.weekGoal} 次 · 已完成 ${stats.weekCount}',
-                    style: const TextStyle(color: PineColors.muted, fontSize: 11),
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  formatMinutes(stats.weekMinutes),
-                  style: const TextStyle(
-                    color: PineColors.ink,
-                    fontSize: 28,
-                    fontWeight: FontWeight.w600,
+                    '周一至周日',
+                    style: TextStyle(color: PineColors.muted, fontSize: 11),
                   ),
                 ),
                 const SizedBox(height: 18),
@@ -99,17 +137,22 @@ class StatsPage extends StatelessWidget {
                             showTitles: true,
                             getTitlesWidget: (value, meta) {
                               final index = value.toInt();
-                              if (index < 0 || index > 6) return const SizedBox();
+                              if (index < 0 || index > 6) {
+                                return const SizedBox();
+                              }
                               final isToday = index == todayIndex;
                               return Padding(
                                 padding: const EdgeInsets.only(top: 6),
                                 child: Text(
                                   _weekLabels[index],
                                   style: TextStyle(
-                                    color: isToday ? PineColors.gold : PineColors.muted,
+                                    color: isToday
+                                        ? PineColors.gold
+                                        : PineColors.muted,
                                     fontSize: 11,
-                                    fontWeight:
-                                        isToday ? FontWeight.w700 : FontWeight.w400,
+                                    fontWeight: isToday
+                                        ? FontWeight.w700
+                                        : FontWeight.w400,
                                   ),
                                 ),
                               );

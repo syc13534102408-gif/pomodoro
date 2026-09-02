@@ -1,6 +1,8 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../src/cloud_auto.dart';
 import '../src/cloud_sync.dart';
@@ -29,6 +31,10 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   String _foregroundKey = '';
   DateTime _lastPersist = DateTime.fromMillisecondsSinceEpoch(0);
   late final AutoCloudSync _autoSync;
+
+  /// 桌面端（macOS）专属导航，与安卓手机布局互不影响。
+  static bool get _desktop => defaultTargetPlatform == TargetPlatform.macOS;
+  int _desktopTab = 0;
 
   @override
   void initState() {
@@ -260,6 +266,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         body: Center(child: CircularProgressIndicator(color: PineColors.gold)),
       );
     }
+    // macOS 走独立桌面布局（侧边栏导航 + 双栏计时），安卓保持手机布局不变。
+    if (_desktop) return _buildDesktop(context);
     final now = DateTime.now();
     final session = _data.activeSession;
     final view = SessionView.of(_data, now) ?? _idleView;
@@ -311,6 +319,436 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             );
           },
         ),
+      ),
+    );
+  }
+
+  // ==================== macOS 桌面布局（安卓走上面的手机布局） ====================
+
+  Widget _buildDesktop(BuildContext context) {
+    return Scaffold(
+      body: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _desktopSidebar(),
+          Container(width: 1, color: PineColors.line),
+          Expanded(
+            child: CallbackShortcuts(
+              bindings: {
+                const SingleActivator(LogicalKeyboardKey.keyR): _desktopReset,
+                const SingleActivator(LogicalKeyboardKey.space):
+                    _desktopToggle,
+              },
+              child: IndexedStack(
+                index: _desktopTab,
+                children: [
+                  _desktopTimerPane(),
+                  StatsPage(data: _data),
+                  SettingsPage(data: _data, onChanged: _replace),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _desktopToggle() {
+    if (_desktopTab != 0) return;
+    _toggleRun();
+  }
+
+  void _desktopReset() {
+    if (_desktopTab != 0) return;
+    _discard();
+  }
+
+  Widget _desktopSidebar() {
+    const icons = [
+      Icons.timer_outlined,
+      Icons.bar_chart_rounded,
+      Icons.tune_rounded
+    ];
+    const labels = ['计时', '统计', '设置'];
+    return Container(
+      width: 200,
+      color: PineColors.dark,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Padding(
+            padding: EdgeInsets.fromLTRB(18, 18, 18, 18),
+            child: Row(
+              children: [
+                _BrandMark(),
+                SizedBox(width: 10),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('松果',
+                        style: TextStyle(
+                          color: PineColors.ink,
+                          fontSize: 16,
+                          height: 1.05,
+                          fontWeight: FontWeight.w700,
+                        )),
+                    SizedBox(height: 3),
+                    Text('专注时光 · 桌面版',
+                        style:
+                            TextStyle(color: PineColors.muted, fontSize: 10)),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          for (var i = 0; i < 3; i++)
+            _desktopNavTile(
+              icon: icons[i],
+              label: labels[i],
+              selected: _desktopTab == i,
+              onTap: () => setState(() => _desktopTab = i),
+            ),
+          const Spacer(),
+          const Padding(
+            padding: EdgeInsets.fromLTRB(18, 10, 18, 16),
+            child: Text('空格 开始/暂停 · R 重置',
+                style: TextStyle(color: PineColors.muted, fontSize: 10)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _desktopNavTile({
+    required IconData icon,
+    required String label,
+    required bool selected,
+    required VoidCallback onTap,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+      child: Material(
+        color: selected ? PineColors.raised : Colors.transparent,
+        borderRadius: BorderRadius.circular(7),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(7),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+            child: Row(
+              children: [
+                Icon(icon,
+                    size: 17,
+                    color: selected ? PineColors.gold : PineColors.muted),
+                const SizedBox(width: 10),
+                Text(label,
+                    style: TextStyle(
+                      color: selected ? PineColors.ink : PineColors.muted,
+                      fontSize: 13,
+                      fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+                    )),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _desktopTimerPane() {
+    final now = DateTime.now();
+    final session = _data.activeSession;
+    final view = SessionView.of(_data, now) ?? _idleView;
+    final stats = StatsView.of(_data, now);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(26, 18, 26, 18),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final timer = _desktopTimerColumn(session, view);
+          if (constraints.maxWidth < 820) {
+            return ListView(
+              children: [
+                SizedBox(height: 560, child: timer),
+                const SizedBox(height: 20),
+                _desktopInfoColumn(stats),
+              ],
+            );
+          }
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                  flex: 6,
+                  child: SizedBox(height: constraints.maxHeight, child: timer)),
+              const SizedBox(width: 24),
+              Container(width: 1, color: PineColors.line),
+              const SizedBox(width: 24),
+              Expanded(flex: 5, child: _desktopInfoColumn(stats)),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _desktopTimerColumn(ActiveSession? session, SessionView view) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const SizedBox(height: 6),
+        Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 380),
+            child: ModeSwitcher(
+              current: view.mode,
+              minutesFor: _data.settings.forMode,
+              onChanged: _switchMode,
+            ),
+          ),
+        ),
+        const SizedBox(height: 18),
+        _taskPicker(),
+        Expanded(
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 320, maxHeight: 320),
+              child: RingTimer(view: view, caption: _caption(session, view)),
+            ),
+          ),
+        ),
+        Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 430),
+            child: _controls(session, view),
+          ),
+        ),
+        const SizedBox(height: 14),
+        const Center(
+          child: Text('空格 开始/暂停 · R 重置当前计时',
+              style: TextStyle(color: PineColors.muted, fontSize: 11)),
+        ),
+      ],
+    );
+  }
+
+  Widget _desktopInfoColumn(StatsView stats) {
+    final goal = _data.goalMinutes <= 0 ? 1 : _data.goalMinutes;
+    final progress = (stats.todayMinutes / goal).clamp(0.0, 1.0);
+    final todos = _data.todos[dateKey(DateTime.now())] ?? [];
+    final todoDone = todos.where((item) => item.done).length;
+    final recent =
+        _data.records.where((record) => record.counted).take(8).toList();
+    return ListView(
+      padding: EdgeInsets.zero,
+      children: [
+        PanelCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Text('今日目标',
+                      style: TextStyle(color: PineColors.muted, fontSize: 12)),
+                  const Spacer(),
+                  Text(
+                      '${stats.todayMinutes.round()} / ${_data.goalMinutes} 分钟',
+                      style:
+                          const TextStyle(color: PineColors.ink, fontSize: 14)),
+                ],
+              ),
+              const SizedBox(height: 10),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(4),
+                child: LinearProgressIndicator(
+                  value: progress,
+                  minHeight: 6,
+                  backgroundColor: PineColors.ink.withValues(alpha: 0.10),
+                  valueColor: const AlwaysStoppedAnimation(PineColors.tomato),
+                ),
+              ),
+              const SizedBox(height: 14),
+              Row(
+                children: [
+                  Expanded(
+                    child: MetricTile(
+                        value: formatMinutes(stats.todayMinutes),
+                        label: '今日专注'),
+                  ),
+                  Expanded(
+                    child: MetricTile(
+                        value: formatMinutes(stats.weekMinutes),
+                        label: '本周专注',
+                        accent: PineColors.mint),
+                  ),
+                  Expanded(
+                    child: MetricTile(
+                        value: '${stats.streak} 天',
+                        label: '连续专注',
+                        accent: PineColors.gold),
+                  ),
+                  Expanded(
+                    child: MetricTile(
+                        value: '${stats.todayCount} 次',
+                        label: '完成次数',
+                        accent: PineColors.gold),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 14),
+        PanelCard(
+          padding: const EdgeInsets.symmetric(vertical: 6),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(6),
+            onTap: () =>
+                showTodoSheet(context, data: _data, onChanged: _replace),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(14, 8, 14, 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.checklist_rounded,
+                          size: 16, color: PineColors.mint),
+                      const SizedBox(width: 8),
+                      const Text('今日清单',
+                          style: TextStyle(
+                              color: PineColors.ink,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600)),
+                      const Spacer(),
+                      Text(todos.isEmpty ? '添加' : '$todoDone / ${todos.length}',
+                          style: const TextStyle(
+                              color: PineColors.muted, fontSize: 12)),
+                    ],
+                  ),
+                  if (todos.isEmpty)
+                    const Padding(
+                      padding: EdgeInsets.only(top: 8),
+                      child: Text('点此添加今日要做的事',
+                          style:
+                              TextStyle(color: PineColors.muted, fontSize: 12)),
+                    )
+                  else
+                    for (final item in todos.take(4))
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: Row(
+                          children: [
+                            Icon(
+                              item.done
+                                  ? Icons.check_circle_rounded
+                                  : Icons.radio_button_unchecked,
+                              size: 15,
+                              color: item.done
+                                  ? PineColors.mint
+                                  : PineColors.muted,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                item.text,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  color: item.done
+                                      ? PineColors.muted
+                                      : PineColors.paper,
+                                  fontSize: 12,
+                                  decoration: item.done
+                                      ? TextDecoration.lineThrough
+                                      : null,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 14),
+        PanelCard(
+          padding: const EdgeInsets.fromLTRB(14, 8, 14, 10),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Text('最近完成',
+                      style: TextStyle(
+                          color: PineColors.ink,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600)),
+                  const Spacer(),
+                  TextButton.icon(
+                    onPressed: () => showManualSheet(context,
+                        data: _data, onChanged: _replace),
+                    icon: const Icon(Icons.add, size: 15),
+                    label: const Text('补记', style: TextStyle(fontSize: 12)),
+                  ),
+                ],
+              ),
+              if (recent.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.only(top: 6, bottom: 6),
+                  child: Text('完成一轮专注后会出现在这里',
+                      style: TextStyle(color: PineColors.muted, fontSize: 12)),
+                )
+              else
+                for (final record in recent) _desktopRecentRow(record),
+            ],
+          ),
+        ),
+        const SizedBox(height: 4),
+      ],
+    );
+  }
+
+  Widget _desktopRecentRow(FocusRecord record) {
+    final color = _colorFor(record.taskName);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        children: [
+          Container(
+            width: 8,
+            height: 8,
+            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+          ),
+          const SizedBox(width: 9),
+          Expanded(
+            child: Text(
+              record.taskName,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(color: PineColors.paper, fontSize: 13),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            '${record.status.label} · ${record.at.hour.toString().padLeft(2, '0')}:${record.at.minute.toString().padLeft(2, '0')}',
+            style: const TextStyle(color: PineColors.muted, fontSize: 11),
+          ),
+          const SizedBox(width: 14),
+          Text(
+            formatMinutes(record.minutes),
+            style: const TextStyle(
+              color: PineColors.ink,
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          IconButton(
+            visualDensity: VisualDensity.compact,
+            icon: const Icon(Icons.close, size: 14),
+            onPressed: () => _deleteRecord(record),
+          ),
+        ],
       ),
     );
   }
@@ -687,4 +1125,28 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       records: _data.records.where((item) => item.id != record.id).toList(),
     ));
   }
+}
+
+/// 桌面侧边栏的品牌小方块（松）。
+class _BrandMark extends StatelessWidget {
+  const _BrandMark();
+
+  @override
+  Widget build(BuildContext context) => Container(
+        width: 32,
+        height: 32,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: PineColors.tomato,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: const Text(
+          '松',
+          style: TextStyle(
+            color: PineColors.deep,
+            fontSize: 16,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+      );
 }

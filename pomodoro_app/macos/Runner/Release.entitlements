@@ -2,7 +2,12 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<!-- 本地自用 Release 用 ad-hoc 签名：开启 App Sandbox 会在启动时触发
+	     _libsecinit_appsandbox 崩溃（无有效开发者签名），故关闭沙箱。
+	     保留 network.client，便于将来重新启用沙箱时使用。 -->
 	<key>com.apple.security.app-sandbox</key>
+	<false/>
+	<key>com.apple.security.network.client</key>
 	<true/>
 </dict>
 </plist>

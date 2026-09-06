@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
@@ -5,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 
 import 'pages/home_page.dart';
+import 'src/menu_bar_timer.dart';
 import 'src/theme.dart';
 
 void main() {
@@ -15,6 +17,12 @@ void main() {
     FlutterForegroundTask.initCommunicationPort();
   }
   runApp(const PomodoroApp());
+  // 【诊断】启动 3 秒后直接发一条通道消息，验证 Dart→原生通道。
+  if (!kIsWeb && Platform.isMacOS) {
+    Timer(const Duration(seconds: 3), () {
+      MenuBarTimer.show(title: '来自Dart OK');
+    });
+  }
 }
 
 class PomodoroApp extends StatelessWidget {

@@ -38,6 +38,8 @@ class MainFlutterWindow: NSWindow {
       button.target = self
       button.action = #selector(activateTimerWindow)
       button.toolTip = "松果 · 专注时光（点击回到计时窗口）"
+      // 【诊断】初始标题：若 3 秒后变为"来自Dart OK"则通道正常。
+      button.title = "等待消息"
     }
     statusItem = item
 
@@ -52,6 +54,12 @@ class MainFlutterWindow: NSWindow {
       }
       let title = (call.arguments as? [String: Any])?["title"] as? String ?? ""
       DispatchQueue.main.async {
+        let state = (self == nil ? "self=nil" : "self=ok")
+        let button = (self?.statusItem?.button == nil ? "btn=nil" : "btn=ok")
+        try? ("\(Date()): self=\(state) \(button) title=[\(title)]\n").write(
+          toFile: "/tmp/pine-native-channel.log",
+          atomically: true,
+          encoding: .utf8)
         self?.statusItem?.button?.title = title
       }
       result(nil)

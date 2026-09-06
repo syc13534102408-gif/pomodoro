@@ -22,6 +22,13 @@ class MenuBarTimer {
     if (!_supported) return;
     _channel
         .invokeMethod<void>('update', {'title': title})
-        .catchError((Object _) {});
+        .catchError((Object e) {
+      // 【诊断】把通道异常写入文件便于定位。
+      try {
+        File('/tmp/pine-dart-channel.log').writeAsStringSync(
+            '${DateTime.now()} $e\n',
+            mode: FileMode.append);
+      } catch (_) {}
+    });
   }
 }

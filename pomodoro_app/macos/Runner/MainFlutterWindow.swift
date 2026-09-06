@@ -3,6 +3,8 @@ import FlutterMacOS
 
 class MainFlutterWindow: NSWindow {
   private var statusItem: NSStatusItem?
+  // 通道必须由窗口持有，否则方法回调处理器可能随局部变量释放。
+  private var menuBarChannel: FlutterMethodChannel?
 
   override func awakeFromNib() {
     let flutterViewController = FlutterViewController()
@@ -40,6 +42,7 @@ class MainFlutterWindow: NSWindow {
     let channel = FlutterMethodChannel(
       name: "pine/menu_bar",
       binaryMessenger: engine.binaryMessenger)
+    menuBarChannel = channel
     channel.setMethodCallHandler { [weak self] call, result in
       guard call.method == "update" else {
         result(FlutterMethodNotImplemented)

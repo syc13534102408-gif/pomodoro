@@ -122,7 +122,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     if (!_desktop) return;
     final view = SessionView.of(data, now);
     if (view == null || !view.running) {
-      MenuBarTimer.show(running: false, title: '');
+      // 未计时时仍显示一个固定标签，避免图标被菜单栏一堆图标淹没。
+      MenuBarTimer.show(title: '专注 待');
       return;
     }
     final label = switch (view.mode) {
@@ -130,9 +131,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       SessionMode.shortBreak => '短休',
       SessionMode.longBreak => '长休',
     };
+    // clockText 超时时自带 '+' 前缀，直接展示。
     MenuBarTimer.show(
-      running: true,
-      // clockText 超时时自带 '+' 前缀，直接展示。
       title: view.targetReached ? view.clockText : '$label ${view.clockText}',
     );
   }

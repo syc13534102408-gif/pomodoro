@@ -29,10 +29,12 @@ class MainFlutterWindow: NSWindow {
   private func installMenuBarTimer(engine: FlutterEngine) {
     let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
     if let button = item.button {
+      // 叶子图标对应品牌"松果"
       button.image = NSImage(
-        systemSymbolName: "timer",
+        systemSymbolName: "leaf.fill",
         accessibilityDescription: "松果计时")
       button.imagePosition = .imageLeading
+      button.font = NSFont.monospacedDigitSystemFont(ofSize: 13, weight: .medium)
       button.target = self
       button.action = #selector(activateTimerWindow)
       button.toolTip = "松果 · 专注时光（点击回到计时窗口）"
@@ -48,18 +50,9 @@ class MainFlutterWindow: NSWindow {
         result(FlutterMethodNotImplemented)
         return
       }
-      guard let args = call.arguments as? [String: Any] else {
-        result(nil)
-        return
-      }
-      let running = args["running"] as? Bool ?? false
-      let title = args["title"] as? String ?? ""
+      let title = (call.arguments as? [String: Any])?["title"] as? String ?? ""
       DispatchQueue.main.async {
-        if running {
-          self?.statusItem?.button?.title = "  \(title)"
-        } else {
-          self?.statusItem?.button?.title = ""
-        }
+        self?.statusItem?.button?.title = title
       }
       result(nil)
     }

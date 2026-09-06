@@ -15,10 +15,13 @@ class MenuBarTimer {
 
   static bool get _supported => !kIsWeb && Platform.isMacOS;
 
-  /// [running] 为 false 时清空菜单栏文本（未在计时）。
-  static void show({required bool running, required String title}) {
+  /// [title] 即菜单栏文本：
+  /// - 未计时建议传 "专注 待"（始终可见，避免图标被一堆状态项淹没）
+  /// - 计时中传 "专注 MM:SS" / "+MM:SS"
+  static void show({required String title}) {
     if (!_supported) return;
-    _channel.invokeMethod<void>('update',
-        {'running': running, 'title': title}).catchError((Object _) {});
+    _channel
+        .invokeMethod<void>('update', {'title': title})
+        .catchError((Object _) {});
   }
 }

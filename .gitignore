@@ -1,4 +1,6 @@
 .DS_Store
+.toolchain/
+__pycache__/
 cloudflare-reminders/node_modules/
 tools/
 outputs/

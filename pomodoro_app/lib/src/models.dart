@@ -210,13 +210,18 @@ class FocusRecord {
     final atParsed = rawAt == null ? null : DateTime.tryParse(rawAt);
     final at = (atParsed ?? dateOnly ?? DateTime.now()).toLocal();
 
-    // dayKey 语义不变：以 `date` 字段为准（date 缺失时才用 at 的本地日期兜底）。
-    final day = dateOnly ?? at;
+    // dayKey 语义：date 字段就是写入时的归属日键，**直接采用**（勿用
+    // dateKey(dateOnly) 重算——统计日口径下零点减 3 小时会回退到前一天，
+    // 曾导致云端恢复的历史记录整体错位一天、今日统计清零）。
+    // date 缺失（旧网页端数据）才按 at 重算兜底。
+    final dayKey = (rawDate != null && rawDate.isNotEmpty)
+        ? rawDate
+        : dateKey(at);
     return FocusRecord(
       id: map['id']?.toString(),
       taskName: (map['name'] ?? map['taskName'] ?? '已删除事件').toString(),
       minutes: (map['minutes'] as num?)?.toDouble() ?? 0,
-      dayKey: dateKey(day),
+      dayKey: dayKey,
       status: RecordStatusX.from(map['status'],
           completedFlag: map['completed'] == true),
       at: at,

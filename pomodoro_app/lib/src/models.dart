@@ -17,7 +17,7 @@ extension SessionModeX on SessionMode {
   bool get isFocus => this == SessionMode.focus;
 
   Color get color => switch (this) {
-        SessionMode.focus => PineColors.tomato,
+        SessionMode.focus => PineColors.focus,
         SessionMode.shortBreak => PineColors.mint,
         SessionMode.longBreak => PineColors.gold,
       };
@@ -137,8 +137,16 @@ class FocusRecord {
   final double minutes;
 
   /// 本地日期键 `YYYY-MM-DD`，序列化为 JSON 的 `date` 字段。
+  ///
+  /// 语义为「记录归属日」：自动专注在开始计时时确定并保持不变，
+  /// 即便完成时刻跨入次日也不随 [at] 漂移（见 roundtrip 测试）。
   final String dayKey;
   final RecordStatus status;
+
+  /// 会话锚点时刻（含时分秒，序列化为 JSON 的 `at` 字段）：
+  /// - 进行中的自动专注：开始计时时刻；
+  /// - 自然完成（completed）：确认完成瞬间，由 `TimerEngine.complete` 更新；
+  /// - 手动补记（manual）：用户在表单里填写的完成时刻。
   final DateTime at;
   final bool completedFlag;
 
@@ -161,6 +169,7 @@ class FocusRecord {
     double? minutes,
     String? dayKey,
     RecordStatus? status,
+    DateTime? at,
   }) =>
       FocusRecord(
         id: id,
@@ -168,14 +177,23 @@ class FocusRecord {
         minutes: minutes ?? this.minutes,
         dayKey: dayKey ?? this.dayKey,
         status: status ?? this.status,
-        at: at,
+        at: at ?? this.at,
         completedFlag: completedFlag,
       );
 
   static FocusRecord fromMap(Map<dynamic, dynamic> map) {
+    // `date` 为纯日期 `YYYY-MM-DD`（决定记录归属哪一天），解析结果恒为当天
+    // 00:00，不含时分秒，不能作为完成时刻。
     final rawDate = map['date']?.toString();
-    final parsed = rawDate == null ? null : DateTime.tryParse(rawDate);
-    final day = parsed ?? DateTime.now();
+    final dateOnly = rawDate == null ? null : DateTime.tryParse(rawDate);
+    // `at` 为含时分秒的完整 ISO8601，优先用于还原完成时刻。云端数据来自网页端
+    // `toISOString()`（UTC），统一转本地时区，保证展示与统计按本地时间。
+    final rawAt = map['at']?.toString();
+    final atParsed = rawAt == null ? null : DateTime.tryParse(rawAt);
+    final at = (atParsed ?? dateOnly ?? DateTime.now()).toLocal();
+
+    // dayKey 语义不变：以 `date` 字段为准（date 缺失时才用 at 的本地日期兜底）。
+    final day = dateOnly ?? at;
     return FocusRecord(
       id: map['id']?.toString(),
       taskName: (map['name'] ?? map['taskName'] ?? '已删除事件').toString(),
@@ -183,7 +201,7 @@ class FocusRecord {
       dayKey: dateKey(day),
       status: RecordStatusX.from(map['status'],
           completedFlag: map['completed'] == true),
-      at: parsed,
+      at: at,
       completedFlag: map['completed'] == true,
     );
   }

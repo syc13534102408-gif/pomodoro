@@ -46,3 +46,7 @@ app.*.map.json
 
 # Widget Preview related
 .widget_preview/
+
+# Signing materials (kept local, never committed)
+/android/app/key.properties
+/android/app/upload-keystore.jks

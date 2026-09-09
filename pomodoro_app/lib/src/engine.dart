@@ -40,6 +40,18 @@ class SessionView {
     return '$sign${minutes.toString().padLeft(2, '0')}:${rest.toString().padLeft(2, '0')}';
   }
 
+  /// 已累计时长 `mm:ss`，满 1 小时后为 `h:mm:ss`。
+  /// 与 clockText（剩余/超时）互补，用于「已经专注了多久」这类展示。
+  String get elapsedText {
+    final seconds = elapsedSeconds.clamp(0, 86400 * 7);
+    final hours = seconds ~/ 3600;
+    final minutes = (seconds % 3600) ~/ 60;
+    final rest = seconds % 60;
+    final mm = minutes.toString().padLeft(2, '0');
+    final ss = rest.toString().padLeft(2, '0');
+    return hours > 0 ? '$hours:$mm:$ss' : '$mm:$ss';
+  }
+
   static SessionView? of(AppData data, DateTime now) {
     final session = data.activeSession;
     if (session == null) return null;
@@ -306,6 +318,9 @@ class TimerEngine {
           return record.copyWith(
             minutes: view.elapsedMinutes,
             status: RecordStatus.completed,
+            // 把 at 推进到确认完成的瞬间，UI 的「完成于 HH:mm」才名副其实；
+            // dayKey 保持开始计时时确定的归属日，跨午夜完成时两口径按设计分离。
+            at: now,
           );
         }).toList(),
       );

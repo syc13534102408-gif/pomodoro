@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 通知 small icon：单色松果点阵（附录 A 坐标，与 ic_launcher_monochrome 同形）。
+     Android 通知小图标只取 alpha 通道，统一用纯白填充，由系统着色。 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M51,75h6v11h-6z" />
+    <path android:fillColor="#FFFFFFFF" android:pathData="M54,30.5a5.5,5.5 0 1 0 0,11a5.5,5.5 0 1 0 0,-11" />
+    <path android:fillColor="#FFFFFFFF" android:pathData="M45,44.5a5.5,5.5 0 1 0 0,11a5.5,5.5 0 1 0 0,-11" />
+    <path android:fillColor="#FFFFFFFF" android:pathData="M63,44.5a5.5,5.5 0 1 0 0,11a5.5,5.5 0 1 0 0,-11" />
+    <path android:fillColor="#FFFFFFFF" android:pathData="M36,58.5a5.5,5.5 0 1 0 0,11a5.5,5.5 0 1 0 0,-11" />
+    <path android:fillColor="#FFFFFFFF" android:pathData="M54,58.5a5.5,5.5 0 1 0 0,11a5.5,5.5 0 1 0 0,-11" />
+    <path android:fillColor="#FFFFFFFF" android:pathData="M72,58.5a5.5,5.5 0 1 0 0,11a5.5,5.5 0 1 0 0,-11" />
+    <path android:fillColor="#FFFFFFFF" android:pathData="M45,72.5a5.5,5.5 0 1 0 0,11a5.5,5.5 0 1 0 0,-11" />
+    <path android:fillColor="#FFFFFFFF" android:pathData="M63,72.5a5.5,5.5 0 1 0 0,11a5.5,5.5 0 1 0 0,-11" />
+</vector>

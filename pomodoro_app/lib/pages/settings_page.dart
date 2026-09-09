@@ -159,9 +159,11 @@ class _SettingsPageState extends State<SettingsPage> {
             onPressed: () => Navigator.pop(context),
             child: const Text('取消'),
           ),
-          FilledButton(
+          BrickButton(
+            label: '恢复',
+            height: 40,
+            expand: false,
             onPressed: () => Navigator.pop(context, controller.text.trim()),
-            child: const Text('恢复'),
           ),
         ],
       ),
@@ -176,25 +178,53 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   Future<void> _clearRecords() async {
-    final confirmed = await showDialog<bool>(
+    final first = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('清空全部专注记录？'),
-        content: const Text('事件、待办和设置会保留，专注记录不可恢复。'),
+        content: const Text('专注记录与统计会全部删除，事件、今日清单与设置会保留。此操作不可撤销。'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
             child: const Text('取消'),
           ),
-          FilledButton(
+          BrickButton(
+            label: '继续',
+            height: 40,
+            expand: false,
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('清空'),
           ),
         ],
       ),
     );
-    if (confirmed != true) return;
+    if (first != true || !mounted) return;
+    final second = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('最后确认'),
+        content: const Text('真的要清空全部专注记录吗？云端备份不受影响，但本机记录删除后无法恢复。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('取消'),
+          ),
+          BrickButton(
+            label: '清空',
+            height: 40,
+            expand: false,
+            color: PineColors.focus,
+            foregroundColor: PineColors.card,
+            onPressed: () => Navigator.pop(context, true),
+          ),
+        ],
+      ),
+    );
+    if (second != true) return;
     _emit(widget.data.copyWith(records: []));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('已清空全部专注记录')),
+    );
   }
 
   @override
@@ -203,16 +233,13 @@ class _SettingsPageState extends State<SettingsPage> {
     final code = data.sync.deviceCode;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('偏好设置')),
+      appBar: AppBar(title: const Text('设置')),
       body: ListView(
-        padding: const EdgeInsets.fromLTRB(18, 8, 18, 28),
+        padding: const EdgeInsets.fromLTRB(20, 6, 20, 24),
         children: [
-          const _SettingsHeading(
-            icon: Icons.timer_outlined,
-            title: '计时与目标',
-          ),
-          const SizedBox(height: 8),
-          PanelCard(
+          const SectionHeader(title: '计时与目标'),
+          const SizedBox(height: 10),
+          BrickCard(
             child: Column(
               children: [
                 Row(
@@ -232,59 +259,51 @@ class _SettingsPageState extends State<SettingsPage> {
                     Expanded(child: _numberField('本周目标（次）', _weekGoal)),
                   ],
                 ),
-                const SizedBox(height: 14),
-                SizedBox(
-                  width: double.infinity,
-                  child: FilledButton(
-                    onPressed: _saveTimer,
-                    child: const Text('保存计时设置'),
-                  ),
+                const SizedBox(height: 16),
+                BrickButton(
+                  label: '保存计时设置',
+                  onPressed: _saveTimer,
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 20),
-          const _SettingsHeading(
-            icon: Icons.notifications_none_rounded,
-            title: '提醒',
-          ),
-          const SizedBox(height: 8),
-          PanelCard(
+          const SizedBox(height: 16),
+          const SectionHeader(title: '提醒'),
+          const SizedBox(height: 10),
+          BrickCard(
             child: Column(
               children: [
-                SwitchListTile.adaptive(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('结束通知',
-                      style: TextStyle(color: PineColors.paper, fontSize: 14)),
-                  subtitle: const Text('计划时长到达时发送系统通知',
-                      style: TextStyle(color: PineColors.muted, fontSize: 11)),
+                _switchRow(
+                  title: '结束通知',
+                  subtitle: '计划时长到达时发送系统通知',
                   value: data.notifyEnabled,
                   onChanged: (value) async {
-                    if (value) await Notifier.requestPermission();
+                    if (value) {
+                      await Notifier.requestPermission();
+                      // 精确闹钟授权：开启后到点可精确触发（只尝试一次，被拒降级）。
+                      unawaited(Notifier.maybeRequestExactAlarmPermission());
+                    } else {
+                      // 全链路静默：撤掉已预排的 911 系统闹钟，并清掉可能残留的 910。
+                      await Notifier.cancelEndAlarm();
+                      await Notifier.cancel();
+                    }
                     _emit(data.copyWith(notifyEnabled: value));
                   },
                 ),
-                const Divider(),
-                SwitchListTile.adaptive(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('完成提示音',
-                      style: TextStyle(color: PineColors.paper, fontSize: 14)),
-                  subtitle: const Text('三音提示，打开时试听一次',
-                      style: TextStyle(color: PineColors.muted, fontSize: 11)),
+                const Divider(height: 1.5),
+                _switchRow(
+                  title: '完成提示音',
+                  subtitle: '三音提示，打开时试听一次',
                   value: data.soundEnabled,
                   onChanged: (value) {
                     if (value) unawaited(Notifier.chime());
                     _emit(data.copyWith(soundEnabled: value));
                   },
                 ),
-                const Divider(),
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('测试提醒',
-                      style: TextStyle(color: PineColors.paper, fontSize: 14)),
-                  subtitle: const Text('立即发送一条通知并播放提示音',
-                      style: TextStyle(color: PineColors.muted, fontSize: 11)),
-                  trailing: const Icon(Icons.chevron_right, size: 18),
+                const Divider(height: 1.5),
+                _tapRow(
+                  title: '测试提醒',
+                  subtitle: '立即发送一条通知并播放提示音',
                   onTap: () async {
                     await Notifier.requestPermission();
                     await Notifier.alert(
@@ -295,29 +314,20 @@ class _SettingsPageState extends State<SettingsPage> {
                   },
                 ),
                 if (ForegroundRunner.supported) ...[
-                  const Divider(),
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    title: const Text('锁屏剩余时间',
-                        style:
-                            TextStyle(color: PineColors.paper, fontSize: 14)),
-                    subtitle: const Text('计时运行时显示；OPPO 需允许锁屏通知与后台运行',
-                        style:
-                            TextStyle(color: PineColors.muted, fontSize: 11)),
-                    trailing: const Icon(Icons.chevron_right, size: 18),
+                  const Divider(height: 1.5),
+                  _tapRow(
+                    title: '锁屏剩余时间',
+                    subtitle: '计时运行时显示；OPPO 需允许锁屏通知与后台运行',
                     onTap: () => ForegroundRunner.requestBatteryExemption(),
                   ),
                 ],
               ],
             ),
           ),
-          const SizedBox(height: 20),
-          const _SettingsHeading(
-            icon: Icons.cloud_outlined,
-            title: '云端同步',
-          ),
-          const SizedBox(height: 8),
-          PanelCard(
+          const SizedBox(height: 16),
+          const SectionHeader(title: '云端同步'),
+          const SizedBox(height: 10),
+          BrickCard(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -326,16 +336,18 @@ class _SettingsPageState extends State<SettingsPage> {
                     Expanded(
                       child: Text(
                         code.isEmpty ? '尚未生成同步码' : code,
-                        style: const TextStyle(
-                          color: PineColors.ink,
+                        style: brickNumberStyle(
                           fontSize: 13,
-                          letterSpacing: 0.6,
+                          color: code.isEmpty ? PineColors.sub : PineColors.ink,
                         ),
                       ),
                     ),
-                    IconButton(
-                      tooltip: '复制同步码',
-                      icon: const Icon(Icons.copy, size: 17),
+                    BrickButton(
+                      label: '',
+                      semanticLabel: '复制同步码',
+                      icon: Icons.copy,
+                      expand: false,
+                      height: 38,
                       onPressed: code.isEmpty
                           ? null
                           : () async {
@@ -352,51 +364,64 @@ class _SettingsPageState extends State<SettingsPage> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 8),
                 Text(
                   '最近上传：${_formatStamp(data.sync.lastUploadedAt)}',
-                  style: const TextStyle(color: PineColors.muted, fontSize: 11),
+                  style: const TextStyle(color: PineColors.sub, fontSize: 11),
                 ),
                 const SizedBox(height: 4),
                 const Text(
                   '绑定同步码后：完成专注自动上传，回到 App 自动拉取',
-                  style: TextStyle(color: PineColors.muted, fontSize: 11),
+                  style: TextStyle(color: PineColors.sub, fontSize: 11),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 14),
                 Row(
                   children: [
                     Expanded(
-                      child: OutlinedButton(
+                      child: BrickButton(
+                        label: '上传本机数据',
+                        height: 44,
                         onPressed: _syncBusy ? null : () => _runSync(_upload),
-                        child: const Text('上传本机数据'),
                       ),
                     ),
                     const SizedBox(width: 10),
                     Expanded(
-                      child: OutlinedButton(
+                      child: BrickButton(
+                        label: '从云端恢复',
+                        height: 44,
+                        color: PineColors.card,
+                        foregroundColor: PineColors.ink,
                         onPressed: _syncBusy ? null : () => _runSync(_restore),
-                        child: const Text('从云端恢复'),
                       ),
                     ),
                   ],
                 ),
                 if (_syncBusy) ...[
-                  const SizedBox(height: 12),
-                  const LinearProgressIndicator(minHeight: 3),
+                  const SizedBox(height: 14),
+                  const BrickProgress(value: 0.35, color: PineColors.gold),
                 ],
                 if (_syncMessage.isNotEmpty) ...[
-                  const SizedBox(height: 10),
-                  Text(
-                    _syncMessage,
-                    style:
-                        const TextStyle(color: PineColors.gold, fontSize: 12),
+                  const SizedBox(height: 12),
+                  Container(
+                    width: double.infinity,
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: PineColors.tint(PineColors.gold),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      _syncMessage,
+                      style:
+                          const TextStyle(color: PineColors.ink, fontSize: 12),
+                    ),
                   ),
                 ],
-                const SizedBox(height: 8),
+                const SizedBox(height: 14),
                 TextField(
                   controller: _worker,
                   enabled: false,
-                  style: const TextStyle(color: PineColors.muted, fontSize: 11),
+                  style: const TextStyle(color: PineColors.sub, fontSize: 11),
                   decoration: const InputDecoration(
                     labelText: '同步服务地址',
                     isDense: true,
@@ -405,24 +430,154 @@ class _SettingsPageState extends State<SettingsPage> {
               ],
             ),
           ),
-          const SizedBox(height: 20),
-          const _SettingsHeading(
-            icon: Icons.storage_outlined,
-            title: '本机数据',
+          const SizedBox(height: 16),
+          const SectionHeader(title: '关于'),
+          const SizedBox(height: 10),
+          const BrickCard(
+            child: Column(
+              children: [
+                Padding(
+                  padding: EdgeInsets.symmetric(vertical: 6),
+                  child: Row(
+                    children: [
+                      Text('版本',
+                          style: TextStyle(color: PineColors.sub, fontSize: 13)),
+                      Spacer(),
+                      Text('v1.2.0 · 松林手帐',
+                          style: TextStyle(
+                              color: PineColors.ink,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600)),
+                    ],
+                  ),
+                ),
+                Divider(height: 1),
+                Padding(
+                  padding: EdgeInsets.symmetric(vertical: 6),
+                  child: Row(
+                    children: [
+                      Text('数据',
+                          style: TextStyle(color: PineColors.sub, fontSize: 13)),
+                      Spacer(),
+                      Text('本地优先 · 云端仅备份',
+                          style: TextStyle(color: PineColors.ink, fontSize: 13)),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
-          const SizedBox(height: 8),
-          PanelCard(
-            child: ListTile(
-              contentPadding: EdgeInsets.zero,
-              title: const Text('清空全部专注记录',
-                  style: TextStyle(color: PineColors.tomato, fontSize: 14)),
-              subtitle: const Text('事件、待办与设置会保留',
-                  style: TextStyle(color: PineColors.muted, fontSize: 11)),
-              trailing: const Icon(Icons.delete_outline, size: 18),
-              onTap: _clearRecords,
+          const SizedBox(height: 16),
+          const SectionHeader(title: '本机数据'),
+          const SizedBox(height: 10),
+          BrickCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: PineColors.tint(PineColors.focus),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Text(
+                    '清空后将删除全部专注记录与统计；事件、今日清单、设置与云端备份不受影响。此操作不可撤销。',
+                    style: TextStyle(color: PineColors.ink, fontSize: 13, height: 1.5),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  height: 46,
+                  child: OutlinedButton.icon(
+                    onPressed: _clearRecords,
+                    icon: const Icon(Icons.delete_outline,
+                        size: 18, color: PineColors.focus),
+                    label: const Text(
+                      '清空全部记录',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: PineColors.focus,
+                      ),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: PineColors.focus,
+                      backgroundColor: Colors.transparent,
+                      side: const BorderSide(
+                          color: PineColors.focus, width: 1.5),
+                      shape: const StadiumBorder(),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  /// 描边开关行。
+  Widget _switchRow({
+    required String title,
+    required String subtitle,
+    required bool value,
+    required ValueChanged<bool> onChanged,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title,
+                    style:
+                        const TextStyle(color: PineColors.ink, fontSize: 14)),
+                const SizedBox(height: 2),
+                Text(subtitle,
+                    style:
+                        const TextStyle(color: PineColors.sub, fontSize: 11)),
+              ],
+            ),
+          ),
+          BrickSwitch(value: value, onChanged: onChanged),
+        ],
+      ),
+    );
+  }
+
+  /// 可点的设置行，右侧箭头。
+  Widget _tapRow({
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+  }) {
+    return BrickPressable(
+      onTap: onTap,
+      shadowed: false,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title,
+                      style:
+                          const TextStyle(color: PineColors.ink, fontSize: 14)),
+                  const SizedBox(height: 2),
+                  Text(subtitle,
+                      style:
+                          const TextStyle(color: PineColors.sub, fontSize: 11)),
+                ],
+              ),
+            ),
+            const Icon(Icons.chevron_right, size: 20, color: PineColors.sub),
+          ],
+        ),
       ),
     );
   }
@@ -431,34 +586,11 @@ class _SettingsPageState extends State<SettingsPage> {
       TextField(
         controller: controller,
         keyboardType: TextInputType.number,
-        style: const TextStyle(color: PineColors.ink, fontSize: 14),
+        style: brickNumberStyle(fontSize: 14),
         decoration: InputDecoration(
           labelText: label,
           isDense: true,
           suffixText: label.contains('次') ? null : '分',
         ),
-      );
-}
-
-class _SettingsHeading extends StatelessWidget {
-  const _SettingsHeading({required this.icon, required this.title});
-
-  final IconData icon;
-  final String title;
-
-  @override
-  Widget build(BuildContext context) => Row(
-        children: [
-          Icon(icon, size: 17, color: PineColors.gold),
-          const SizedBox(width: 8),
-          Text(
-            title,
-            style: const TextStyle(
-              color: PineColors.ink,
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
       );
 }

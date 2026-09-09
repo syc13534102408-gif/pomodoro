@@ -116,7 +116,7 @@ void main() {
 
     // 模拟网页端载荷：剥掉任务/记录的 id，恢复时它们会重新生成。
     final raw = base.toMap();
-    final stripIds = (List<dynamic> list) => [
+    List<dynamic> stripIds(List<dynamic> list) => [
           for (final entry in list)
             () {
               final map = Map<String, dynamic>.from(entry as Map);

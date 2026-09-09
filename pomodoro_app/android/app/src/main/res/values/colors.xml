@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 纸面底色，与 Flutter 侧 PineColors.paper 一致 -->
+    <color name="launch_background">#F6F1E7</color>
+    <color name="normal_background">#F6F1E7</color>
+</resources>

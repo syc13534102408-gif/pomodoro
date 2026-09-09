@@ -76,8 +76,10 @@ curl "$(cat .last-url)/ping"
 
 拿到地址后（去掉末尾 `/ping`）：
 
-- **网页端**：`index.html` 中的 `DEFAULT_PUSH_WORKER_URL`
+- **网页端**：`index.html` 中的 `DEFAULT_SYNC_URL`（注意不是 `DEFAULT_PUSH_WORKER_URL`，后者是 Web Push 用的 Cloudflare 地址）
 - **安卓端**：`lib/src/cloud_sync.dart` 中的 `CloudSync.defaultBaseUrl`
+
+**两处必须同时改**，否则两端会连到不同后端、无法互通。
 
 然后重新构建 APK（`flutter build apk --release`）并用 adb 安装，网页端推送到 GitHub Pages。
 

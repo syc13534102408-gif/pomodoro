@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-page-node-id="M75jjqw3UFDJXdPCRpKmBB">
+<head data-page-node-id="g2svniqoufOEGYYuDG9bGY">
+<meta charset="UTF-8" data-page-node-id="bh4ksQXjjdUndMCqPZGBJB">
+<meta name="viewport" content="width=device-width, initial-scale=1.0" data-page-node-id="o7BFxthzgJTRJRcqEGA9Fz">
+<title>方案E · 松林手帐 — 高保真视觉稿 v1</title>
+<style>
+  :root{
+    --paper:#F6F1E7; --card:#FFFDF8; --ink:#33302A; --sub:#85796A;
+    --faint:#C9BFAE; --line:#E6DECF; --pine:#4E7A5B; --focus:#D96B52;
+    --mint:#5FAE8B; --gold:#D9A441;
+    --tint-focus:#F2DED2; --tint-mint:#E1E8DA; --tint-gold:#F2E6D0;
+    --shadow:0 3px 10px rgba(51,48,42,.08);
+    --task: #D96B52,#5FAE8B,#D9A441,#7F9CC0,#B78FB0,#7CBF9D,#CE9A64,#A3A8CC;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#EDE6D6;color:var(--ink);
+    font-family:system-ui,-apple-system,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+    padding:36px 20px 64px; -webkit-font-smoothing:antialiased}
+  .num{font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace;font-variant-numeric:tabular-nums}
+
+  .top{max-width:1200px;margin:0 auto 26px}
+  .top h1{font-size:26px;font-weight:700;letter-spacing:.5px}
+  .top .sub{margin-top:8px;color:var(--sub);font-size:13px;line-height:1.7}
+  .palette{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+  .sw{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--sub)}
+  .sw i{width:18px;height:18px;border-radius:6px;display:inline-block;box-shadow:inset 0 0 0 1px rgba(0,0,0,.05)}
+  .tag{display:inline-block;padding:2px 8px;border-radius:999px;background:var(--card);
+    border:1px solid var(--line);font-size:11px;color:var(--sub);margin-right:6px}
+
+  .row{display:flex;gap:28px;flex-wrap:wrap;max-width:1200px;margin:0 auto;align-items:flex-start}
+  .frame{width:352px}
+  .frame .cap{font-size:13px;font-weight:600;margin:0 0 10px 6px;color:#6B6150}
+  .frame .cap em{font-style:normal;font-weight:400;color:var(--sub);margin-left:6px;font-size:12px}
+
+  .phone{background:var(--paper);border-radius:42px;border:1px solid #D8CDB6;
+    box-shadow:0 24px 60px -18px rgba(80,66,40,.35), inset 0 0 0 6px #E9E0CC;
+    padding:14px 14px 10px;width:352px;overflow:hidden}
+  .pscreen{background:var(--paper);border-radius:30px;padding:14px 16px 8px;position:relative}
+  .navbar{display:flex;margin-top:8px;background:var(--card);border:1px solid var(--line);
+    border-radius:22px;padding:8px 10px}
+  .nitem{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;
+    font-size:10px;color:var(--sub)}
+  .nitem.on{color:var(--pine);font-weight:600}
+  .nitem svg{width:19px;height:19px}
+
+  .date-row{display:flex;justify-content:space-between;align-items:center;height:26px}
+  .date-row .d{font-size:13px;color:var(--sub)}
+  .brand{width:16px;height:16px;border-radius:50%;background:var(--pine)}
+  .brand:after{content:"";display:block;width:6px;height:6px;border-radius:50%;background:var(--paper);margin:5px 0 0 5px}
+
+  .card{background:var(--card);border-radius:20px;box-shadow:var(--shadow);padding:14px 16px}
+  .seg{display:flex;gap:8px;margin-top:10px}
+  .pill{height:42px;border-radius:999px;display:flex;align-items:center;justify-content:center;
+    font-size:15px;font-weight:600;cursor:default;user-select:none}
+  .seg .s{flex:1;display:flex;align-items:center;justify-content:center;gap:6px;height:40px;
+    border-radius:999px;color:var(--sub);font-size:14px}
+  .seg .s i{width:8px;height:8px;border-radius:50%;background:var(--line);display:inline-block}
+  .seg .s b{font-weight:400;font-family:ui-monospace,Menlo,monospace;font-size:11px}
+  .seg .s.on{color:var(--ink);font-weight:600}
+  .seg .s.focus.on{background:var(--tint-focus)} .seg .s.focus.on i{background:var(--focus)}
+  .seg .s.mint.on{background:var(--tint-mint)} .seg .s.mint.on i{background:var(--mint)}
+  .seg .s.gold.on{background:var(--tint-gold)} .seg .s.gold.on i{background:var(--gold)}
+
+  .task{display:flex;align-items:center;gap:10px;margin-top:12px}
+  .task .td{width:10px;height:10px;border-radius:50%;flex:none}
+  .task .tn{font-size:15px;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .task .tc{color:var(--sub);font-size:17px}
+  .gap6{margin-top:6px}.gap8{margin-top:8px}.gap10{margin-top:10px}
+  .gap12{margin-top:12px}.gap14{margin-top:14px}
+
+  .tcard{position:relative;background:var(--card);border-radius:22px;box-shadow:var(--shadow);
+    padding:16px 18px 18px;display:flex;flex-direction:column;align-items:center}
+  .tbar{width:56px;height:6px;border-radius:3px;margin-bottom:10px}
+  .tcap{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--sub);margin-bottom:6px}
+  .tcap i{width:7px;height:7px;border-radius:50%;display:inline-block}
+  .tclock{font-size:62px;font-weight:600;letter-spacing:1px;line-height:1.05}
+  .tclock.goldT{color:var(--gold)}
+  .tprog{width:100%;height:6px;border-radius:3px;background:#EFE9DC;margin-top:16px;overflow:hidden}
+  .tprog i{display:block;height:100%;border-radius:3px}
+  .stamp{position:absolute;right:-8px;top:-14px;width:62px;height:62px;border-radius:50%;
+    border:2.5px solid var(--pine);transform:rotate(-12deg);display:flex;flex-direction:column;
+    align-items:center;justify-content:center;color:var(--pine);opacity:.92;background:rgba(255,253,248,.6)}
+  .stamp b{font-size:15px;font-weight:800;line-height:1}
+  .stamp span{font-size:8px;letter-spacing:1px;margin-top:2px}
+
+  .ctl{display:flex;align-items:center;gap:10px}
+  .b{height:46px;border-radius:999px;display:flex;align-items:center;justify-content:center;
+    font-size:15px;font-weight:600;cursor:default;user-select:none;flex:none;padding:0 18px}
+  .b.ink{background:var(--ink);color:var(--card);flex:1}
+  .b.gold{background:var(--gold);color:var(--ink)}
+  .b.ghost{background:transparent;color:var(--sub);font-weight:500;padding:0 4px}
+  .b.goldO{background:transparent;color:var(--ink);border:1.5px solid var(--gold);background:var(--tint-gold)}
+
+  .sec{display:flex;align-items:center;gap:7px;font-size:13px;font-weight:700;margin:16px 2px 8px}
+  .sec i{width:4px;height:13px;border-radius:2px;background:var(--pine);display:inline-block}
+  .srow{display:flex;align-items:center;gap:10px;padding:5px 0}
+  .srow+.srow{border-top:1px solid var(--line)}
+  .dot{width:10px;height:10px;border-radius:50%;flex:none}
+  .rowname{font-size:14px;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .rowname.done{color:var(--sub);text-decoration:line-through}
+  .mini{font-size:12px;color:var(--sub)}
+  .mnum{font-size:13px;color:var(--sub)}
+  .r{display:flex;justify-content:space-between;align-items:center;font-size:13px}
+  .r b{font-weight:600}
+  .r .v{color:var(--sub)}
+  .link{color:var(--pine);font-size:13px;font-weight:600}
+  .dst{font-size:15px;font-weight:600}
+  .sub{font-size:13px;color:var(--sub)}
+  .check{width:19px;height:19px;border-radius:6px;border:1.6px solid var(--line);flex:none;display:flex;align-items:center;justify-content:center}
+  .check.on{background:var(--pine);border-color:var(--pine)}
+  .check.on:after{content:"✓";color:#fff;font-size:11px;font-weight:700}
+  .swctl{width:42px;height:24px;border-radius:999px;background:var(--line);position:relative;flex:none}
+  .swctl.on{background:var(--pine)}
+  .swctl i{position:absolute;top:2px;left:2px;width:20px;height:20px;border-radius:50%;background:#fff;transition:left .18s}
+  .swctl.on i{left:20px}
+  .btnline{height:44px;border-radius:999px;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:600}
+  .btnline.ink{background:var(--ink);color:var(--card)}
+  .btnline.gold{background:var(--gold);color:var(--ink)}
+  .btnline.ghostB{background:var(--card);color:var(--ink);border:1px solid var(--line)}
+  .btnline.danger{background:transparent;color:var(--focus);border:1.5px solid var(--focus)}
+
+  .bars{display:flex;align-items:flex-end;gap:10px;height:120px;margin-top:12px}
+  .barc{flex:1;display:flex;align-items:flex-end;justify-content:center;height:100%}
+  .bar{width:58%;border-radius:6px 6px 0 0;display:flex;flex-direction:column;justify-content:flex-end;overflow:hidden}
+  .bar i{display:block;width:100%}
+  .todaybar{position:relative}
+  .wlab{display:flex;gap:10px;margin-top:6px}
+  .wlab span{flex:1;text-align:center;font-size:11px;color:var(--sub)}
+  .wlab span.now{color:var(--pine);font-weight:700;position:relative}
+  .wlab span.now:before{content:"今";position:absolute;top:-16px;left:50%;transform:translateX(-50%);
+    background:var(--pine);color:#fff;font-size:9px;border-radius:4px;padding:0 4px;line-height:14px;font-weight:600}
+  .mgrid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-top:10px}
+  .mgrid .wh{text-align:center;font-size:10px;color:var(--sub);padding-bottom:2px}
+  .cell{height:27px;border-radius:7px;display:flex;align-items:center;justify-content:center;
+    font-size:11px;color:var(--ink);background:transparent}
+  .cell.l1{background:#EDF3EE}.cell.l2{background:#D9E8DE}.cell.l3{background:#B9D5C3}.cell.l4{background:#93BDA4}
+  .cell.today{outline:2px solid var(--pine);outline-offset:1px;font-weight:700}
+  .cell.out{color:var(--faint)}
+  .krow{display:flex;align-items:center;gap:10px;padding:7px 0}
+  .krow+.krow{border-top:1px solid var(--line)}
+  .pct{font-size:12px;color:var(--sub)}
+  .field{display:flex;align-items:center;justify-content:space-between;height:40px;
+    border:1px solid var(--line);border-radius:12px;background:var(--card);padding:0 12px;font-size:13px}
+  .field .k{color:var(--sub)}
+  .grp2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .ver{display:flex;justify-content:space-between;padding:8px 0;font-size:13px;color:var(--sub)}
+  .danger{font-size:13px;color:var(--focus);line-height:1.6;background:#FBF0EC;border-radius:12px;padding:10px 12px}
+  .kv{display:flex;justify-content:space-between;align-items:center;padding:7px 0}
+  .kv .k{color:var(--sub);font-size:13px}
+  .kv .v{font-size:14px;font-weight:600}
+  .badge{display:inline-block;font-size:11px;font-weight:600;padding:2px 9px;border-radius:999px;background:var(--tint-mint);color:#3E7A5E}
+  .sheetDim{position:absolute;inset:0;background:rgba(51,48,42,.35)}
+  .sheet{position:absolute;left:0;right:0;bottom:0;background:var(--card);border-radius:26px 26px 0 0;padding:12px 18px 18px}
+  .handle{width:44px;height:4px;border-radius:2px;background:var(--line);margin:0 auto 12px}
+  .ph{position:relative}
+  .scrim{position:absolute;inset:0;background:var(--paper);opacity:.96;border-radius:30px}
+  .shrow{display:flex;justify-content:space-between;padding:7px 0}
+  .shrow .k{color:var(--sub);font-size:13px}
+  .shrow .v{font-size:14px;font-weight:500}
+  .fx{display:flex;align-items:center;gap:8px}
+  .note{max-width:1200px;margin:34px auto 0;font-size:12px;color:#8A7F6B;line-height:1.8}
+</style>
+</head>
+<body data-page-node-id="BgW0ZtegjBNkAib2NsoLhk">
+
+<div class="top" data-page-node-id="7ygCVjN4zYQjABPRsNcTe4">
+  <h1 data-page-node-id="qdX6ICznFyH4rDx2bzYuxk">方案 E · 松林手帐 — 高保真视觉稿 v1</h1>
+  <div class="sub" data-page-node-id="wQSYa2kSY1MaujcEjzFu9u">
+    <span class="tag" data-page-node-id="fSMCh79telUH6EyKIEykWD">pinecone 安卓端</span><span class="tag" data-page-node-id="IBfSNGvRbB8QyTRNc4AGIG">真机尺寸示意 352×…</span><span class="tag" data-page-node-id="v7YqA0OK1jhFe0NcUbEiRQ">定稿：D0=A / D3 仅浅纸 / R1·R2 已修正</span><br data-page-node-id="hcqHcUM2mKxhdUBwUg1m6B">
+    纯视觉示意（HTML/CSS），非 Flutter 实现产物。令牌取 <b data-page-node-id="kTHZPmk5391oPIIPXvCHuT">#F6F1E7 纸 / #FFFDF8 卡 / #33302A 墨 / #4E7A5B 松绿</b>；
+    阶段三色仅出现在 色条 / 段选 / 进度 / 色点 / 印章；主行动按钮一律墨底纸字（无障碍 AA），「完成」为金底墨字。
+  </div>
+  <div class="palette" data-page-node-id="TLI9p6X9Yrg7uIUpN85w9J">
+    <span class="sw" data-page-node-id="Rv98XFkAJi3Z5vNYKd0GyI"><i style="background:#F6F1E7" data-page-node-id="w76nfeJyRrTd1cHZggBVvS"></i>paper</span>
+    <span class="sw" data-page-node-id="pkshIIaPmE2RkOQBEx7Cp7"><i style="background:#FFFDF8" data-page-node-id="pNll4iIbBdLFRvcw8S4JCP"></i>card</span>
+    <span class="sw" data-page-node-id="nVeRglTD3FCZzqn3llTKOq"><i style="background:#33302A" data-page-node-id="oxjsdSVgjlDr2rsPSwBG91"></i>ink</span>
+    <span class="sw" data-page-node-id="4HXJRlXfZBTzdFKyt4Usso"><i style="background:#85796A" data-page-node-id="ECbGrEWawjbdqLdemWvdaH"></i>sub</span>
+    <span class="sw" data-page-node-id="AowL1HIsZmBvH2tVFEBxSP"><i style="background:#E6DECF" data-page-node-id="4B5vX3Z1sdXhyCjfN2sFTO"></i>line</span>
+    <span class="sw" data-page-node-id="N0rKXnb5NeMufRCJ2llhua"><i style="background:#4E7A5B" data-page-node-id="8IEHYU0xb6UNCxCNT2AawF"></i>pine</span>
+    <span class="sw" data-page-node-id="Te92kmb0PKZiFIBlKNbb36"><i style="background:#D96B52" data-page-node-id="LDMEUhfd5yAmCCqpDFeMAd"></i>focus 专注</span>
+    <span class="sw" data-page-node-id="yEHhaHAHgKOOt8FVa5RMjh"><i style="background:#5FAE8B" data-page-node-id="AVA7Tz8lPcDybrih7MG48D"></i>mint 短休</span>
+    <span class="sw" data-page-node-id="TNqhXxcvLj9BVYrJBQltYM"><i style="background:#D9A441" data-page-node-id="Jov1B8Sh8LVi1IunHTfzEB"></i>gold 长休/完成</span>
+  </div>
+</div>
+
+<div class="row" data-page-node-id="R54rhoNvDHixwlA5SiHlZL">
+
+  <!-- ── 专注页 · 空闲 ─────────────────────────── -->
+  <div class="frame" data-page-node-id="7jswbTPZ4DPXkvhu2nmIG3">
+    <div class="cap" data-page-node-id="NdbPgrcV6c9ldjAwmc74mb">专注页 · 空闲（专注 25 · 任务已选）</div>
+    <div class="phone" data-page-node-id="3LEQTiS5iyLvgyOSsQyp6a"><div class="pscreen" data-page-node-id="0N5aiipVAlUxbYmhuvcKPQ">
+      <div class="date-row" data-page-node-id="uuuKGMHBkBpq2n3NWDxZsm"><span class="d" data-page-node-id="DpUwYHm8CbRj3Cuxnws6A5">9月8日 周二</span><span class="brand" data-page-node-id="kqssCVTp99okB06nLmMFTE"></span></div>
+      <div class="seg" data-page-node-id="C7yQ3sEQcUWZy4HMd1ECxw">
+        <div class="s focus on" data-page-node-id="gW48V6ev4qzrqBXliS6FNo"><i data-page-node-id="4AURAyJzmSnZuwvyfr5yMJ"></i>专注<b data-page-node-id="HHfpH5W5xHkOhsDfH4hD8r">25</b></div>
+        <div class="s mint" data-page-node-id="oPLTp4RSyCkxXT705rOieQ"><i data-page-node-id="ph7YkhwKwen4CjgDmTjpf9"></i>短休<b data-page-node-id="2OK4Dls4jbd35vsCRfQmDE">5</b></div>
+        <div class="s gold" data-page-node-id="m6s6jpEuHDtBJtTJe03FH9"><i data-page-node-id="D3lJGPoT5Sub88Jx5efcnb"></i>长休<b data-page-node-id="FZUzb0CKtXmtPhBaZcTBW5">15</b></div>
+      </div>
+      <div class="card task gap12" data-page-node-id="QulDplrNNgeXYuDfPWL2aj">
+        <span class="td" style="background:var(--focus)" data-page-node-id="HiAr4psE4Qu2IUEwn3n9UR"></span>
+        <span class="tn" data-page-node-id="vBOSVX2hHvxNbCAbxIpEdD">数学真题</span><span class="tc" data-page-node-id="xyBjc2I5odyu7kAZkzFct6">›</span>
+      </div>
+      <div class="tcard gap12" data-page-node-id="q0jnxuYAPPLoaUYKubsEKK">
+        <div class="tbar" style="background:var(--focus)" data-page-node-id="4RfULU3Txk5DUoDLzWpnpj"></div>
+        <div class="tcap" data-page-node-id="yNEZQYHuoLOufx6DxymztX"><i style="background:var(--focus)" data-page-node-id="ivWba1rWMmjHt6InPDad9e"></i>专注 · 第 1 个番茄 · 数学真题</div>
+        <div class="tclock num" data-page-node-id="bzaaF9VpK4eicRObujLXKR">25:00</div>
+        <div class="tprog" data-page-node-id="11wmQQFL2V1UH89OcbYxEx"><i style="width:0%;background:var(--focus)" data-page-node-id="ARWR4L0RETB20KUgZJve80"></i></div>
+      </div>
+      <div class="ctl gap14" data-page-node-id="gsmQpBUV8IGZtOJgvwFnwz">
+        <div class="b ghost" data-page-node-id="G7d6LsBHBm67YfYpyemDfb">重置</div>
+        <div class="b ink" data-page-node-id="i7H3SVpGaCe1V48NcbXu9v">开始</div>
+      </div>
+      <div class="card gap14" data-page-node-id="OCqk30eeF1EikzZsZewPKM">
+        <div class="r" data-page-node-id="RnWShKAHtqwyo51DtK9Lu3"><span class="dst" data-page-node-id="2UKEvwaY2aOR2zhbpMnTRQ">今日</span><span class="sub num" data-page-node-id="rvRv7HUaRghB6e4v3V16kf">84 / 200 分钟 · 3 个番茄</span></div>
+        <div class="tprog gap8" data-page-node-id="5kOGl0DTAsNqM3thZ6ACGH"><i style="width:42%;background:var(--pine)" data-page-node-id="PcE9zjrXDXRbyOkEabRVx8"></i></div>
+        <div class="srow gap8" data-page-node-id="439lQ9KI5NAWVUnYdhFSCZ">
+          <span class="check on" data-page-node-id="F0Y50ciZ5soAH4R4He0mm8"></span><span class="rowname done" data-page-node-id="XQhcpaCLQpniRdUlNzcIQf">数学真题 · 卷三订正</span>
+        </div>
+        <div class="srow" data-page-node-id="V1T4bkxiJLTx4EH9oMezQR">
+          <span class="check" data-page-node-id="AoKuvaROUzGawPDKmqfoxW"></span><span class="rowname" data-page-node-id="MQMai0DUBqiPz5Yhf9cLnE">错题整理 · 导数</span>
+        </div>
+      </div>
+      <div class="card gap12" style="margin-top:12px;padding-bottom:6px" data-page-node-id="NpJLemFicCkZ1oiVoDwDig">
+        <div class="r" data-page-node-id="KKclFxDppI9CpgzxENJ1Eo"><span class="dst" style="font-size:14px" data-page-node-id="LBMWy6kAG4Od1lvnUMMmPd">最近记录</span><span class="link" data-page-node-id="aDOJJSAMN4ZvDwBOJopilf">补记 +</span></div>
+        <div class="srow" data-page-node-id="9bj0XP3NTV62TH5mZV53D9"><span class="dot" style="background:var(--focus)" data-page-node-id="fdRomDO2OOtw6qrsISNgGB"></span><span class="rowname" data-page-node-id="GnRnD6fLfMzOmKqZW1hBfG">数学真题</span><span class="mini num" data-page-node-id="1dcCH9kgvIWyZDVis0pl9H">25 分 · 14:02</span></div>
+        <div class="srow" data-page-node-id="Oh75qr2O2G9zxIQiRU8Pdp"><span class="dot" style="background:#7F9CC0" data-page-node-id="eAlY99t0hdsrOQ9y5jY973"></span><span class="rowname" data-page-node-id="jqGpZ0ikSHjjZIKH8CPFn8">看网课</span><span class="mini num" data-page-node-id="RzdL56lemdnH9azb0sFrZi">25 分 · 13:20</span></div>
+      </div>
+      <div class="navbar" data-page-node-id="CFLwelTWYAtfzFf9bf4P05">
+        <div class="nitem on" data-page-node-id="boleBFkmR38FwQ3tL5fORL"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" data-page-node-id="Wjj0koTvmdnxtR6cfJw7mA"><circle cx="12" cy="13" r="8" data-page-node-id="6jV0OHuA5ZYQ6NwSTFstAv"/><path d="M12 9v4l2.5 2.5" data-page-node-id="pVVP1lSOO2bESspqwj5b5w"/></svg>专注</div>
+        <div class="nitem" data-page-node-id="bdBMD1cXx6KixhOKXByWBq"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" data-page-node-id="OSWWwZDW2YGt7UYjEiCryV"><path d="M6 10v9M12 5v14M18 12v7" data-page-node-id="nJrZqrAsVt2cQBRArT0EKQ"/></svg>报告</div>
+        <div class="nitem" data-page-node-id="k98DcBSN3Maa8OHhIYyYG6"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" data-page-node-id="uSWAARm2jzHNc4EvIVrBN8"><circle cx="12" cy="12" r="3" data-page-node-id="iMIr4AFPD6TvxFBli7nZuh"/><path d="M12 3v2.5M12 18.5V21M3 12h2.5M18.5 12H21M5.6 5.6l1.8 1.8M16.6 16.6l1.8 1.8M18.4 5.6l-1.8 1.8M7.4 16.6l-1.8 1.8" data-page-node-id="A0AlAe2RzFhRBZVYKUwgU6"/></svg>设置</div>
+      </div>
+    </div></div>
+  </div>
+
+  <!-- ── 专注页 · 运行 ─────────────────────────── -->
+  <div class="frame" data-page-node-id="ZwYxQLUb3USjDyhELCqNHl">
+    <div class="cap" data-page-node-id="lzcyajcMH3ksFC0OQFy2Bn">专注页 · 运行<em data-page-node-id="CgNvZdjVZyuEYfnbokhhaL">墨底暂停 + 金底完成</em></div>
+    <div class="phone" data-page-node-id="rPMVQ5Uag2RH1STcFNQzIE"><div class="pscreen" data-page-node-id="gl8rcj7UocWCUkvn4h3MLU">
+      <div class="date-row" data-page-node-id="xHuNKFt1DjxI99P0RxrlM4"><span class="d" data-page-node-id="n5Sc8frHt3lRhU6LrOHHHo">9月8日 周二</span><span class="brand" data-page-node-id="lfUmM3WILcL6yKzn3u3uGb"></span></div>
+      <div class="seg" data-page-node-id="5a3C1JcgU9PI5RQmK6eSUw">
+        <div class="s focus on" data-page-node-id="tppn6qT0k5oByHJmHH1qPx"><i data-page-node-id="qsQ2oGdjzri5XGKIiGWh0q"></i>专注<b data-page-node-id="aATF5imRm4XVG2MzPFjEjA">25</b></div>
+        <div class="s mint" data-page-node-id="FqvOFQ4kfKxG40lO8rUCv0"><i data-page-node-id="kW9NjvJdLsoo5DOgAjmeBP"></i>短休<b data-page-node-id="jYmEXrGFFpIs58f1RcODJH">5</b></div>
+        <div class="s gold" data-page-node-id="GmxuriEHZhtHWdhlWg0F8w"><i data-page-node-id="f4RNrJ0dpJ2Jt2fHvTPTzw"></i>长休<b data-page-node-id="lBkWxyLhi7JKW1BcwS4Bbn">15</b></div>
+      </div>
+      <div class="card task gap12" data-page-node-id="cuFFZTaj4QES4kQ6HW5mkK">
+        <span class="td" style="background:#7F9CC0" data-page-node-id="t6ZTBEjwVcmDYGNtAVfFNe"></span>
+        <span class="tn" data-page-node-id="hPDxfJmTLC4TFG9mNfXELa">看网课</span><span class="tc" data-page-node-id="vSGISby91Vdx1AbQjAVGOw">›</span>
+      </div>
+      <div class="tcard gap12" data-page-node-id="KSwDVXaCHbSEqIluhLmLNy">
+        <div class="tbar" style="background:var(--mint)" data-page-node-id="MRChYDV34ECBEZgFk9DlnF"></div>
+        <div class="tcap" data-page-node-id="cXl0EkTyTM2X6b5GGNXmO4"><i style="background:var(--mint)" data-page-node-id="TCIX2ElbRltA4oghvv4H0i"></i>短休 · 起身活动一下 · 05:00</div>
+        <div class="tclock num" data-page-node-id="PNzfSxuy2uERGK6IAobTvD">03:42</div>
+        <div class="tprog" data-page-node-id="0BrqR5TsoXeuL0wbEEnL9o"><i style="width:28%;background:var(--mint)" data-page-node-id="BIIQeTZuJ3zxk7kHEM5sy7"></i></div>
+      </div>
+      <div class="ctl gap14" data-page-node-id="LFiCT8mtcJKhitVkZd9HTF">
+        <div class="b ghost" data-page-node-id="FGGbV1QNdj4uOWEX4fIC3f">重置</div>
+        <div class="b ink" data-page-node-id="Sezb7gkppkC53ezIaQm9Sa">暂停</div>
+        <div class="b goldO" data-page-node-id="Qhb0rZeAghY9LLRBCzCZlG">完成</div>
+      </div>
+      <div class="card gap14" data-page-node-id="GWADXIqXOBIOpo1HVefmmG">
+        <div class="r" data-page-node-id="nUgnJ5xhZFMIBkJECD8125"><span class="dst" data-page-node-id="K2mAn7Vc6Ml1KhnNckkhWd">今日</span><span class="sub num" data-page-node-id="wTb0Yfj96QxD50Pr3gRWCc">96 / 200 分钟 · 3 个番茄</span></div>
+        <div class="tprog gap8" data-page-node-id="L9Q1XQa02fHd2j3DKDfy0x"><i style="width:48%;background:var(--pine)" data-page-node-id="YXc5F75AITMUVfMwCHru84"></i></div>
+        <div class="srow" data-page-node-id="iTtI2FZl5mAa436gEyS4b0"><span class="check on" data-page-node-id="oH3XuNe2SrenPGcb2kq0W1"></span><span class="rowname done" data-page-node-id="qp5iedS1fqiHZv2j1Y8e3t">看网课 · 中值定理</span></div>
+      </div>
+      <div class="card gap12" style="margin-top:12px;padding-bottom:6px" data-page-node-id="6mJTUDsevKkqv027oXHSm7">
+        <div class="r" data-page-node-id="C2PyBv4oD9tpZgvIk1nl7O"><span class="dst" style="font-size:14px" data-page-node-id="e1JUGii0RXLyW62mP7FsV2">最近记录</span><span class="link" data-page-node-id="3bNoOHFOhsqChU3WdhR7uE">补记 +</span></div>
+        <div class="srow" data-page-node-id="z7rGmwFLNoG9EyEVxWVfGi"><span class="dot" style="background:var(--focus)" data-page-node-id="0SCq32BSEJDXKpnYjXyyhx"></span><span class="rowname" data-page-node-id="faMc3GOxyrqafZOWP96dSB">数学真题</span><span class="mini num" data-page-node-id="dJWnBgVAJbKelcqC2vdyzM">25 分 · 14:02</span></div>
+        <div class="srow" data-page-node-id="eOZ8wSFkp3C0FPYEG01ukA"><span class="dot" style="background:#7F9CC0" data-page-node-id="gmJYfvhsPoguWBv0R8r3Af"></span><span class="rowname" data-page-node-id="Hg1xDBfCHa6qYs5NvQ2W70">看网课</span><span class="mini num" data-page-node-id="YPIbixKkTAMD4BOCmo6HLG">25 分 · 13:20</span></div>
+      </div>
+      <div class="navbar" data-page-node-id="AMjNzridBzpAso0ECSfBTp">
+        <div class="nitem on" data-page-node-id="FSfKgfmChZBozE0r8r6ZKO"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" data-page-node-id="mTGPERbI9eNfxDLJA730qK"><circle cx="12" cy="13" r="8" data-page-node-id="Z2coDkW8eLo4waOzB4pv4t"/><path d="M12 9v4l2.5 2.5" data-page-node-id="uGkRmcqMcwjvkyey8kERbJ"/></svg>专注</div>
+        <div class="nitem" data-page-node-id="bFqlBtUlDv7Lnur0y1uRar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" data-page-node-id="k6DfRp6yuDy7rgSehLAr1T"><path d="M6 10v9M12 5v14M18 12v7" data-page-node-id="r9xF2UezWtAudFcfv2RVAl"/></svg>报告</div>
+        <div class="nitem" data-page-node-id="ThlBhD6u3n1QpuxYlxLY6m"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" data-page-node-id="7rqM9s0s39RpEmTFZhNGo2"><circle cx="12" cy="12" r="3" data-page-node-id="ffGKY31X6Q4dYVONJO4mTo"/><path d="M12 3v2.5M12 18.5V21M3 12h2.5M18.5 12H21M5.6 5.6l1.8 1.8M16.6 16.6l1.8 1.8M18.4 5.6l-1.8 1.8M7.4 16.6l-1.8 1.8" data-page-node-id="YGSOZTnCEVkunCmIsQqWJC"/></svg>设置</div>
+      </div>
+    </div></div>
+  </div>
+
+  <!-- ── 专注页 · 超时（含完成章动效示意）───────── -->
+  <div class="frame" data-page-node-id="IxBMmDYgLvHPccPMDYgcJY">
+    <div class="cap" data-page-node-id="d4J5nLzTMnWHpqOGgnzpYi">专注页 · 超时<em data-page-node-id="lNBuklRed9PUboFDqMSeYH">金语义 + 完成章</em></div>
+    <div class="phone" data-page-node-id="1Ha3N2BxVPHH5STCvYTiQ2"><div class="pscreen" data-page-node-id="wuetU81RFxkwl0sbYAja36">
+      <div class="date-row" data-page-node-id="FEQkfWcj49Vm6cEe5EwTtV"><span class="d" data-page-node-id="Y0ybWlZKND5s15vktGku8L">9月8日 周二</span><span class="brand" data-page-node-id="fo9rkyO6H8hwLD4jKNhhUM"></span></div>
+      <div class="seg" data-page-node-id="KntnqefrskE9A0iDOQEBTM">
+        <div class="s focus on" data-page-node-id="XY9sCbLHaa792LzLVvK5jc"><i data-page-node-id="yEuEcQh2CUin4JLfXeQm7L"></i>专注<b data-page-node-id="78WRNFPVtXgmoX34f7hWYb">25</b></div>
+        <div class="s mint" data-page-node-id="yn6KemA0Fwc1BSFDgV0fKN"><i data-page-node-id="dmxXCCW8gGHZh5uuyCQSmD"></i>短休<b data-page-node-id="iFD5jCRL9MAuNiAAnuaKGJ">5</b></div>
+        <div class="s gold" data-page-node-id="6v7IFrKTyvpornauM4RRei"><i data-page-node-id="prGnkey4Rv7zhyfFmOYStD"></i>长休<b data-page-node-id="HQHye7NWDH98q0qCeWuHOG">15</b></div>
+      </div>
+      <div class="card task gap12" data-page-node-id="OKECJaFvqNtPoYCtCgmvn6">
+        <span class="td" style="background:var(--focus)" data-page-node-id="GTCtyYqfG33Nk5Wtxy0Y48"></span>
+        <span class="tn" data-page-node-id="tTuUqP29FGtjxAYdiGe1MW">数学真题</span><span class="tc" data-page-node-id="tS6qDZ07nzOGJFmBCGrnNQ">›</span>
+      </div>
+      <div class="tcard gap12" data-page-node-id="bG45MRSpcMvYxKKIGBk6qS">
+        <div class="stamp" data-page-node-id="3A9R4LFhy4ILrKBKIoTo25"><b data-page-node-id="Em4ulVHzXoaBHFExBkF103">✓</b><span data-page-node-id="UxJnZVMX06quW6hFP7d4eh">专注完成</span></div>
+        <div class="tbar" style="background:var(--gold)" data-page-node-id="30FXFfasXGlFl7U0Hy4Yev"></div>
+        <div class="tcap" data-page-node-id="HWlmyPuPcsrfI3UID02laj"><i style="background:var(--gold)" data-page-node-id="4QkhOA2A7ptxNoCXWKTFma"></i>已超时 · 仍在为本轮累积 · 随时可完成</div>
+        <div class="tclock goldT num" data-page-node-id="kKeI2wvOSBiO55w6GKR8Sj">+02:35</div>
+        <div class="tprog" data-page-node-id="ZIEdHa3qzY1RQtl0HYSlrl"><i style="width:100%;background:var(--gold)" data-page-node-id="8iq8jA1ChDCGeXNlYwvmUY"></i></div>
+      </div>
+      <div class="ctl gap14" data-page-node-id="BivZTvHRUxsAlr98pqAFOB">
+        <div class="b ghost" data-page-node-id="DAhK94ME2keOK4M3CysUWm">重置</div>
+        <div class="b gold" data-page-node-id="D8GIW5kXDnFfsG1VQbKfp9">完成本轮</div>
+      </div>
+      <div class="card gap14" data-page-node-id="DfRzu2XHOcUDLMX8VrDGhp">
+        <div class="r" data-page-node-id="dwJ39IxUYWD9VtE34b5lLu"><span class="dst" data-page-node-id="89H6ODSG9bx8YnxAyFebp2">今日</span><span class="sub num" data-page-node-id="E8t3951xPT5DKtmGDSdI4t">96 / 200 分钟 · 3 个番茄</span></div>
+        <div class="tprog gap8" data-page-node-id="VLnh7zJAE90LnZXywZnRAn"><i style="width:48%;background:var(--pine)" data-page-node-id="r1t5jVQilJRfCF4mqVCaaz"></i></div>
+        <div class="srow" data-page-node-id="H0Owno4dZuv7DzFf9AsXXs"><span class="check on" data-page-node-id="ecdViu3aFqUNhD9TKpA17p"></span><span class="rowname done" data-page-node-id="gmHE1FANHeoqbsIXvC2d6t">数学真题 · 卷三订正</span></div>
+      </div>
+      <div class="card gap12" style="margin-top:12px;padding-bottom:6px" data-page-node-id="2luyCdbHfq0V4xyHcF4Q00">
+        <div class="r" data-page-node-id="69jFKhYaNZOeaTr8Tt9ciZ"><span class="dst" style="font-size:14px" data-page-node-id="FxyEo6csfvwCp1UxvTsnXE">最近记录</span><span class="link" data-page-node-id="HTXjAHDHA1btpCAtxz67Eo">补记 +</span></div>
+        <div class="srow" data-page-node-id="i6KvLh2tdYvFwLpezRxbPC"><span class="dot" style="background:var(--focus)" data-page-node-id="kpVNTaSENkIUxDm61Tdow0"></span><span class="rowname" data-page-node-id="Oag5CqqzETueHoUAIOLnoa">数学真题</span><span class="mini num" data-page-node-id="KGNzMY6cWwEmnqnVB8EvQK">27 分 · 15:02</span></div>
+        <div class="srow" data-page-node-id="aASDvsTWFlsY2RukaKTymQ"><span class="dot" style="background:var(--focus)" data-page-node-id="S7sMHEY4P824qUXt25rqKh"></span><span class="rowname" data-page-node-id="VmCyuXJfMZpEFiyuUOlH62">数学真题</span><span class="mini num" data-page-node-id="R7aiIFcLcLeeFSa9JUKXCf">25 分 · 14:02</span></div>
+      </div>
+      <div class="navbar" data-page-node-id="MJtG7tB11nQhtfVWbXbXWS">
+        <div class="nitem on" data-page-node-id="BqXBR3kwWQ3e5dRUT3i3ZG"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" data-page-node-id="kWidyJiLVIuyR2Jn5QReAC"><circle cx="12" cy="13" r="8" data-page-node-id="l15lbKXCchvtbbjZTjXlyu"/><path d="M12 9v4l2.5 2.5" data-page-node-id="fniqbjRARCFDdqg7C8rBul"/></svg>专注</div>
+        <div class="nitem" data-page-node-id="Sc67vMOu1mlw5khLNHTAQ5"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" data-page-node-id="QaWvYXtVVHEQoDIhwH2pSL"><path d="M6 10v9M12 5v14M18 12v7" data-page-node-id="rSIMJuciyMtRyhX8VG52f3"/></svg>报告</div>
+        <div class="nitem" data-page-node-id="BWJxivCJTWZksWGEksb4t0"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" data-page-node-id="4vTocX76WR5YsceOfEJVeT"><circle cx="12" cy="12" r="3" data-page-node-id="m5sEkAMP2qH3vLQK3EjGIT"/><path d="M12 3v2.5M12 18.5V21M3 12h2.5M18.5 12H21M5.6 5.6l1.8 1.8M16.6 16.6l1.8 1.8M18.4 5.6l-1.8 1.8M7.4 16.6l-1.8 1.8" data-page-node-id="BJqbhEYRFkLS124mIkMoMx"/></svg>设置</div>
+      </div>
+    </div></div>
+  </div>
+
+  <!-- ── 报告页 ───────────────────────────────── -->
+  <div class="frame" data-page-node-id="EDV3jm6NWyNbpVajSBP0FI">
+    <div class="cap" data-page-node-id="15LgNXoriUm5bE7S2Gpr72">报告页<em data-page-node-id="IL3YMuyL0pmcM4QjzK1aRs">汇总 + 周分布 + 月历格 + 构成</em></div>
+    <div class="phone" data-page-node-id="fYQAIepiDQU4aOuFPqwkEf"><div class="pscreen" data-page-node-id="BvuR8lk7lqXMFaHAp2LLwm">
+      <div class="r" style="padding-top:4px" data-page-node-id="aPmFFqCO22oOkLRg8rFJ2W">
+        <span style="font-size:22px;font-weight:700" data-page-node-id="5hZIH4XBtuUWH1oPwuvo2f">专注报告</span>
+        <span style="display:flex;gap:6px" data-page-node-id="sGHnEtBT4yhFDeSjHc1gQZ">
+          <span style="background:var(--card);border:1px solid var(--line);border-radius:999px;padding:4px 12px;font-size:12px;font-weight:600" data-page-node-id="wL2E8xnXfyhWUfgLxnu52H">本周</span>
+          <span style="border-radius:999px;padding:4px 12px;font-size:12px;color:var(--sub)" data-page-node-id="yzxLORTvnaxLx6Ksx9N8by">上周</span>
+        </span>
+      </div>
+      <div class="card gap12" data-page-node-id="ZKKmVzFNSpSgFRJbNwuAkq">
+        <div style="font-size:12px;color:var(--sub)" data-page-node-id="FFBqc9WJAiQYk2HXOV8w44">本周累计 · 已专注</div>
+        <div class="num" style="font-size:34px;font-weight:600;line-height:1.1" data-page-node-id="RcPCC3doX33mG11nivliqN">8 小时 42 分</div>
+        <div style="font-size:12px;color:var(--sub);margin-top:2px" data-page-node-id="MntkPf75lWcuyw4fNHyTJ1">本周目标 <span class="num" style="color:var(--ink)" data-page-node-id="mJaqQhbDFZnXrxdImM4bFS">12 / 20</span> 个番茄 · 还差 8 个</div>
+        <div class="tprog" data-page-node-id="qeItOSYuNdCVzDxkaDMsKZ"><i style="width:60%;background:var(--gold)" data-page-node-id="EB5JG2Iq3CRNSx2G7bYFXg"></i></div>
+      </div>
+      <div class="card" style="margin-top:12px" data-page-node-id="sCjU7XkKFAMNJa1T8DY3lg">
+        <div class="r" data-page-node-id="A3TDFZLmwcf8qWpM4q70ML"><span style="font-size:14px;font-weight:700" data-page-node-id="1UJIPZmScgYmuTzFWvLzBW">每周分布</span><span style="font-size:11px;color:var(--sub)" data-page-node-id="fyykuIjf0SYQfABVV9Hbcs">单位：分钟</span></div>
+        <div class="bars" data-page-node-id="VEAVlne1S4Z4snUcK5ODSu">
+          <div class="barc" data-page-node-id="HvtDJtXo9adzujoDDVaEP0"><div class="bar" data-page-node-id="pCSQc0F7mhrk0BJb7aBuWF"><i style="height:38%;background:#7F9CC0" data-page-node-id="s7sN08tMZWYceDzIdLgte1"></i><i style="height:26%;background:var(--focus)" data-page-node-id="eek3SBvz06llliJpy4VN6B"></i></div></div>
+          <div class="barc todaybar" data-page-node-id="sfavEYpnwVFnOGNGdHn4oy"><div class="bar" style="background:#EDF3EE;padding-top:2px" data-page-node-id="W19ttYCX0B3SjuD940sSlw"><i style="height:30%;background:var(--pine)" data-page-node-id="nTBILU6UUql65C8IgrfrT7"></i><i style="height:22%;background:#7CBF9D" data-page-node-id="By0pr8oqjEdAN5mpsxj4vC"></i></div></div>
+          <div class="barc" data-page-node-id="8yHBSSpvZOYRNIQpEJm4wL"><div class="bar" data-page-node-id="HlR5EwpX3GnyFAp5IzLHkk"><i style="height:6px;background:var(--line);border-radius:3px" data-page-node-id="gxfogUWlpH5M6vzdGk61Xb"></i></div></div>
+          <div class="barc" data-page-node-id="eBBLBT9ihChdvjiKwefDE6"><div class="bar" data-page-node-id="y11JDoKhKuMFsqskbnFOjU"><i style="height:52%;background:#B78FB0" data-page-node-id="RCXDGSXeHFmeoFrZKgE1m5"></i><i style="height:28%;background:var(--focus)" data-page-node-id="HPykfuYHE9iGpXPzOT2Ps3"></i></div></div>
+          <div class="barc" data-page-node-id="k1yqhr00cSaNy06B3byCO5"><div class="bar" data-page-node-id="CMVrGfQ76KqYa2MpKbecOE"><i style="height:24%;background:#7CBF9D" data-page-node-id="QQocTMJyfKaC4gWfRievC1"></i></div></div>
+          <div class="barc" data-page-node-id="CNy9TlNyWhkQ2HGRbl2d0D"><div class="bar" data-page-node-id="GFLVeJpJeIQ5BsRXWsTdMT"><i style="height:12%;background:#CE9A64" data-page-node-id="L2AR9AWDzjx1sk46OdexmY"></i></div></div>
+          <div class="barc" data-page-node-id="S3cvDNaqTtkDHLiVtCrSZO"><div class="bar" data-page-node-id="fZcIN202pGdLiBrbKqE1Yj"><i style="height:6px;background:var(--line);border-radius:3px" data-page-node-id="pvhpP3v1jt83tDpUBKBvod"></i></div></div>
+        </div>
+        <div class="wlab" data-page-node-id="s9A9tTiJqDC2wywM0DKnex"><span data-page-node-id="XJbLk7VCdGrHqk3rTh2upI">一</span><span class="now" data-page-node-id="tYS3pAcAVFa1ndaKwT5NmY">二</span><span data-page-node-id="QhQPYdkvsmtmDWbCQJVvtE">三</span><span data-page-node-id="vOlVGgP9teA4zBaHdiT2AL">四</span><span data-page-node-id="tPoPJ8PsqHT93g0CJ9B5oZ">五</span><span data-page-node-id="9yakVhmQnjcMAsp85TMP7W">六</span><span data-page-node-id="yIDEA29R1Fv1Xfg5PIEPDh">日</span></div>
+      </div>
+      <div class="card" style="margin-top:12px" data-page-node-id="93a7QXdh7cOW0oDalMzr5E">
+        <div class="r" data-page-node-id="EluNZX8w9QCSlhJJ87ln2T"><span style="font-size:14px;font-weight:700" data-page-node-id="AP9jvbPLZDOJWlBzVtswTC">9 月 · 打卡</span><span style="font-size:11px;color:var(--sub)" data-page-node-id="J3YtyaGPwVZQVCfSGoeKb6">格内 = 番茄数，底色 = 时长</span></div>
+        <div class="mgrid" data-page-node-id="ifm72X84lX4p62boUcJWrh">
+          <span class="wh" data-page-node-id="DvuHPtAc8SPI7r9scneX8m">一</span><span class="wh" data-page-node-id="LWrVOO9gXOL5YV7qPx6DOY">二</span><span class="wh" data-page-node-id="cLgBm4nBBpOfXWWYhIkAi8">三</span><span class="wh" data-page-node-id="bzDWlolGM5Sc0Y5EXFtjgb">四</span><span class="wh" data-page-node-id="F3tBJzji1951LjaD85aF6n">五</span><span class="wh" data-page-node-id="BH3DprpNshn6n7lmk4aNvP">六</span><span class="wh" data-page-node-id="4jPIG6oczPGh42MHCx4CiA">日</span>
+          <span class="cell out" data-page-node-id="Fd8zYIipP82N47EqIkvNmB">1</span><span class="cell l1" data-page-node-id="WWGcBBRFu2pqA3TibAnaOx">1</span><span class="cell l2" data-page-node-id="XsJAPRm2iXIQnVNlsjQGgV">3</span><span class="cell" data-page-node-id="B8XFGqnlnygRTBzGnD5Fii">0</span><span class="cell l4" data-page-node-id="EmDa6d1nSEOgxJN5sQaRQO">6</span><span class="cell l2" data-page-node-id="JBqOrDZpDgLUJyV0UIrGDV">3</span><span class="cell" data-page-node-id="OU3k6eBhAXCvXO2MPNRS7G">0</span>
+          <span class="cell l1" data-page-node-id="ienrBgfnjqlRC5GWrWiihf">2</span><span class="cell l3" data-page-node-id="KVcZvTfsQcK4XME4jUToCq">4</span><span class="cell l1" data-page-node-id="vSvmldMExSACZoGJm0dhAs">1</span><span class="cell l2" data-page-node-id="gdR2dKDnKjtJzED8elZwHh">3</span><span class="cell" data-page-node-id="N4kWdgpO77HpGq748ujDmS">0</span><span class="cell l4" data-page-node-id="CCevu8Md7sCqcdHJovoHya">7</span><span class="cell l2" data-page-node-id="62sRqPIMqDaIeRkbHtUed8">2</span>
+          <span class="cell l1" data-page-node-id="mR8zMP3fnDtR0geXHXWVov">1</span><span class="cell l3" data-page-node-id="VztOcREHfaiggXmTYBSagO">5</span><span class="cell l2" data-page-node-id="ltKmSZGNd8bMEeHZDxAiA1">3</span><span class="cell" data-page-node-id="7Nf8e73uQb0IG4YEBNebAD">0</span><span class="cell l1" data-page-node-id="YTd6h46M2Fr39zgETD7sdZ">2</span><span class="cell" data-page-node-id="vZsUmPNEayZ5rpbXVBaNI2">0</span><span class="cell l3" data-page-node-id="dIUaKxJxaQRwrRV5U5DGdD">4</span>
+          <span class="cell l2" data-page-node-id="dawPG7FybVIQHyqCr2GRoF">3</span><span class="cell today l4" data-page-node-id="VZbJA5079EFzvySlW1ntfB">6</span><span class="cell l1" data-page-node-id="8dPZnHVCZHssq3eQ4xKrem">1</span><span class="cell" data-page-node-id="b7vsvGkIiTSGV7h3BJHEDy">0</span><span class="cell l2" data-page-node-id="tQoV9jy4BF6EDEKa9c0b0r">3</span><span class="cell l1" data-page-node-id="mTR8gO9XHKV4K957CV1RdB">2</span><span class="cell" data-page-node-id="XP6mUHyROkexduUFslPE64">0</span>
+          <span class="cell l3" data-page-node-id="MqTjqxBTcs5NpFvIRjm9Se">5</span><span class="cell l1" data-page-node-id="jP3JKjltMOW8rBVLqcMGDg">1</span><span class="cell l2" data-page-node-id="mWyUaBKZ6qQKcjhieIKqfL">3</span>
+        </div>
+      </div>
+      <div class="card" style="margin-top:12px" data-page-node-id="7Onu9Q0TF9hRiYjQLXjDUH">
+        <div style="font-size:14px;font-weight:700" data-page-node-id="0qQpqeh3BMPH9jzLRORKCL">事件构成</div>
+        <div class="krow" data-page-node-id="Dio7WN5b9EcERtA7Qad7n6"><span class="dot" style="background:var(--focus)" data-page-node-id="aMQ2es8C2a99U3oXLgZr3g"></span><span class="rowname" style="font-size:13px" data-page-node-id="8Tug7v16htD9Nj5BzqF4cq">数学真题</span><span class="pct num" data-page-node-id="Z9ZAxMSgRe87H1dEPKgcl5">46%</span></div>
+        <div class="krow" data-page-node-id="FwegknEJ5mB9qgL3nApOcy"><span class="dot" style="background:#7F9CC0" data-page-node-id="O6U5CsV4FgLZwpyTnIpJO2"></span><span class="rowname" style="font-size:13px" data-page-node-id="5hBHBRoEP86r8zquAhbdEY">看网课</span><span class="pct num" data-page-node-id="gDfrfj2FDCERlrrlQKfzxI">31%</span></div>
+        <div class="krow" data-page-node-id="PPjJH08vyi4CCTO6fVMKBO"><span class="dot" style="background:#B78FB0" data-page-node-id="UhC8keJnmaW2kBLRjPaCl5"></span><span class="rowname" style="font-size:13px" data-page-node-id="TkXTvhPC4jEKL6JsYxHDRz">错题整理</span><span class="pct num" data-page-node-id="GvY0X6LzqtUO9KnosOfrAm">23%</span></div>
+      </div>
+      <div class="navbar" data-page-node-id="D4zF7WE1voIbWFHkpOw4vN">
+        <div class="nitem" data-page-node-id="Gv3OXegHR7PoP3EPGAbGXk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" data-page-node-id="xJlogoSCNXyDZNqItqwmhs"><circle cx="12" cy="13" r="8" data-page-node-id="P0xnEhJkkk9HvjV1qsQEjx"/><path d="M12 9v4l2.5 2.5" data-page-node-id="H052JJ0ca5DNjT5RS5cAfP"/></svg>专注</div>
+        <div class="nitem on" data-page-node-id="Ub8VUR6RbmdmWfPO8Cm0KI"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" data-page-node-id="QkaSMBC2jsquXvbEXmipVL"><path d="M6 10v9M12 5v14M18 12v7" data-page-node-id="cpAmQN487C92o3uMSIQhRy"/></svg>报告</div>
+        <div class="nitem" data-page-node-id="nhXNeHvrdShdXcQeGB9KY1"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" data-page-node-id="rtdHVRh0pkLPgfCLR5RCxd"><circle cx="12" cy="12" r="3" data-page-node-id="tdX4IphTh8x8zRBCdFyEiE"/><path d="M12 3v2.5M12 18.5V21M3 12h2.5M18.5 12H21M5.6 5.6l1.8 1.8M16.6 16.6l1.8 1.8M18.4 5.6l-1.8 1.8M7.4 16.6l-1.8 1.8" data-page-node-id="laUC6ofrDYWbDFjvWH8Ba3"/></svg>设置</div>
+      </div>
+    </div></div>
+  </div>
+
+  <!-- ── 设置页 ───────────────────────────────── -->
+  <div class="frame" data-page-node-id="lcdeP4ckfmBCsfgjQz89jF">
+    <div class="cap" data-page-node-id="VGZbeMOMep6aa5QVotrjBm">设置页<em data-page-node-id="EUObYrBLv5QthQnGms3K46">四区卡片 · 无「外观」（仅浅纸）</em></div>
+    <div class="phone" data-page-node-id="GEKY9Yaz68YKOfAU60IwS3"><div class="pscreen" data-page-node-id="wssHfHOgcYDT48mniV7dwP">
+      <div style="font-size:22px;font-weight:700;padding:4px 0 2px" data-page-node-id="DBcAA9HVJvJIAcHK8NgPjI">设置</div>
+
+      <div class="sec" data-page-node-id="0Na9EA6GnhqU6bHejOv0Qm"><i data-page-node-id="TKOvXHd6TqYPUs4qzZL4wg"></i>计时与目标</div>
+      <div class="card" data-page-node-id="n1fVJFuewPUepkyh8mmMXS">
+        <div class="grp2" data-page-node-id="vWb5X0QF4MrTfLGbER6M3N">
+          <div class="field" data-page-node-id="HtDKU5rzB06I8VPVekjMe3"><span class="k" data-page-node-id="e81sJ50C9KXXYTz7ckX3e6">专注</span><span class="num" style="font-weight:600" data-page-node-id="rrA2imrRf9M5D9Yz9kXqVd">25 分</span></div>
+          <div class="field" data-page-node-id="3j0Ba02vUaH2rlWF9i20RS"><span class="k" data-page-node-id="jjPGleGNw6iNgaPf9kzHKi">短休</span><span class="num" style="font-weight:600" data-page-node-id="BTdoVS12nVYyD6BnfYquqp">5 分</span></div>
+          <div class="field" data-page-node-id="l9ncFnEuZPkM6smOdqVLVy"><span class="k" data-page-node-id="QaLF3GdisnMmJZxKTmTtRs">长休</span><span class="num" style="font-weight:600" data-page-node-id="fuJTp8TL0gwd2SvmwdmUa1">15 分</span></div>
+          <div class="field" data-page-node-id="JJMGTfIs1mT3eLQ3bIuqMw"><span class="k" data-page-node-id="jGjWjPil2rZIJJY45sd5U2">今日目标</span><span class="num" style="font-weight:600" data-page-node-id="rVpHbvaWJDSgPansBm5ZwF">200 分</span></div>
+          <div class="field" style="grid-column:1/-1" data-page-node-id="RTiwzUx9RUl9H4ij8Oyh4d"><span class="k" data-page-node-id="JjfGyIFfeP3cGO2SCad74m">本周目标</span><span class="num" style="font-weight:600" data-page-node-id="qn76qnqSCsvK6oRiiFIHeH">20 次</span></div>
+        </div>
+        <div class="btnline ink" style="margin-top:10px" data-page-node-id="KHAUbHRws3IO2Q8c8AHNuQ">保存</div>
+      </div>
+
+      <div class="sec" data-page-node-id="9NKJyGJWFrUEACnwUOB1ta"><i data-page-node-id="iHbrlk9SyI60dAjknEuTfe"></i>提醒</div>
+      <div class="card" style="padding-top:8px;padding-bottom:8px" data-page-node-id="XiPtJf6gqzRTG9BihY0vHs">
+        <div class="srow" data-page-node-id="hRzAYgj7rBXB7BafIMxT8Y"><span class="rowname" data-page-node-id="EfDUM7GKcTfjIFmm1VYPE2">结束通知</span><span class="swctl on" data-page-node-id="eNoJmT0i84rQKn1R8Rk9RK"><i data-page-node-id="QO6no2RnpFBPMId3S7ax0F"></i></span></div>
+        <div class="srow" data-page-node-id="dEtsmZbP2v2eC1gxsw4cka"><span class="rowname" data-page-node-id="NMcyl9uEYP8zCW8LFKgAVQ">完成提示音</span><span class="swctl on" data-page-node-id="HBAacdJdG3Q3AEv2iKz4lJ"><i data-page-node-id="NzraGrIxLdEKBPZkAqxeiX"></i></span></div>
+        <div class="srow" data-page-node-id="gCbe4uDn2hDd0B3WyvPJvp"><span class="rowname" data-page-node-id="QSNUv1QfL1c7FNkBnxwW46">锁屏剩余时间</span><span class="swctl" data-page-node-id="1IY1gbOccUoKWrE6GnVK6A"><i data-page-node-id="qIKqDOYJdJokhckIopmBnH"></i></span></div>
+      </div>
+
+      <div class="sec" data-page-node-id="I9oCvJOGohlA1jmfzEF4Qn"><i data-page-node-id="EFtVq9kbxqG1dqmoVA1p4N"></i>云端同步</div>
+      <div class="card" style="padding-top:6px;padding-bottom:6px" data-page-node-id="0XKvGhZ1uXfITeAwRWYBZF">
+        <div class="kv" data-page-node-id="FkY6UmGAUIACDTz7r29fLl"><span class="k" data-page-node-id="y3odA0J7LRM8xjIajBIK7n">同步码</span><span class="v num" data-page-node-id="3rJoUKyWsU1HkLNHj6Ejk8">•••••••• 9F3C</span></div>
+        <div style="display:flex;gap:8px;margin-top:6px" data-page-node-id="Xcnmb1QHyHDDXNE8cmxBG7">
+          <div class="btnline ghostB" style="flex:1" data-page-node-id="CcQTAum5kYJHmfVg3nnFT0">上传本机数据</div>
+          <div class="btnline ghostB" style="flex:1" data-page-node-id="fMR4EwxmoluB9NCDN5E1jy">从云端恢复</div>
+        </div>
+        <div class="kv" data-page-node-id="mz1ogvpiV0VGDJg2SyB9kQ"><span class="k" data-page-node-id="hRZfMQZ1RORSH8gjQAGaA6">服务地址</span><span class="v" style="font-size:12px" data-page-node-id="i4CN0DBWUf2zn7JsEWzP8b">sync.example.com</span></div>
+      </div>
+
+      <div class="sec" data-page-node-id="IuY97qvE1jGc2KIFjldhDg"><i data-page-node-id="7HZzgihdlkoGjigkLvtgC4"></i>关于</div>
+      <div class="card" style="padding-top:6px;padding-bottom:6px" data-page-node-id="K9fLDD6RSKGQMrQ2H2auxF">
+        <div class="kv" data-page-node-id="W8rtsNpnWvRMW3C5NxH6tn"><span class="k" data-page-node-id="NS2JjBBX1thHGHkjfJsWx0">版本</span><span class="v num" data-page-node-id="UBNrzhTePf2xUQ2Mi3GAec">v1.2.0</span></div>
+        <div class="kv" data-page-node-id="yUOyUh550WjoFF6o04MG5S"><span class="k" data-page-node-id="50KZRiRdgWcSmHoAtDQEBD">开源</span><span class="v" style="font-size:12px" data-page-node-id="3oCv23pRzUbO2HSzo92Lrz">github.com/pinecone</span></div>
+      </div>
+
+      <div class="sec" data-page-node-id="AVCXH6AEiSze9029zKKeip"><i data-page-node-id="0OkihBKE0Dt1WCBsXSDU9u"></i>本机数据</div>
+      <div style="background:var(--card);border-radius:20px;box-shadow:var(--shadow);padding:14px 16px" data-page-node-id="dKGZMmWkd8boCVxPEwlaPI">
+        <div class="danger" data-page-node-id="TZb0QHDzWSmtYCzzljg8rV">清空后将删除全部专注记录与清单，云端备份不受影响，此操作不可撤销。</div>
+        <div class="btnline danger" style="margin-top:10px" data-page-node-id="cMSpg1zdIohE0CbGVcxi0y">清空全部记录</div>
+      </div>
+
+      <div class="navbar" data-page-node-id="U5gOeyMQFnlVXErp0EDxgf">
+        <div class="nitem" data-page-node-id="HXZMpynNiOcGhJrk62rKvt"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" data-page-node-id="XJIabo8OoBOArCpMQNs86u"><circle cx="12" cy="13" r="8" data-page-node-id="1KgCwaQNvGPDkViW7cae6D"/><path d="M12 9v4l2.5 2.5" data-page-node-id="ZdksglRf2WMlANXYmioImk"/></svg>专注</div>
+        <div class="nitem" data-page-node-id="T253y72eTghAmVvq46TmGn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" data-page-node-id="GSRFEOF0CnpA90eh6Vvqgf"><path d="M6 10v9M12 5v14M18 12v7" data-page-node-id="Ms5ZWgT75ZnZ1acjjtqfp9"/></svg>报告</div>
+        <div class="nitem on" data-page-node-id="TAbJy78Sb7aH3zl1zYr9P5"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" data-page-node-id="faf7m42C8ODIMkIf5CRjBZ"><circle cx="12" cy="12" r="3" data-page-node-id="vz9I5uvzDcwfs3T2HeUDCZ"/><path d="M12 3v2.5M12 18.5V21M3 12h2.5M18.5 12H21M5.6 5.6l1.8 1.8M16.6 16.6l1.8 1.8M18.4 5.6l-1.8 1.8M7.4 16.6l-1.8 1.8" data-page-node-id="LMLgiVEvfU5mW8weoH41UC"/></svg>设置</div>
+      </div>
+    </div></div>
+  </div>
+
+  <!-- ── 记录详情 sheet ───────────────────────── -->
+  <div class="frame" data-page-node-id="cVTNEX0Gm8KcqFcU09J4n5">
+    <div class="cap" data-page-node-id="oq6KfZz1d2bfFwosbqWUFz">记录详情 · 底部纸面<em data-page-node-id="URYouXRzzh3T3OvQHauZC4">二级层 · 下钻</em></div>
+    <div class="phone" data-page-node-id="8ZKKGUzS9cXOjoZpFs2dXH"><div class="pscreen ph" style="height:560px" data-page-node-id="QAAZc9hsIR7LbJCK7y1FRq">
+      <div class="scrim" style="opacity:1" data-page-node-id="BuigQnTF4lsxEOdXXTdHuz"></div>
+      <div style="position:relative;padding:2px 0 90px;opacity:.55" data-page-node-id="EivHoYNb6E7WhJlxwpRwR1">
+        <div class="date-row" data-page-node-id="w7unBavqxzL7B6ToW3eSM9"><span class="d" data-page-node-id="f6mLfmSBeBN4T3jHckljSi">9月8日 周二</span><span class="brand" data-page-node-id="5jROwbBIwTfJRMJ6V9KJcF"></span></div>
+        <div class="card gap12" style="margin-top:12px;height:180px" data-page-node-id="t3sM8h3qY1lSAmK6GwGvkb"></div>
+        <div class="card" style="margin-top:12px;height:120px" data-page-node-id="zwohCXXS9FjQY2qtAsj3F8"></div>
+      </div>
+      <div class="sheet" data-page-node-id="KrKNwRBh6q3Ih4Ycptw5FS">
+        <div class="handle" data-page-node-id="qPfYQLTHgHZqVHOgl3F8Jj"></div>
+        <div class="r" data-page-node-id="JCLxaGgNiishGl0aX30Ji4"><span style="font-size:17px;font-weight:700" data-page-node-id="2LNFkPAS923FAwkEwtGjId">记录详情</span>
+          <span class="badge" data-page-node-id="hSURGWmNzHOWp2onyoyOmc">已完成</span></div>
+        <div style="margin-top:10px" data-page-node-id="sGvBcxiRqkDHzllVMVv91J">
+          <div class="shrow" data-page-node-id="L0Zh72Lg7Izy5CWVzRGkfS"><span class="k" data-page-node-id="SZqehvhesJxlV1qWmq4vzR">专注事件</span><span class="v" data-page-node-id="9EPKNi0deZ0Qfe3r1EGjXC">数学真题</span></div>
+          <div class="shrow" data-page-node-id="IAnIpLEU8p9nBh2TyCO90l"><span class="k" data-page-node-id="Dv1HIYcdSUpA1EBkbDvOZR">时长</span><span class="v num" data-page-node-id="FTmLEk7fcZMBRuuKGmPH7A">27 分钟</span></div>
+          <div class="shrow" data-page-node-id="jMaIpIHA0Cra4iOxs4uBcu"><span class="k" data-page-node-id="ZNwRQt76KNiRlicG4xZMCD">状态</span><span class="v" data-page-node-id="BhbaBk0PUFhwjBwL3dVRBI">专注 · 到点后继续累积</span></div>
+          <div class="shrow" data-page-node-id="gUKjIzxu9xlEATclv7Fud3"><span class="k" data-page-node-id="LzAFrxgc7ueIZr5eu0xCQC">完成于</span><span class="v num" data-page-node-id="ZsmHJrCaVF8qKc7KznJMSe">15:02 · 9月8日</span></div>
+        </div>
+        <div class="btnline danger" style="margin-top:12px" data-page-node-id="mCf0uh8p9HNEgR6ZqVfTbe">删除这条记录</div>
+      </div>
+    </div></div>
+  </div>
+
+</div>
+
+<div class="note" data-page-node-id="X6bv1yZFBy0Y6QCVDAR7Lt">
+  说明：① 视觉稿全部使用定稿令牌与 R1/R2 修正（今日目标按分钟、主按钮墨底、完成金底）；② 「完成章」与清单勾选为完成时刻动效示意；③ 月历格底色为当日专注分钟数色阶（松绿 α），格内数字为番茄数——数据口径见设计方案 §12.2；④ 图标为示意占位，最终以 Flutter Material Icons / 自绘为准。
+</div>
+
+</body>
+</html>

@@ -135,27 +135,25 @@ class StatsView {
   }
 
   static StatsView of(AppData data, DateTime now) {
-    final today = dateKey(now);
-    final monday = mondayOf(now);
+    final statToday = statDayOf(now);
+    final today = ymdOf(statToday);
+    final monday = mondayOf(statToday);
     final counted = data.records.where((record) => record.counted).toList();
 
     double todayMinutes = 0;
     double weekMinutes = 0;
-    var todayCount = 0;
-    var weekCount = 0;
+    final weekDayMinutes = List<double>.filled(7, 0);
     final weekTaskTotals = {for (var i = 0; i < 7; i++) i: <String, double>{}};
     final days = <String>{};
 
     for (final record in counted) {
-      final day = record.day;
       if (record.dayKey == today) {
         todayMinutes += record.minutes;
-        todayCount += 1;
       }
-      final offset = day.difference(monday).inDays;
+      final offset = record.day.difference(monday).inDays;
       if (offset >= 0 && offset < 7) {
         weekMinutes += record.minutes;
-        weekCount += 1;
+        weekDayMinutes[offset] += record.minutes;
         weekTaskTotals[offset]!.update(
           record.taskName,
           (value) => value + record.minutes,
@@ -171,9 +169,10 @@ class StatsView {
       final live = view.elapsedMinutes;
       if (live > 0) {
         todayMinutes += live;
-        final offset = dayStart(now).difference(monday).inDays;
+        final offset = statToday.difference(monday).inDays;
         if (offset >= 0 && offset < 7) {
           weekMinutes += live;
+          weekDayMinutes[offset] += live;
           weekTaskTotals[offset]!.update(
             data.selectedTask.name,
             (value) => value + live,
@@ -183,12 +182,21 @@ class StatsView {
       }
     }
 
+    // 番茄计数改为「时长当量」：满 50 分钟 1 个，缺口不足 15 分钟补齐（见
+    // models.pomodoroEquiv），日/周/月历统一口径。原「完成次数」口径仅保留
+    // 在 complete() 的休息轮换里。
+    final todayCount = pomodoroEquiv(todayMinutes);
+    final weekCount =
+        weekDayMinutes.fold<int>(0, (sum, m) => sum + pomodoroEquiv(m));
+
+    // 连续天数按统计日序列回溯（dateKey 已是统计日口径，cursor 用统计日零点
+    // 直接格式化，避免 0~3 点时段错位）。
     var streak = 0;
-    var cursor = dayStart(now);
-    if (!days.contains(dateKey(cursor))) {
+    var cursor = statToday;
+    if (!days.contains(ymdOf(cursor))) {
       cursor = cursor.subtract(const Duration(days: 1));
     }
-    while (days.contains(dateKey(cursor))) {
+    while (days.contains(ymdOf(cursor))) {
       streak += 1;
       cursor = cursor.subtract(const Duration(days: 1));
     }
@@ -324,7 +332,10 @@ class TimerEngine {
           );
         }).toList(),
       );
-      final completedToday = StatsView.of(next, now).todayCount;
+      // 休息轮换按「完成次数」口径（当量口径只用于统计展示，见 StatsView）。
+      final completedToday = next.records
+          .where((r) => r.counted && r.dayKey == dateKey(now))
+          .length;
       final nextMode = completedToday % 4 == 0 && completedToday > 0
           ? SessionMode.longBreak
           : SessionMode.shortBreak;
@@ -355,11 +366,25 @@ class TimerEngine {
     );
   }
 
-  /// 切换阶段：中断当前会话并回到待开始状态。
-  static AppData switchMode(AppData data, SessionMode mode) {
+  /// 切换阶段：**不打断进行中的会话**。
+  ///
+  /// - 无会话：仅切换待开始模式；
+  /// - 切到会话所属模式：若被挂起（暂停）则继续走表；
+  /// - 切到其他模式：运行中自动暂停冻结（已专注时长与剩余都保留），
+  ///   新模式以 idle 态呈现；切回原模式时时间从冻结点继续。
+  /// 「挂起会话存在时开始新模式」由 complete() 语义承接：先按已专注时长
+  /// 落记录，再自动进入休息——不丢数据，统计只记一份。
+  static AppData switchMode(AppData data, SessionMode mode, DateTime now) {
     final session = data.activeSession;
     if (session == null) return data.copyWith(idleMode: mode);
-    return discard(data).copyWith(idleMode: mode);
+    if (session.mode == mode) {
+      // 切回会话所属模式：被挂起则继续走表，并把待开始模式归位。
+      return session.running
+          ? data.copyWith(idleMode: mode)
+          : resume(data, now).copyWith(idleMode: mode);
+    }
+    final next = session.running ? pause(data, now) : data;
+    return next.copyWith(idleMode: mode);
   }
 
   /// 会话实时镜像：用对端发布的快照重建本机会话（对等控制，见 docs/05 §8）。

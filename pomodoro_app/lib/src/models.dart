@@ -62,19 +62,37 @@ extension RecordStatusX on RecordStatus {
   }
 }
 
-/// 本地日期键 `YYYY-MM-DD`，与网页端 `dateKey()` 一致。
-String dateKey(DateTime date) => [
-      date.year.toString().padLeft(4, '0'),
-      date.month.toString().padLeft(2, '0'),
-      date.day.toString().padLeft(2, '0'),
+/// 统计日的分界时刻：凌晨 3 点。0:00–2:59 记入前一个统计日
+/// （熬夜场景：凌晨的专注算「昨天」，明天再早起不算跨两天）。
+const Duration statDayBoundary = Duration(hours: 3);
+
+/// [dt] 所属统计日的自然日零点（凌晨 3 点分界）。
+DateTime statDayOf(DateTime dt) => dayStart(dt.subtract(statDayBoundary));
+
+/// `YYYY-MM-DD` 格式化（不做任何时区/分界换算）。
+String ymdOf(DateTime d) => [
+      d.year.toString().padLeft(4, '0'),
+      d.month.toString().padLeft(2, '0'),
+      d.day.toString().padLeft(2, '0'),
     ].join('-');
+
+/// 本地「统计日」键 `YYYY-MM-DD`：以凌晨 3 点为两天的分界。
+/// 记录归属（dayKey）、今日清单、统计聚合统一使用本口径。
+String dateKey(DateTime date) => ymdOf(statDayOf(date));
 
 DateTime dayStart(DateTime date) => DateTime(date.year, date.month, date.day);
 
-/// 本周一 00:00。
+/// 本周一 00:00（基于传入时刻；统计场景请传 `statDayOf(now)`）。
 DateTime mondayOf(DateTime date) {
   final day = dayStart(date);
   return day.subtract(Duration(days: day.weekday - 1));
+}
+
+/// 番茄当量：每满 50 分钟记 1 个番茄；距整段缺口不足 15 分钟时补齐进位，
+/// 否则向下取整。示例：34→0、35→1、49→1、50→1、84→1、85→2。
+int pomodoroEquiv(double minutes) {
+  if (minutes <= 0) return 0;
+  return (minutes + 15) ~/ 50;
 }
 
 class PineTask {

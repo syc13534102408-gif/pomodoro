@@ -271,23 +271,30 @@ class _MonthlyReview extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final now = DateTime.now();
-    final monthRecords = data.records.where((record) =>
-        record.counted &&
-        record.at.year == now.year &&
-        record.at.month == now.month);
+    // 月历按「统计日」（凌晨 3 点分界）分桶：0:00–2:59 的记录归前一天。
+    final statNow = statDayOf(now);
+    final monthRecords = data.records.where((record) {
+      if (!record.counted) return false;
+      final day = statDayOf(record.at);
+      return day.year == statNow.year && day.month == statNow.month;
+    }).toList();
     final minutes = monthRecords.fold<double>(0, (sum, r) => sum + r.minutes);
-    final count = monthRecords.length;
-    final activeDays = monthRecords.map((r) => r.at.day).toSet().length;
-    final daysInMonth = DateTime(now.year, now.month + 1, 0).day;
+    // 番茄数统一走时长当量（满 50 分钟 1 个，缺口不足 15 分钟补齐）。
+    final count = pomodoroEquiv(minutes);
+    final activeDays = monthRecords.map((r) => statDayOf(r.at).day).toSet().length;
+    final daysInMonth = DateTime(statNow.year, statNow.month + 1, 0).day;
     final dayValues = List<double>.filled(daysInMonth, 0);
-    final dayCounts = List<int>.filled(daysInMonth, 0);
     final byTask = <String, double>{};
     for (final record in monthRecords) {
-      dayValues[record.at.day - 1] += record.minutes;
-      dayCounts[record.at.day - 1] += 1;
+      final day = statDayOf(record.at).day;
+      dayValues[day - 1] += record.minutes;
       byTask[record.taskName] = (byTask[record.taskName] ?? 0) + record.minutes;
     }
-    final monthName = '${now.year}年${now.month}月';
+    // 格内数字 = 当日番茄当量（按当日总分钟换算，非记录条数）。
+    final dayCounts = [
+      for (final m in dayValues) pomodoroEquiv(m),
+    ];
+    final monthName = '${statNow.year}年${statNow.month}月';
     final tasks = byTask.entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value));
     final taskPeak = tasks.isEmpty ? 1.0 : tasks.first.value;
@@ -350,11 +357,11 @@ class _MonthlyReview extends StatelessWidget {
           ),
           const SizedBox(height: 10),
           _MonthGrid(
-            year: now.year,
-            month: now.month,
+            year: statNow.year,
+            month: statNow.month,
             dayValues: dayValues,
             dayCounts: dayCounts,
-            todayDay: now.day,
+            todayDay: statNow.day,
           ),
           if (tasks.isNotEmpty) ...[
             const SizedBox(height: 18),

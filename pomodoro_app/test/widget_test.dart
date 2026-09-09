@@ -129,11 +129,11 @@ void main() {
         at: now.subtract(Duration(hours: 3 - i)),
       );
     }
-    expect(StatsView.of(data, now).todayCount, 3);
+    expect(StatsView.of(data, now).todayCount, 1); // 75 分钟 → 1 个番茄当量
 
     data = TimerEngine.start(data, SessionMode.focus, now);
     data = TimerEngine.complete(data, now.add(const Duration(minutes: 25)));
-    expect(StatsView.of(data, now).todayCount, 4);
+    expect(StatsView.of(data, now).todayCount, 2); // 100 分钟 → 2 个
     expect(data.activeSession!.mode, SessionMode.longBreak);
   });
 

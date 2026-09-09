@@ -549,7 +549,10 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         minutes: next.settings.focus.toDouble(),
         at: now,
       );
-      final count = StatsView.of(next, now).todayCount;
+      // 休息轮换按完成次数口径（同 engine.complete）。
+      final count = next.records
+          .where((r) => r.counted && r.dayKey == dateKey(now))
+          .length;
       final breakMode = count > 0 && count % 4 == 0
           ? SessionMode.longBreak
           : SessionMode.shortBreak;
@@ -595,10 +598,46 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
   void _switchMode(SessionMode mode) {
     unawaited(Notifier.cancel());
-    _apply(TimerEngine.switchMode(_data, mode), force: true);
+    _apply(TimerEngine.switchMode(_data, mode, DateTime.now()), force: true);
   }
 
   void _replace(AppData next) => _apply(next, force: true);
+
+  /// 会话是否处于「挂起」：会话存在，但用户切到了其他模式——
+  /// 会话被暂停冻结保留，切回其所属模式即继续。
+  bool _isSuspended() {
+    final session = _data.activeSession;
+    return session != null && session.mode != _data.idleMode;
+  }
+
+  /// 当前应显示的会话：挂起时返回 null（显示所选模式的待开始视图），
+  /// 并由 [_suspendBanner] 提示挂起中的会话。
+  ActiveSession? get _displaySession =>
+      _isSuspended() ? null : _data.activeSession;
+
+  SessionView _displayView(DateTime now) {
+    if (_isSuspended()) return _idleView;
+    return SessionView.of(_data, now) ?? _idleView;
+  }
+
+  /// 挂起提示条：告诉用户「没丢，切回就继续」。
+  Widget _suspendBanner() {
+    final session = _data.activeSession!;
+    final view = SessionView.of(_data, DateTime.now());
+    final left = view?.clockText ?? '';
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: PineColors.tint(PineColors.gold),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Text(
+        '${session.mode.label}已暂停 · $left · 切回「${session.mode.label}」继续',
+        style: const TextStyle(color: PineColors.ink, fontSize: 12),
+      ),
+    );
+  }
 
   SessionView get _idleView {
     final planned = _data.settings.forMode(_data.idleMode) * 60;
@@ -666,8 +705,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   /// → 今日卡 → 最近记录。整页可滚动，杜绝小屏/大字号溢出。
   Widget _timerTab() {
     final now = DateTime.now();
-    final session = _data.activeSession;
-    final view = SessionView.of(_data, now) ?? _idleView;
+    final session = _displaySession;
+    final view = _displayView(now);
     final stats = StatsView.of(_data, now);
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -680,10 +719,14 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               _dateHeader(),
               SizedBox(height: compact ? 8 : 12),
               ModeSwitcher(
-                current: view.mode,
+                current: _data.idleMode,
                 minutesFor: _data.settings.forMode,
                 onChanged: _switchMode,
               ),
+              if (_isSuspended()) ...[
+                SizedBox(height: compact ? 8 : 12),
+                _suspendBanner(),
+              ],
               SizedBox(height: compact ? 8 : 12),
               _taskPicker(),
               SizedBox(height: compact ? 10 : 14),
@@ -711,7 +754,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 ),
               ),
               SizedBox(height: compact ? 8 : 12),
-              _controls(session, view),
+              _controls(session, view, suspended: _data.activeSession),
               SizedBox(height: compact ? 8 : 12),
               _metrics(stats),
               SizedBox(height: compact ? 8 : 12),
@@ -731,8 +774,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
   Widget _buildDesktop(BuildContext context) {
     final now = DateTime.now();
-    final session = _data.activeSession;
-    final view = SessionView.of(_data, now) ?? _idleView;
+    final session = _displaySession;
+    final view = _displayView(now);
     return Scaffold(
       body: CallbackShortcuts(
         bindings: {
@@ -871,12 +914,16 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                   child: ConstrainedBox(
                     constraints: const BoxConstraints(maxWidth: 320),
                     child: ModeSwitcher(
-                      current: view.mode,
+                      current: _data.idleMode,
                       minutesFor: _data.settings.forMode,
                       onChanged: _switchMode,
                     ),
                   ),
                 ),
+                if (_isSuspended()) ...[
+                  const SizedBox(height: 10),
+                  _suspendBanner(),
+                ],
                 const SizedBox(height: 12),
                 // 任务行（轻量，非卡片）：整行可点换任务。
                 Center(
@@ -927,7 +974,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 Center(
                   child: ConstrainedBox(
                     constraints: const BoxConstraints(maxWidth: 400),
-                    child: _controls(session, view),
+                    child: _controls(session, view,
+                        suspended: _data.activeSession),
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -1182,10 +1230,20 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     );
   }
 
-  Widget _controls(ActiveSession? session, SessionView view) {
+  Widget _controls(
+    ActiveSession? session,
+    SessionView view, {
+    ActiveSession? suspended,
+  }) {
     final primary = session == null ? '开始' : (session.running ? '暂停' : '继续');
-    final confirm =
-        session == null ? '直接记录' : (view.mode.isFocus ? '完成并开始休息' : '结束休息');
+    // 挂起会话存在时（显示的是另一模式的 idle 视图），「完成」按钮承接
+    // 挂起会话的 complete 语义：专注 → 按已专注时长落记录并自动休息；
+    // 休息 → 结束休息。
+    final confirm = suspended != null
+        ? (suspended.mode.isFocus ? '完成并休息' : '结束休息')
+        : session == null
+            ? '直接记录'
+            : (view.mode.isFocus ? '完成并开始休息' : '结束休息');
 
     return Row(
       children: [

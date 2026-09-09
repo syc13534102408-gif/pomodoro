@@ -102,7 +102,8 @@ MenuBarState menuBarStateOf(AppData data, DateTime now) {
 
   final short = _modeShort(view.mode);
   final isFocus = view.mode.isFocus;
-  final head = isFocus ? '专注中 · ${data.selectedTask.name}' : '${view.mode.label}中';
+  final head =
+      isFocus ? '专注中 · ${data.selectedTask.name}' : '${view.mode.label}中';
   final confirm = isFocus ? '完成并开始休息' : '结束休息';
 
   // 暂停：冻结在剩余（或超时）时刻，配色转灰，一眼能看出没在走。

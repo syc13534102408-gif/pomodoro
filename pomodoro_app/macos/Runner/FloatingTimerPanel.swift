@@ -20,13 +20,11 @@ final class FloatingTimerPanel: NSPanel {
 
   private static let enabledKey = "pine.overlayEnabled"
   private static let originKey = "pine.overlayOrigin"
-  private static let size = NSSize(width: 168, height: 74)
+  private static let size = NSSize(width: 150, height: 62)
 
-  private let headLabel = NSTextField(labelWithString: "专注中")
   private let timeLabel = NSTextField(labelWithString: "00:00")
   private let progressView = PineProgressView()
 
-  private var lastHead: String?
   private var lastTime: String?
   private var lastTint: Int?
   private var lastProgress: Double?
@@ -68,42 +66,29 @@ final class FloatingTimerPanel: NSPanel {
     root.addSubview(effect)
     contentView = root
 
-    headLabel.font = .systemFont(ofSize: 11, weight: .medium)
-    headLabel.textColor = NSColor.white.withAlphaComponent(0.72)
-    headLabel.alignment = .center
-    headLabel.lineBreakMode = .byTruncatingTail
-    headLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
-
-    timeLabel.font = .monospacedDigitSystemFont(ofSize: 27, weight: .semibold)
+    // 悬浮窗只显示「已经专注了多久」：大号等宽数字，阶段色由 tint 表达。
+    timeLabel.font = .monospacedDigitSystemFont(ofSize: 30, weight: .semibold)
     timeLabel.textColor = .white
     timeLabel.alignment = .center
-
-    let stack = NSStackView(views: [headLabel, timeLabel])
-    stack.orientation = .vertical
-    stack.alignment = .centerX
-    stack.spacing = 0
-    stack.translatesAutoresizingMaskIntoConstraints = false
-    effect.addSubview(stack)
+    timeLabel.lineBreakMode = .byTruncatingTail
+    timeLabel.translatesAutoresizingMaskIntoConstraints = false
+    effect.addSubview(timeLabel)
     progressView.translatesAutoresizingMaskIntoConstraints = false
     effect.addSubview(progressView)
 
     NSLayoutConstraint.activate([
-      stack.leadingAnchor.constraint(equalTo: effect.leadingAnchor, constant: 12),
-      stack.trailingAnchor.constraint(equalTo: effect.trailingAnchor, constant: -12),
-      stack.topAnchor.constraint(equalTo: effect.topAnchor, constant: 9),
+      timeLabel.centerXAnchor.constraint(equalTo: effect.centerXAnchor),
+      timeLabel.centerYAnchor.constraint(equalTo: effect.centerYAnchor, constant: -7),
       progressView.leadingAnchor.constraint(equalTo: effect.leadingAnchor, constant: 12),
       progressView.trailingAnchor.constraint(equalTo: effect.trailingAnchor, constant: -12),
-      progressView.bottomAnchor.constraint(equalTo: effect.bottomAnchor, constant: -11),
+      progressView.bottomAnchor.constraint(equalTo: effect.bottomAnchor, constant: -9),
       progressView.heightAnchor.constraint(equalToConstant: 4),
     ])
   }
 
   /// 每秒一次的刷新入口。`active` 为 false（无进行中会话）时自动隐藏。
+  /// head 仅保持通道兼容，悬浮窗不显示任务行。
   func apply(head: String, elapsed: String, progress: Double, tintArgb: Int, active: Bool) {
-    if head != lastHead {
-      headLabel.stringValue = head
-      lastHead = head
-    }
     if elapsed != lastTime {
       timeLabel.stringValue = elapsed
       lastTime = elapsed

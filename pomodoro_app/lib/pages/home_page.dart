@@ -718,15 +718,13 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     );
   }
 
-  /// 专注舱：模式 → 任务 → 计时 → 控制 → 今日进度 → 最近完成 → 快捷键。
-  /// 内容 max 520pt 居中；列可纵向滚动（窗口矮时轻滚），拖宽只留白不拉伸。
+  /// 专注舱 B（极简）：段选 → 任务行 → 大环形计时 → 控制 → 信息小卡。
+  /// 主体无卡片容器，大环是唯一视觉中心；「今日进度 + 最近完成 + 手动补记」
+  /// 收进底部一张信息小卡。窗口矮时可滚动，拖宽只留白。
   Widget _desktopCabin(ActiveSession? session, SessionView view) {
     final stats = StatsView.of(_data, DateTime.now());
-    final goal = _data.goalMinutes <= 0 ? 1 : _data.goalMinutes;
-    final todayRatio = (stats.todayMinutes / goal).clamp(0.0, 1.0);
     return Padding(
-      // 顶部让位给右上抽屉按钮，避免重叠。
-      padding: const EdgeInsets.fromLTRB(24, 56, 24, 14),
+      padding: const EdgeInsets.fromLTRB(24, 52, 24, 12),
       child: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 520),
@@ -734,76 +732,76 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                ModeSwitcher(
-                  current: view.mode,
-                  minutesFor: _data.settings.forMode,
-                  onChanged: _switchMode,
-                ),
-                const SizedBox(height: 12),
-                _taskPicker(),
-                const SizedBox(height: 12),
                 Center(
                   child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 420),
-                    child: SizedBox(
-                      height: 236,
-                      child: Stack(
-                        clipBehavior: Clip.none,
+                    constraints: const BoxConstraints(maxWidth: 320),
+                    child: ModeSwitcher(
+                      current: view.mode,
+                      minutesFor: _data.settings.forMode,
+                      onChanged: _switchMode,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                // 任务行（轻量，非卡片）：整行可点换任务。
+                Center(
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(10),
+                    onTap: () => showTaskSheet(context,
+                        data: _data, onChanged: _replace),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 6),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
-                          BrickTimer(
-                            view: view,
-                            caption: _caption(session, view),
-                          ),
-                          if (_stampVisible)
-                            const Positioned(
-                              top: -10,
-                              right: -8,
-                              child: _CompletionStamp(),
+                          _TaskSwatch(
+                              color: _data.selectedTask.swatch, size: 9),
+                          const SizedBox(width: 8),
+                          ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 300),
+                            child: Text(
+                              _data.selectedTask.name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                  color: PineColors.ink, fontSize: 12.5),
                             ),
+                          ),
+                          const SizedBox(width: 4),
+                          const Icon(Icons.chevron_right,
+                              size: 15, color: PineColors.faint),
                         ],
                       ),
                     ),
                   ),
                 ),
-                const SizedBox(height: 10),
-                _controls(session, view),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Text(
-                      '今日 ${stats.todayMinutes.round()} / ${_data.goalMinutes} 分钟',
-                      style:
-                          const TextStyle(color: PineColors.sub, fontSize: 10),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Container(
-                        height: 6,
-                        decoration: BoxDecoration(
-                          color: PineColors.line,
-                          borderRadius: BorderRadius.circular(99),
-                        ),
-                        child: FractionallySizedBox(
-                          alignment: Alignment.centerLeft,
-                          widthFactor: todayRatio,
-                          child: Container(
-                            decoration: BoxDecoration(
-                              color: PineColors.pine,
-                              borderRadius: BorderRadius.circular(99),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
+                const SizedBox(height: 8),
+                Center(
+                  child: _DesktopRing(
+                    progress: view.progress,
+                    color:
+                        view.targetReached ? PineColors.gold : view.mode.color,
+                    timeText: view.clockText,
+                    caption: _caption(session, view),
+                    overtime: view.targetReached,
+                    stamp: _stampVisible,
+                  ),
                 ),
-                const SizedBox(height: 14),
-                _desktopRecent(),
+                const SizedBox(height: 4),
+                Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 400),
+                    child: _controls(session, view),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                _desktopInfoCard(stats),
                 const SizedBox(height: 8),
                 const Center(
                   child: Text(
-                    '空格 开始/暂停 · R 重置当前计时 · Esc 关闭抽屉',
-                    style: TextStyle(color: PineColors.sub, fontSize: 10.5),
+                    '空格 开始/暂停 · R 重置 · Esc 关抽屉',
+                    style: TextStyle(color: PineColors.faint, fontSize: 10.5),
                   ),
                 ),
               ],
@@ -814,74 +812,132 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     );
   }
 
-  /// 最近完成（桌面舱）：最近 3 条，整行可点 → 记录详情（删除在详情内，
-  /// 与安卓/详情 sheet 共用同一逻辑）。空态占一行保持布局稳定。
-  Widget _desktopRecent() {
+  /// 底部信息小卡：今日进度 + 最近完成（含手动补记入口）。
+  /// 最近记录行整行可点进详情（删除在详情内，与安卓共用逻辑）。
+  Widget _desktopInfoCard(StatsView stats) {
+    final goal = _data.goalMinutes <= 0 ? 1 : _data.goalMinutes;
+    final todayRatio = (stats.todayMinutes / goal).clamp(0.0, 1.0);
     final items =
         _data.records.where((record) => record.counted).take(3).toList();
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        const Text(
-          '最近完成',
-          style: TextStyle(
-            color: PineColors.sub,
-            fontSize: 11,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        const SizedBox(height: 6),
-        if (items.isEmpty)
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 4),
-            child: Text(
-              '完成一轮专注后会出现在这里',
-              style: TextStyle(color: PineColors.faint, fontSize: 11),
-            ),
-          )
-        else
-          for (final record in items)
-            InkWell(
-              borderRadius: BorderRadius.circular(8),
-              onTap: () => showRecordDetailSheet(
-                context,
-                data: _data,
-                record: record,
-                color: _colorFor(record.taskName),
-                onChanged: _replace,
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 8),
+      decoration: BoxDecoration(
+        color: PineColors.card,
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: Paper.shadow,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Text(
+                '今日 ${stats.todayMinutes.round()} / ${_data.goalMinutes} 分钟',
+                style: const TextStyle(color: PineColors.sub, fontSize: 10),
               ),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 6),
-                child: Row(
-                  children: [
-                    _TaskSwatch(color: _colorFor(record.taskName), size: 9),
-                    const SizedBox(width: 9),
-                    Expanded(
-                      child: Text(
-                        record.taskName,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                            color: PineColors.ink, fontSize: 12),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Container(
+                  height: 5,
+                  decoration: BoxDecoration(
+                    color: PineColors.line,
+                    borderRadius: BorderRadius.circular(99),
+                  ),
+                  child: FractionallySizedBox(
+                    alignment: Alignment.centerLeft,
+                    widthFactor: todayRatio,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: PineColors.pine,
+                        borderRadius: BorderRadius.circular(99),
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    Text(
-                      '${record.status.label} · ${record.at.hour.toString().padLeft(2, '0')}:${record.at.minute.toString().padLeft(2, '0')}',
-                      style: const TextStyle(
-                          color: PineColors.sub, fontSize: 10.5),
-                    ),
-                    const SizedBox(width: 10),
-                    Text(
-                      formatMinutes(record.minutes),
-                      style: brickNumberStyle(fontSize: 12),
-                    ),
-                  ],
+                  ),
                 ),
               ),
-            ),
-        const Divider(height: 1, color: PineColors.line),
-      ],
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              const Text(
+                '最近完成',
+                style: TextStyle(
+                    color: PineColors.ink,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600),
+              ),
+              const Spacer(),
+              InkWell(
+                borderRadius: BorderRadius.circular(99),
+                onTap: () =>
+                    showManualSheet(context, data: _data, onChanged: _replace),
+                child: const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  child: Text(
+                    '＋ 补记',
+                    style: TextStyle(
+                        color: PineColors.pine,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 2),
+          if (items.isEmpty)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 6),
+              child: Text(
+                '完成一轮专注后会出现在这里',
+                style: TextStyle(color: PineColors.faint, fontSize: 11),
+              ),
+            )
+          else
+            for (final record in items)
+              InkWell(
+                borderRadius: BorderRadius.circular(8),
+                onTap: () => showRecordDetailSheet(
+                  context,
+                  data: _data,
+                  record: record,
+                  color: _colorFor(record.taskName),
+                  onChanged: _replace,
+                ),
+                child: Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 2, vertical: 6),
+                  child: Row(
+                    children: [
+                      _TaskSwatch(color: _colorFor(record.taskName), size: 9),
+                      const SizedBox(width: 9),
+                      Expanded(
+                        child: Text(
+                          record.taskName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                              color: PineColors.ink, fontSize: 12),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        '${record.status.label} · ${record.at.hour.toString().padLeft(2, '0')}:${record.at.minute.toString().padLeft(2, '0')}',
+                        style: const TextStyle(
+                            color: PineColors.sub, fontSize: 10.5),
+                      ),
+                      const SizedBox(width: 10),
+                      Text(
+                        formatMinutes(record.minutes),
+                        style: brickNumberStyle(fontSize: 12),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+        ],
+      ),
     );
   }
 
@@ -1219,6 +1275,111 @@ class _TaskSwatch extends StatelessWidget {
         height: size,
         decoration: BoxDecoration(color: color, shape: BoxShape.circle),
       );
+}
+
+/// 大环形计时（主舱 B）：无卡片容器，圆环是唯一视觉中心。
+/// 圆环随进度收弧（阶段色），中心等宽大数字 + 状态 caption；超时整环金色。
+class _DesktopRing extends StatelessWidget {
+  const _DesktopRing({
+    required this.progress,
+    required this.color,
+    required this.timeText,
+    required this.caption,
+    required this.overtime,
+    this.stamp = false,
+  });
+
+  final double progress;
+  final Color color;
+  final String timeText;
+  final String caption;
+  final bool overtime;
+
+  /// 完成章（桌面）：一次专注完成时在环右上角盖下。
+  final bool stamp;
+
+  static const double _diameter = 244;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: _diameter,
+      height: _diameter,
+      child: Stack(
+        clipBehavior: Clip.none,
+        fit: StackFit.expand,
+        children: [
+          CustomPaint(
+            painter: _RingPainter(progress: progress, color: color),
+          ),
+          Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  timeText,
+                  style: brickNumberStyle(
+                    fontSize: 50,
+                    color: overtime ? PineColors.gold : PineColors.ink,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  caption,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: PineColors.sub, fontSize: 11),
+                ),
+              ],
+            ),
+          ),
+          if (stamp)
+            const Positioned(
+              top: -8,
+              right: -6,
+              child: _CompletionStamp(),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 圆环：纸色轨道 + 阶段色圆弧（顺时针从 12 点起），超时后整环闭合。
+class _RingPainter extends CustomPainter {
+  const _RingPainter({required this.progress, required this.color});
+
+  final double progress;
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    const stroke = 12.0;
+    final rect = Offset.zero & size;
+    final track = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = stroke
+      ..color = PineColors.line;
+    canvas.drawCircle(rect.center, (size.width - stroke) / 2, track);
+    final p = progress.clamp(0.0, 1.0);
+    if (p <= 0) return;
+    final arc = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = stroke
+      ..strokeCap = StrokeCap.round
+      ..color = color;
+    canvas.drawArc(
+      rect.deflate(stroke / 2),
+      -3.14159 / 2,
+      6.28318 * p,
+      false,
+      arc,
+    );
+  }
+
+  @override
+  bool shouldRepaint(_RingPainter old) =>
+      old.progress != progress || old.color != color;
 }
 
 /// 完成章（P8）：一次专注完成时在计时卡右上角盖下，弹性入场。

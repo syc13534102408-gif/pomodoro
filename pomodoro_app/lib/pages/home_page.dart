@@ -1,9 +1,11 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../src/cloud_auto.dart';
 import '../src/cloud_sync.dart';
@@ -12,6 +14,7 @@ import '../src/menu_bar_timer.dart';
 import '../src/models.dart';
 import '../src/notification_policy.dart';
 import '../src/notifications.dart';
+import '../src/session_channel.dart';
 import '../src/sheets.dart';
 import '../src/storage.dart';
 import '../src/theme.dart';
@@ -56,6 +59,25 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   /// 与 Notifier 内部缓存不同：它记录的是「进程内已成功预排的时刻」，
   /// 这里记录的是「按当前状态应该存在的排程」，用于去重与开关联动。
   int? _desiredAlarmDeadlineMs;
+
+  // ==================== 会话实时镜像（对等控制，方案 A 短轮询） ====================
+
+  /// 传输失败一律静默：镜像能力可降级，绝不影响本地计时。
+  SessionChannel? _sessionChannel;
+  Timer? _mirrorTimer;
+  bool _mirrorEnabled = false;
+
+  /// 全局单调序号：本机发布与远端采纳共用一个计数，保证后写者胜。
+  int _sessionSeq = 0;
+
+  /// 本机设备标识（首次运行生成，存独立 prefs 键，不进云净荷）。
+  String _deviceId = '';
+
+  /// 上一次发布的会话内容摘要，内容没变就不发（抑制乒乓）。
+  String? _lastPublishedSessionJson;
+
+  static const _mirrorPrefsKey = 'pine-session-mirror';
+  static const _deviceIdPrefsKey = 'pine-device-id';
 
   NotifyPlatform get _notifyPlatform =>
       _isAndroid ? NotifyPlatform.android : NotifyPlatform.other;
@@ -107,6 +129,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   void dispose() {
     _ticker?.cancel();
     _stampTimer?.cancel();
+    _mirrorTimer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -117,8 +140,14 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       _tick(forcePersist: true);
       // 回到前台：拉取网页端可能刚上传的更新。
       unawaited(_autoSync.onResume(context, _data));
+      // 镜像轮询只在前台跑（后台冻结时轮询无意义），回前台立即收敛一次。
+      if (_mirrorEnabled) {
+        _startMirrorTimer();
+        unawaited(_pollSessionMirror());
+      }
     } else if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.detached) {
+      _mirrorTimer?.cancel();
       _persist(force: true);
     }
   }
@@ -146,6 +175,21 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     });
     _persist(force: true);
     _startTicker();
+    // 会话实时镜像：读开关与本机设备标识，开启则启动前台轮询。
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      _mirrorEnabled = prefs.getBool(_mirrorPrefsKey) ?? false;
+      _deviceId = prefs.getString(_deviceIdPrefsKey) ?? '';
+      if (_deviceId.isEmpty) {
+        final rand = DateTime.now().microsecondsSinceEpoch.toRadixString(16) +
+            DateTime.now().hashCode.toRadixString(16);
+        _deviceId = 'pine-${rand.replaceAll('-', '').padRight(12, '0').substring(0, 12)}';
+        await prefs.setString(_deviceIdPrefsKey, _deviceId);
+      }
+      if (_mirrorEnabled) _startMirrorTimer();
+    } catch (_) {
+      // 镜像初始化失败不影响主流程。
+    }
     await _syncForeground();
     // 冷启动来自 911 到点通知时，launchDetails 会经 Notifier 回调切回首页；
     // 这里再补一次状态消费（幂等，只是确保 tab 正确）。
@@ -190,12 +234,98 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     unawaited(Storage.save(_data));
   }
 
-  void _apply(AppData next, {bool force = false}) {
+  void _apply(AppData next, {bool force = false, bool fromRemote = false}) {
     setState(() => _data = next);
     _persist(force: force);
     // 用户一操作就刷新菜单栏，别等下一秒的 tick。
     _syncMenuBar();
     unawaited(_syncForeground());
+    // 会话镜像：本机状态变化即广播（采纳远端状态时抑制，防乒乓）。
+    unawaited(_publishSession(next, fromRemote: fromRemote));
+  }
+
+  // ==================== 会话实时镜像 ====================
+
+  void _startMirrorTimer() {
+    _mirrorTimer?.cancel();
+    _mirrorTimer = Timer.periodic(const Duration(seconds: 3), (_) {
+      unawaited(_pollSessionMirror());
+    });
+  }
+
+  /// 广播本机会话快照。内容与上次相同则跳过；失败静默。
+  Future<void> _publishSession(AppData next, {bool fromRemote = false}) async {
+    if (fromRemote || !_mirrorEnabled || !_ready) return;
+    final code = next.sync.deviceCode;
+    if (code.isEmpty) return;
+    try {
+      (_sessionChannel ??= SessionChannel());
+      final session = next.activeSession;
+      final payloadJson = jsonEncode(session?.toMap());
+      // 内容没变就不发：idle 期间 _apply 的重复调用、恢复同一状态等场景。
+      if (payloadJson == _lastPublishedSessionJson) return;
+      _lastPublishedSessionJson = payloadJson;
+      _sessionSeq += 1;
+      final seq = _sessionSeq;
+      await _sessionChannel!.publish(
+        deviceCode: code,
+        deviceId: _deviceId,
+        seq: seq,
+        session: session?.toMap(),
+        taskName: next.selectedTask.name,
+      );
+    } catch (_) {
+      // 发布失败不影响本地状态；下次状态变化会再带新 seq 发布。
+    }
+  }
+
+  /// 轮询远端会话快照，有更新且非本机回声时采纳。
+  Future<void> _pollSessionMirror() async {
+    if (!mounted || !_mirrorEnabled || !_ready) return;
+    final code = _data.sync.deviceCode;
+    if (code.isEmpty) return;
+    try {
+      (_sessionChannel ??= SessionChannel());
+      final remote = await _sessionChannel!.poll(code);
+      if (!mounted) return;
+      if (!shouldAdoptRemoteSession(
+        lastSeenSeq: _sessionSeq,
+        remoteSeq: remote.seq,
+        selfDeviceId: _deviceId,
+        remoteDeviceId: remote.deviceId,
+      )) {
+        return;
+      }
+      _sessionSeq = remote.seq;
+      if (remote.session == null) {
+        // 对端完成/丢弃/未开始：本机清会话（不写统计，记录走备份同步）。
+        if (_data.activeSession == null) return;
+        _apply(TimerEngine.discard(_data), force: true, fromRemote: true);
+      } else {
+        _apply(
+          TimerEngine.adoptRemoteSession(_data, remote.session),
+          force: true,
+          fromRemote: true,
+        );
+      }
+    } catch (_) {
+      // 网络/格式问题静默：3 秒后下一轮再试。
+    }
+  }
+
+  /// 设置页开关回调（独立 prefs 键，不进云净荷——两端各自开关，无需同步）。
+  Future<void> _setMirrorEnabled(bool enabled) async {
+    setState(() => _mirrorEnabled = enabled);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_mirrorPrefsKey, enabled);
+    } catch (_) {}
+    if (enabled) {
+      _startMirrorTimer();
+      unawaited(_pollSessionMirror());
+    } else {
+      _mirrorTimer?.cancel();
+    }
   }
 
   /// 进程内到点翻转（每秒 tick 检测到 targetReached 由 false→true）。
@@ -501,7 +631,12 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
           children: [
             _timerTab(),
             StatsPage(data: _data),
-            SettingsPage(data: _data, onChanged: _replace),
+            SettingsPage(
+              data: _data,
+              onChanged: _replace,
+              mirrorEnabled: _mirrorEnabled,
+              onMirrorChanged: _setMirrorEnabled,
+            ),
           ],
         ),
       ),
@@ -947,7 +1082,12 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         (MediaQuery.sizeOf(context).width - 16).clamp(300.0, 356.0).toDouble();
     final page = _desktopOverlay == _overlayStats
         ? StatsPage(data: _data)
-        : SettingsPage(data: _data, onChanged: _replace);
+        : SettingsPage(
+            data: _data,
+            onChanged: _replace,
+            mirrorEnabled: _mirrorEnabled,
+            onMirrorChanged: _setMirrorEnabled,
+          );
     return Container(
       width: width,
       clipBehavior: Clip.antiAlias,

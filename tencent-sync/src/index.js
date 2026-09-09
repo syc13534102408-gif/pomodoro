@@ -49,6 +49,10 @@ function reply(statusCode, body, origin) {
 
 const keyOf = (deviceCode) => `sync/${deviceCode}.json`;
 
+// 会话实时镜像：与备份净荷（sync/）完全分离，只有最新的会话快照，直接覆盖写。
+const sessionKeyOf = (deviceCode) => `session/${deviceCode}.json`;
+const MAX_SESSION_PAYLOAD = 16 * 1024;
+
 function readObject(key) {
   return new Promise((resolve, reject) => {
     cos().getObject(
@@ -127,6 +131,59 @@ async function handleDownload(query, origin) {
   return reply(200, { payload: parsed.payload, updatedAt: parsed.updatedAt }, origin);
 }
 
+async function handleSessionPublish(body, origin) {
+  const { deviceCode, deviceId, seq, session, taskName } = body || {};
+  if (typeof deviceCode !== 'string' || !CODE_RE.test(deviceCode)) {
+    return reply(400, { error: '同步码无效' }, origin);
+  }
+  if (typeof deviceId !== 'string' || deviceId.length < 4 || deviceId.length > 64) {
+    return reply(400, { error: '设备标识无效' }, origin);
+  }
+  if (!Number.isInteger(seq) || seq < 0) {
+    return reply(400, { error: 'seq 无效' }, origin);
+  }
+  if (session !== null && (typeof session !== 'object' || Array.isArray(session))) {
+    return reply(400, { error: '会话状态无效' }, origin);
+  }
+  const record = {
+    deviceId,
+    seq,
+    at: new Date().toISOString(),
+    session: session ?? null,
+    taskName: typeof taskName === 'string' ? taskName : null,
+  };
+  const serialized = JSON.stringify(record);
+  if (serialized.length > MAX_SESSION_PAYLOAD) {
+    return reply(413, { error: '会话状态超过 16KB 限制' }, origin);
+  }
+  await writeObject(sessionKeyOf(deviceCode), serialized);
+  return reply(200, { seq, at: record.at }, origin);
+}
+
+async function handleSessionPoll(query, origin) {
+  const deviceCode = (query && (query.deviceCode || query.devicecode)) || '';
+  if (typeof deviceCode !== 'string' || !CODE_RE.test(deviceCode)) {
+    return reply(400, { error: '同步码无效' }, origin);
+  }
+  // 无记录 / 记录损坏都返回空态，轮询端无需特判 404。
+  const empty = { seq: 0, deviceId: null, at: null, session: null, taskName: null };
+  const raw = await readObject(sessionKeyOf(deviceCode));
+  if (!raw) return reply(200, empty, origin);
+  let parsed;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (_) {
+    return reply(200, empty, origin);
+  }
+  return reply(200, {
+    seq: Number.isInteger(parsed.seq) ? parsed.seq : 0,
+    deviceId: typeof parsed.deviceId === 'string' ? parsed.deviceId : null,
+    at: typeof parsed.at === 'string' ? parsed.at : null,
+    session: parsed.session && typeof parsed.session === 'object' ? parsed.session : null,
+    taskName: typeof parsed.taskName === 'string' ? parsed.taskName : null,
+  }, origin);
+}
+
 exports.main_handler = async (event) => {
   const headers = event.headers || {};
   const origin = headers.origin || headers.Origin || null;
@@ -164,6 +221,22 @@ exports.main_handler = async (event) => {
     }
     if (method === 'GET' && path.endsWith('/sync/download')) {
       return await handleDownload(query, origin);
+    }
+    if (method === 'POST' && path.endsWith('/session/publish')) {
+      let body = event.body;
+      if (event.isBase64Encoded && body) {
+        body = Buffer.from(body, 'base64').toString('utf8');
+      }
+      let parsed = null;
+      try {
+        parsed = body ? JSON.parse(body) : null;
+      } catch (_) {
+        parsed = null;
+      }
+      return await handleSessionPublish(parsed, origin);
+    }
+    if (method === 'GET' && path.endsWith('/session/poll')) {
+      return await handleSessionPoll(query, origin);
     }
     return reply(404, {
       error: `未找到接口：${method} ${path}`,

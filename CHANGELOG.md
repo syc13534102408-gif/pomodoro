@@ -4,6 +4,15 @@
 > （原文已移入 `docs/archive/outputs-*.md`，细节以原文为准）。
 > 版本号以 `pomodoro_app/pubspec.yaml` 为准；更早的历史见 git 提交记录。
 
+## 2026-09-09（晚）· 会话实时同步（安卓 ↔ macOS）
+
+- 跨设备实时镜像计时状态：**一边开始专注，另一边约 3 秒内同步开始**；暂停/继续/完成/丢弃对等互相同步。
+- 方案 A：腾讯云 SCF 加 `/session/publish` + `/session/poll` 会话通道（与备份通道解耦），App 前台每 3 秒轮询，seq 单调递增、后写者胜，回环/乒乓双重抑制。
+- 统计只记一份：完成记录仅由发起端写入，经既有备份同步到达对端。
+- 设置页新增「会话实时同步」开关（默认关，需已绑定同步码）；引擎新增 `adoptRemoteSession`/`shouldAdoptRemoteSession` 纯函数 + 单测（`test/session_adopt_test.dart`）。
+- 限制：手机息屏/被系统冻结期间轮询暂停，亮屏立即对齐（平台限制）；后端需 `deploy.py --update` 重新部署后生效。
+- 协议与雷区详见 `docs/05 §8`、`docs/07 §2`。
+
 ## 2026-09-09 · macOS 后台可见性（未发版）
 
 - **新增悬浮置顶计时窗**（`macos/Runner/FloatingTimerPanel.swift`）：阶段 + 已专注大字 + 进度条，

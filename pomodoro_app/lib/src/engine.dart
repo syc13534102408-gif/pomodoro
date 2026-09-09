@@ -362,6 +362,22 @@ class TimerEngine {
     return discard(data).copyWith(idleMode: mode);
   }
 
+  /// 会话实时镜像：用对端发布的快照重建本机会话（对等控制，见 docs/05 §8）。
+  ///
+  /// [sessionMap] 为 null 表示对端已无会话（完成/丢弃/未开始）→ 本机清会话
+  /// （复用 discard：idleMode 回退到对端同款模式语义，且不写统计——记录由
+  /// 发起端经备份同步到达，避免双份统计）。
+  /// 时间口径：deadline / overtimeStartedAt 是绝对时刻，直接信任对端时钟
+  /// （两端 NTP 校时偏差为秒级，对 3 秒轮询间隔无感）。
+  static AppData adoptRemoteSession(AppData data, Map<dynamic, dynamic>? sessionMap) {
+    if (sessionMap == null) {
+      return data.activeSession == null ? data : discard(data);
+    }
+    final remote = ActiveSession.fromMap(sessionMap);
+    if (remote == null) return data;
+    return data.copyWith(activeSession: remote);
+  }
+
   /// 手动补记一条已完成记录。
   static AppData addManual(
     AppData data, {
@@ -385,4 +401,21 @@ class TimerEngine {
   /// 冷启动恢复：补齐跨过截止点的状态。
   static AppData restore(AppData data, DateTime now) =>
       syncMinutes(advance(data, now), now);
+}
+
+/// 是否应采纳远端会话快照（纯函数，供镜像轮询与单测使用）。
+///
+/// 三重抑制：
+/// - `remoteSeq <= 0`：云端无记录的空态，无内容可采纳；
+/// - `remoteSeq <= lastSeenSeq`：重放/乱序（本机已见过更新的状态）；
+/// - `remoteDeviceId == selfDeviceId`：本机自己发布的回声。
+bool shouldAdoptRemoteSession({
+  required int lastSeenSeq,
+  required int remoteSeq,
+  required String selfDeviceId,
+  required String remoteDeviceId,
+}) {
+  if (remoteSeq <= 0) return false;
+  if (remoteDeviceId.isEmpty || selfDeviceId.isEmpty) return false;
+  return remoteSeq > lastSeenSeq && remoteDeviceId != selfDeviceId;
 }

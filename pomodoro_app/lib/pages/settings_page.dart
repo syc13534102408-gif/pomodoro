@@ -12,10 +12,20 @@ import '../src/theme.dart';
 import '../src/widgets.dart';
 
 class SettingsPage extends StatefulWidget {
-  const SettingsPage({super.key, required this.data, required this.onChanged});
+  const SettingsPage({
+    super.key,
+    required this.data,
+    required this.onChanged,
+    this.mirrorEnabled = false,
+    this.onMirrorChanged,
+  });
 
   final AppData data;
   final ValueChanged<AppData> onChanged;
+
+  /// 会话实时镜像开关（独立 prefs，不进云净荷；home_page 持有实际状态）。
+  final bool mirrorEnabled;
+  final ValueChanged<bool>? onMirrorChanged;
 
   @override
   State<SettingsPage> createState() => _SettingsPageState();
@@ -417,6 +427,36 @@ class _SettingsPageState extends State<SettingsPage> {
                     ),
                   ),
                 ],
+                const SizedBox(height: 14),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('会话实时同步',
+                              style: TextStyle(
+                                  color: PineColors.ink, fontSize: 13)),
+                          const SizedBox(height: 2),
+                          Text(
+                            code.isEmpty
+                                ? '需先绑定同步码；开启后专注状态在绑定设备间互相同步（约 3 秒）'
+                                : '专注开始/暂停/完成在已绑定设备间互相同步（约 3 秒）；手机息屏期间暂停轮询，亮屏立即对齐',
+                            style: const TextStyle(
+                                color: PineColors.sub, fontSize: 11),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    BrickSwitch(
+                      value: widget.mirrorEnabled && code.isNotEmpty,
+                      onChanged: code.isEmpty || widget.onMirrorChanged == null
+                          ? (_) {}
+                          : widget.onMirrorChanged!,
+                    ),
+                  ],
+                ),
                 const SizedBox(height: 14),
                 TextField(
                   controller: _worker,

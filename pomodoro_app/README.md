@@ -1,6 +1,6 @@
 # 专注时光（松果）· 安卓 + macOS 端
 
-网页端番茄钟的 Flutter 移植版（v1.1.0+3），安卓与 macOS 桌面共用一套代码。
+网页端番茄钟的 Flutter 移植版（v1.2.0+4），安卓与 macOS 桌面共用一套代码。
 数据与网页端通过**腾讯云同步后端**互通（同码互通，本地优先）。
 
 > 项目级文档见 [`../docs/`](../docs/)；本文只讲本模块特有的内容。
@@ -13,7 +13,8 @@
 - 专注事件管理（增删改、配色、删除不影响历史统计）、今日清单、手动补记
 - 统计页：周堆叠柱状图（自绘 `BrickBars`）、本月回顾、事件构成、连续天数
 - 今日目标（分钟，旧「次」数据自动迁移）、本周目标（次）
-- 结束通知 + 三音提示音；安卓前台服务常驻通知（锁屏倒计时，系统 Chronometer 渲染）
+- 结束通知 + 三音提示音；安卓前台服务常驻通知（锁屏倒计时，系统 Chronometer 渲染）；
+  macOS 菜单栏显示已专注时长 + 悬浮置顶计时窗（可跨全屏显示，见 `macos/Runner/FloatingTimerPanel.swift`）
 - 云端同步：手动上传/恢复 + 自动同步 + 冲突弹窗（绝不静默覆盖）
 - UI：方案 D「扁平积木」（仅浅色），规格见 [`../docs/design/`](../docs/design/)
 
@@ -35,7 +36,7 @@ F=$PWD/../tools/flutter/bin/flutter
 
 $F pub get
 ../tools/flutter/bin/dart analyze    # flutter analyze 的 LSP 在本机会崩，用这个
-$F test                              # 25 项，应全绿
+$F test                              # 56 项用例 / 7 个文件，应全绿
 $F build apk --release --target-platform android-arm64   # 约 19MB
 ```
 

@@ -660,6 +660,29 @@ class _ManualSheetState extends State<_ManualSheet> {
     });
   }
 
+  /// 补记过去某天：只选日期，时刻沿用当前已选时间。
+  /// 归属日由 addManual 的 dateKey(at) 自动决定（凌晨 3 点分界生效）。
+  Future<void> _pickDate() async {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _at.isAfter(today) ? today : _at,
+      firstDate: today.subtract(const Duration(days: 365)),
+      lastDate: today,
+    );
+    if (picked == null) return;
+    setState(() {
+      _at = DateTime(picked.year, picked.month, picked.day, _at.hour, _at.minute);
+    });
+  }
+
+  /// 日期按钮上的星期标签。
+  String _weekdayLabel(DateTime d) {
+    const week = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
+    return week[d.weekday - 1];
+  }
+
   void _save() {
     final minutes = double.tryParse(_minutes.text);
     if (minutes == null || minutes <= 0) return;
@@ -705,13 +728,30 @@ class _ManualSheetState extends State<_ManualSheet> {
                 labelText: '专注时长', suffixText: '分钟', isDense: true),
           ),
           const SizedBox(height: 14),
-          BrickButton(
-            label:
-                '完成时间 ${_at.hour.toString().padLeft(2, '0')}:${_at.minute.toString().padLeft(2, '0')}',
-            icon: Icons.schedule,
-            color: PineColors.card,
-            foregroundColor: PineColors.ink,
-            onPressed: _pickTime,
+          Row(
+            children: [
+              Expanded(
+                child: BrickButton(
+                  label:
+                      '${_at.month}/${_at.day}（${_at.year == DateTime.now().year ? '' : '${_at.year}/'}${_weekdayLabel(_at)}）',
+                  icon: Icons.event,
+                  color: PineColors.card,
+                  foregroundColor: PineColors.ink,
+                  onPressed: _pickDate,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: BrickButton(
+                  label:
+                      '完成时间 ${_at.hour.toString().padLeft(2, '0')}:${_at.minute.toString().padLeft(2, '0')}',
+                  icon: Icons.schedule,
+                  color: PineColors.card,
+                  foregroundColor: PineColors.ink,
+                  onPressed: _pickTime,
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 10),
           BrickButton(

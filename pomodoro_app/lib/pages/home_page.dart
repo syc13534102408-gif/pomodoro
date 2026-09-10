@@ -1000,8 +1000,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   Widget _desktopInfoCard(StatsView stats) {
     final goal = _data.goalMinutes <= 0 ? 1 : _data.goalMinutes;
     final todayRatio = (stats.todayMinutes / goal).clamp(0.0, 1.0);
-    final items =
-        _data.records.where((record) => record.counted).take(3).toList();
+    final items = _data.records.where((record) => record.counted).toList()
+      ..sort((a, b) => b.at.compareTo(a.at));
     return Container(
       padding: const EdgeInsets.fromLTRB(14, 12, 14, 8),
       decoration: BoxDecoration(
@@ -1078,7 +1078,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               ),
             )
           else
-            for (final record in items)
+            for (final record in items.take(3))
               InkWell(
                 borderRadius: BorderRadius.circular(8),
                 onTap: () => showRecordDetailSheet(
@@ -1342,10 +1342,12 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   }
 
   Widget _recent() {
-    final items =
-        _data.records.where((record) => record.counted).take(8).toList();
+    // 按完成时刻倒序——多端合并后数组顺序不再保证新在前，
+    // 依赖数组位置会让新记录沉底不显示（2026-09-10 事故）。
+    final items = _data.records.where((record) => record.counted).toList()
+      ..sort((a, b) => b.at.compareTo(a.at));
     final rows = <Widget>[];
-    for (var i = 0; i < items.length; i++) {
+    for (var i = 0; i < items.length && i < 8; i++) {
       if (i > 0) {
         rows.add(const Divider(height: 1, color: PineColors.line));
       }

@@ -271,22 +271,22 @@ class _MonthlyReview extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final now = DateTime.now();
-    // 月历按「统计日」（凌晨 3 点分界）分桶：0:00–2:59 的记录归前一天。
+    // 月历按「统计日」分桶：直接用记录的归属日键（dayKey，凌晨 3 点分界），
+    // 不用 record.at——at 可能是恢复时合成的零点占位值（00:00），按 at 分桶
+    // 会把整天的记录错分到前一天（2026-09-10 数据事故根因之一）。
     final statNow = statDayOf(now);
-    final monthRecords = data.records.where((record) {
-      if (!record.counted) return false;
-      final day = statDayOf(record.at);
-      return day.year == statNow.year && day.month == statNow.month;
-    }).toList();
+    final ym = '${statNow.year}-${statNow.month.toString().padLeft(2, '0')}';
+    final monthRecords = data.records.where((record) =>
+        record.counted && record.dayKey.startsWith(ym)).toList();
     final minutes = monthRecords.fold<double>(0, (sum, r) => sum + r.minutes);
     // 番茄数统一走时长当量（满 50 分钟 1 个，缺口不足 15 分钟补齐）。
     final count = pomodoroEquiv(minutes);
-    final activeDays = monthRecords.map((r) => statDayOf(r.at).day).toSet().length;
+    final activeDays = monthRecords.map((r) => r.dayKey.substring(8)).toSet().length;
     final daysInMonth = DateTime(statNow.year, statNow.month + 1, 0).day;
     final dayValues = List<double>.filled(daysInMonth, 0);
     final byTask = <String, double>{};
     for (final record in monthRecords) {
-      final day = statDayOf(record.at).day;
+      final day = int.parse(record.dayKey.substring(8, 10));
       dayValues[day - 1] += record.minutes;
       byTask[record.taskName] = (byTask[record.taskName] ?? 0) + record.minutes;
     }

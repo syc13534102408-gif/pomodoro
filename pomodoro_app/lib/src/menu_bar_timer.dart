@@ -35,6 +35,7 @@ class MenuBarState {
     required this.elapsed,
     required this.progress,
     required this.active,
+    this.phase = '',
   });
 
   /// 菜单栏常驻文本，与叶子图标并排，尽量短。
@@ -66,6 +67,9 @@ class MenuBarState {
 
   /// 是否有进行中的会话；为 false 时悬浮小窗自动隐藏。
   final bool active;
+
+  /// 阶段短标签：专注中 / 短休息 / 长休息 / 已超时 / 已暂停（悬浮窗 V3 用）。
+  final String phase;
 }
 
 String _modeShort(SessionMode mode) => switch (mode) {
@@ -88,6 +92,7 @@ MenuBarState menuBarStateOf(AppData data, DateTime now) {
     final stats = StatsView.of(data, now);
     return MenuBarState(
       title: '松果',
+      phase: '',
       head: '未开始 · ${data.idleMode.label}',
       detail: '今日 ${stats.todayMinutes.round()} / ${data.goalMinutes} 分钟',
       primary: '开始',
@@ -112,6 +117,7 @@ MenuBarState menuBarStateOf(AppData data, DateTime now) {
       // 暂停也显示已累计时长：此时它冻结在暂停时刻，正是「专注了多久」。
       title: '暂停 ${view.elapsedText}',
       head: '${view.mode.label} · 已暂停',
+      phase: '已暂停',
       detail: view.targetReached
           ? '已专注 ${view.elapsedText}，超出计划 ${view.clockText}'
           : '已专注 ${view.elapsedText}，剩余 ${view.clockText}',
@@ -135,6 +141,7 @@ MenuBarState menuBarStateOf(AppData data, DateTime now) {
       confirm: confirm,
       canReset: true,
       tint: PineColors.gold.toARGB32(),
+      phase: '已超时',
       elapsed: view.elapsedText,
       progress: 1,
       active: true,
@@ -149,6 +156,7 @@ MenuBarState menuBarStateOf(AppData data, DateTime now) {
     confirm: confirm,
     canReset: true,
     tint: (isFocus ? PineColors.focus : PineColors.mint).toARGB32(),
+    phase: isFocus ? '专注中' : view.mode.label,
     elapsed: view.elapsedText,
     progress: view.progress,
     active: true,
@@ -199,6 +207,7 @@ class MenuBarTimer {
       'elapsed': state.elapsed,
       'progress': state.progress,
       'active': state.active,
+      'phase': state.phase,
     }).catchError((Object _) {
       // 菜单栏是可降级能力：原生未就绪时不影响计时本身。
     });

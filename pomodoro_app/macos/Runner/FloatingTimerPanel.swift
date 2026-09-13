@@ -20,11 +20,14 @@ final class FloatingTimerPanel: NSPanel {
 
   private static let enabledKey = "pine.overlayEnabled"
   private static let originKey = "pine.overlayOrigin"
-  private static let size = NSSize(width: 150, height: 62)
+  private static let size = NSSize(width: 190, height: 48)
 
+  private let dotView = NSView()
+  private let phaseLabel = NSTextField(labelWithString: "专注中")
   private let timeLabel = NSTextField(labelWithString: "00:00")
   private let progressView = PineProgressView()
 
+  private var lastPhase: String?
   private var lastTime: String?
   private var lastTint: Int?
   private var lastProgress: Double?
@@ -61,34 +64,88 @@ final class FloatingTimerPanel: NSPanel {
     effect.blendingMode = .behindWindow
     effect.state = .active
     effect.wantsLayer = true
-    effect.layer?.cornerRadius = 14
+    // 胶囊：圆角取半高；1px 白色细边让它在浅色壁纸上也有轮廓。
+    effect.layer?.cornerRadius = Self.size.height / 2
     effect.layer?.masksToBounds = true
+    effect.layer?.borderWidth = 1
+    effect.layer?.borderColor = NSColor.white.withAlphaComponent(0.08).cgColor
     root.addSubview(effect)
     contentView = root
 
-    // 悬浮窗只显示「已经专注了多久」：大号等宽数字，阶段色由 tint 表达。
-    timeLabel.font = .monospacedDigitSystemFont(ofSize: 30, weight: .semibold)
+    // 悬浮窗 V3（信息型）：阶段色点 + 阶段短标签 + 右对齐大数字 + 底部细进度。
+    dotView.wantsLayer = true
+    dotView.layer?.cornerRadius = 4
+    dotView.layer?.backgroundColor =
+      NSColor.white.withAlphaComponent(0.5).cgColor
+
+    phaseLabel.font = .systemFont(ofSize: 10.5, weight: .semibold)
+    phaseLabel.textColor = NSColor.white.withAlphaComponent(0.72)
+    phaseLabel.lineBreakMode = .byTruncatingTail
+    // 不做弹性拉伸：宽度由内容实测决定（fitWidth），保证左右留白恒等。
+    phaseLabel.setContentHuggingPriority(.required, for: .horizontal)
+    phaseLabel.setContentCompressionResistancePriority(.required, for: .horizontal)
+
+    timeLabel.font = .monospacedDigitSystemFont(ofSize: 22, weight: .semibold)
     timeLabel.textColor = .white
-    timeLabel.alignment = .center
-    timeLabel.lineBreakMode = .byTruncatingTail
-    timeLabel.translatesAutoresizingMaskIntoConstraints = false
-    effect.addSubview(timeLabel)
+    timeLabel.alignment = .right
+    timeLabel.setContentHuggingPriority(.defaultHigh, for: .horizontal)
+    timeLabel.setContentCompressionResistancePriority(.required, for: .horizontal)
+
+    let stack = NSStackView(views: [dotView, phaseLabel, timeLabel])
+    stack.orientation = .horizontal
+    stack.alignment = .centerY
+    stack.spacing = 8
+    stack.translatesAutoresizingMaskIntoConstraints = false
+    effect.addSubview(stack)
     progressView.translatesAutoresizingMaskIntoConstraints = false
     effect.addSubview(progressView)
 
     NSLayoutConstraint.activate([
-      timeLabel.centerXAnchor.constraint(equalTo: effect.centerXAnchor),
-      timeLabel.centerYAnchor.constraint(equalTo: effect.centerYAnchor, constant: -7),
-      progressView.leadingAnchor.constraint(equalTo: effect.leadingAnchor, constant: 12),
-      progressView.trailingAnchor.constraint(equalTo: effect.trailingAnchor, constant: -12),
-      progressView.bottomAnchor.constraint(equalTo: effect.bottomAnchor, constant: -9),
-      progressView.heightAnchor.constraint(equalToConstant: 4),
+      dotView.widthAnchor.constraint(equalToConstant: 8),
+      dotView.heightAnchor.constraint(equalToConstant: 8),
+      stack.leadingAnchor.constraint(equalTo: effect.leadingAnchor, constant: 16),
+      stack.centerYAnchor.constraint(equalTo: effect.centerYAnchor, constant: -4),
+      // 右侧只设下限，宽度由 fitWidth 按内容伸缩决定。
+      stack.trailingAnchor.constraint(
+        lessThanOrEqualTo: effect.trailingAnchor, constant: -16),
+      progressView.leadingAnchor.constraint(equalTo: effect.leadingAnchor, constant: 16),
+      progressView.trailingAnchor.constraint(equalTo: effect.trailingAnchor, constant: -16),
+      progressView.bottomAnchor.constraint(equalTo: effect.bottomAnchor, constant: -7),
+      progressView.heightAnchor.constraint(equalToConstant: 3),
     ])
   }
 
+  /// 内容实测宽度 → 窗口随文字伸缩，左右留白恒等 16/16、右缘锚定。
+  /// 位数跨档（如 25:00 → 01:23:45）时才改宽度，并用系统动画平滑过渡。
+  private func fitWidth(animated: Bool) {
+    let hasPhase = !phaseLabel.stringValue.isEmpty
+    let dotPart: CGFloat = hasPhase ? 8 + 8 : 0            // 圆点 + 间距
+    let phasePart: CGFloat = hasPhase
+      ? ceil(phaseLabel.intrinsicContentSize.width) + 8     // 标签 + 与数字间距
+      : 0
+    let timePart = ceil(timeLabel.intrinsicContentSize.width)
+    let width = 16 + dotPart + phasePart + timePart + 16
+    guard abs(width - frame.width) > 0.5 else { return }
+    var target = frame
+    let rightEdge = frame.origin.x + frame.width
+    target.size.width = width
+    target.origin.x = rightEdge - width
+    setFrame(target, display: true, animate: animated && isVisible)
+  }
+
   /// 每秒一次的刷新入口。`active` 为 false（无进行中会话）时自动隐藏。
-  /// head 仅保持通道兼容，悬浮窗不显示任务行。
-  func apply(head: String, elapsed: String, progress: Double, tintArgb: Int, active: Bool) {
+  func apply(
+    head: String, phase: String, elapsed: String, progress: Double,
+    tintArgb: Int, active: Bool
+  ) {
+    if phase != lastPhase {
+      lastPhase = phase
+      // 阶段词为空（理论上仅空闲瞬间）时收起点与标签，让宽度只按时间算。
+      let hasPhase = !phase.isEmpty
+      dotView.isHidden = !hasPhase
+      phaseLabel.isHidden = !hasPhase
+      if hasPhase { phaseLabel.stringValue = phase }
+    }
     if elapsed != lastTime {
       timeLabel.stringValue = elapsed
       lastTime = elapsed
@@ -99,11 +156,14 @@ final class FloatingTimerPanel: NSPanel {
     }
     if tintArgb != lastTint {
       let tint = pineColor(tintArgb)
-      timeLabel.textColor = tint
+      // 阶段色只做「点 + 进度」，数字保持白色——更接近 macOS 小件的克制观感。
+      dotView.layer?.backgroundColor = tint.cgColor
       progressView.tint = tint
       lastTint = tintArgb
     }
     setVisible(userEnabled && active)
+    // 内容宽度随文字伸缩（左右留白恒等），位数跨档时平滑过渡。
+    fitWidth(animated: true)
     // 空闲期隐藏累积的状态差异会在重新显示时一次性补齐，这里无需额外处理。
   }
 

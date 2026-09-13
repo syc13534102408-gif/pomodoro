@@ -303,7 +303,11 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         _apply(TimerEngine.discard(_data), force: true, fromRemote: true);
       } else {
         _apply(
-          TimerEngine.adoptRemoteSession(_data, remote.session),
+          TimerEngine.adoptRemoteSession(
+            _data,
+            remote.session,
+            taskName: remote.taskName,
+          ),
           force: true,
           fromRemote: true,
         );

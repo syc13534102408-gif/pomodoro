@@ -98,6 +98,19 @@ class MainFlutterWindow: NSWindow, NSMenuDelegate {
       }
       result(nil)
     }
+
+    // 主窗内空格 = 开始/暂停。Flutter 的 CallbackShortcuts 依赖视图持有
+    // firstResponder，点过悬浮窗/菜单栏后可能失焦导致空格失灵——这里在
+    // 窗口层统一接管：焦点在本窗且不在文本输入控件时，空格直接转发 toggle。
+    NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+      guard let self = self,
+            event.keyCode == 49,                   // 空格
+            self === NSApp.keyWindow,
+            !(self.firstResponder is NSTextView),
+            !(self.firstResponder is NSTextField) else { return event }
+      self.send(action: "toggle")
+      return nil                                    // 吞掉事件，避免重复触发
+    }
   }
 
   private func buildStatusBarMenu() -> NSMenu {
@@ -172,6 +185,7 @@ class MainFlutterWindow: NSWindow, NSMenuDelegate {
   private func updateOverlay(_ state: [String: Any], tintArgb: Int) {
     FloatingTimerPanel.shared.apply(
       head: string(state, "head") ?? "专注中",
+      phase: string(state, "phase") ?? "专注中",
       elapsed: string(state, "elapsed") ?? "00:00",
       progress: (state["progress"] as? NSNumber)?.doubleValue ?? 0,
       tintArgb: tintArgb,
@@ -236,6 +250,7 @@ class MainFlutterWindow: NSWindow, NSMenuDelegate {
 
   @objc private func activateTimerWindow() {
     NSApp.activate(ignoringOtherApps: true)
+    if isMiniaturized { deminiaturize(nil) }
     makeKeyAndOrderFront(nil)
   }
 }

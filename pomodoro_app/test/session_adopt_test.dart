@@ -19,8 +19,10 @@ void main() {
       final next = TimerEngine.adoptRemoteSession(data, null);
 
       expect(next.activeSession, isNull);
-      // 清会话不产生/删除记录（记录由发起端经备份同步到达，避免双份统计）。
-      expect(next.records.length, data.records.length);
+      // discard 语义：start 落下的 inProgress 占位记录被删除（重置不记录）；
+      // 无任何 counted 记录产生（这轮不进统计，已专注部分由发起端负责）。
+      expect(next.records.length, data.records.length - 1);
+      expect(next.records.where((r) => r.counted), isEmpty);
     });
 
     test('远端无会话 + 本机本就空闲 → 原样返回', () {

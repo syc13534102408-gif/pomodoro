@@ -320,18 +320,40 @@ class TimerEngine {
 
     var next = data;
     if (session.mode.isFocus) {
-      next = next.copyWith(
-        records: next.records.map((record) {
-          if (record.id != session.recordId) return record;
-          return record.copyWith(
-            minutes: view.elapsedMinutes,
-            status: RecordStatus.completed,
-            // 把 at 推进到确认完成的瞬间，UI 的「完成于 HH:mm」才名副其实；
-            // dayKey 保持开始计时时确定的归属日，跨午夜完成时两口径按设计分离。
-            at: now,
-          );
-        }).toList(),
-      );
+      // 镜像会话（会话实时同步采纳的外来会话）在本机没有对应的进行中记录
+      // （recordId 由发起端创建，实时同步只传快照不传记录）——完成时必须
+      // 补建 completed 记录，否则这一轮会从统计里凭空消失。id 保持与发起端
+      // 一致：镜像端上传后，发起端按同 id 将自己的 in_progress 记录收口为
+      // completed，两端最终一致、只记一份。
+      final recordExists = next.records.any((r) => r.id == session.recordId);
+      if (recordExists) {
+        next = next.copyWith(
+          records: next.records.map((record) {
+            if (record.id != session.recordId) return record;
+            return record.copyWith(
+              minutes: view.elapsedMinutes,
+              status: RecordStatus.completed,
+              // 把 at 推进到确认完成的瞬间，UI 的「完成于 HH:mm」才名副其实；
+              // dayKey 保持开始计时时确定的归属日，跨午夜完成时两口径按设计分离。
+              at: now,
+            );
+          }).toList(),
+        );
+      } else {
+        next = next.copyWith(
+          records: [
+            FocusRecord(
+              id: session.recordId,
+              taskName: data.selectedTask.name,
+              minutes: view.elapsedMinutes,
+              dayKey: dateKey(now),
+              status: RecordStatus.completed,
+              at: now,
+            ),
+            ...next.records,
+          ],
+        );
+      }
       // 休息轮换按「完成次数」口径（当量口径只用于统计展示，见 StatsView）。
       final completedToday = next.records
           .where((r) => r.counted && r.dayKey == dateKey(now))
@@ -390,17 +412,32 @@ class TimerEngine {
   /// 会话实时镜像：用对端发布的快照重建本机会话（对等控制，见 docs/05 §8）。
   ///
   /// [sessionMap] 为 null 表示对端已无会话（完成/丢弃/未开始）→ 本机清会话
-  /// （复用 discard：idleMode 回退到对端同款模式语义，且不写统计——记录由
-  /// 发起端经备份同步到达，避免双份统计）。
+  /// （复用 discard：不写统计——记录由发起端经备份同步到达，避免双份统计）。
   /// 时间口径：deadline / overtimeStartedAt 是绝对时刻，直接信任对端时钟
   /// （两端 NTP 校时偏差为秒级，对 3 秒轮询间隔无感）。
-  static AppData adoptRemoteSession(AppData data, Map<dynamic, dynamic>? sessionMap) {
+  ///
+  /// [taskName] 为快照携带的发起端任务名：本地任务列表中存在同名任务时
+  /// **切换选中任务跟随发起端**——双端选中任务不同时，镜像端的显示、
+  /// 「完成」落记录的任务名才与发起端一致。本地无同名任务时保持本机选择
+  /// （前提：使用会话同步前先完成一次备份同步，使两端任务列表一致）。
+  static AppData adoptRemoteSession(
+    AppData data,
+    Map<dynamic, dynamic>? sessionMap, {
+    String? taskName,
+  }) {
     if (sessionMap == null) {
       return data.activeSession == null ? data : discard(data);
     }
     final remote = ActiveSession.fromMap(sessionMap);
     if (remote == null) return data;
-    return data.copyWith(activeSession: remote);
+    var next = data.copyWith(activeSession: remote);
+    if (taskName != null && taskName.isNotEmpty) {
+      final idx = next.tasks.indexWhere((t) => t.name == taskName);
+      if (idx >= 0 && idx != next.selectedIndex) {
+        next = next.copyWith(selectedIndex: idx);
+      }
+    }
+    return next;
   }
 
   /// 手动补记一条已完成记录。

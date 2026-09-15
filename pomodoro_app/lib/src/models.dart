@@ -82,6 +82,16 @@ String dateKey(DateTime date) => ymdOf(statDayOf(date));
 
 DateTime dayStart(DateTime date) => DateTime(date.year, date.month, date.day);
 
+const List<String> _weekdayNames = ['一', '二', '三', '四', '五', '六', '日'];
+
+/// `2026年12月19日 周六`；[withYear] 为 false 时 `12月19日 周六`。
+/// 全应用（倒计时、记录详情、设置页）统一走这里，禁止各页自拼。
+String chineseDate(DateTime d, {bool withYear = true}) {
+  final head =
+      withYear ? '${d.year}年${d.month}月${d.day}日' : '${d.month}月${d.day}日';
+  return '$head 周${_weekdayNames[d.weekday - 1]}';
+}
+
 /// 本周一 00:00（基于传入时刻；统计场景请传 `statDayOf(now)`）。
 DateTime mondayOf(DateTime date) {
   final day = dayStart(date);
@@ -214,9 +224,8 @@ class FocusRecord {
     // dateKey(dateOnly) 重算——统计日口径下零点减 3 小时会回退到前一天，
     // 曾导致云端恢复的历史记录整体错位一天、今日统计清零）。
     // date 缺失（旧网页端数据）才按 at 重算兜底。
-    final dayKey = (rawDate != null && rawDate.isNotEmpty)
-        ? rawDate
-        : dateKey(at);
+    final dayKey =
+        (rawDate != null && rawDate.isNotEmpty) ? rawDate : dateKey(at);
     return FocusRecord(
       id: map['id']?.toString(),
       taskName: (map['name'] ?? map['taskName'] ?? '已删除事件').toString(),
@@ -433,6 +442,69 @@ class TimerSettings {
   }
 }
 
+/// 考试倒计时目标。
+///
+/// **只存本机、不进云端净荷**：网页端暂无该字段，若随上传下发，网页端回传的
+/// 净荷（不含本字段）会把它覆盖丢失。见 [AppData.toCloudMap] 注释。
+class Countdown {
+  const Countdown({
+    this.enabled = true,
+    this.label = defaultLabel,
+    this.date = defaultDate,
+  });
+
+  /// 2027 级考研初试预判值：教育部《招生工作管理规定》正式公告发布前，
+  /// 按历年惯例（12 月第三个周末）预判为 2026 年 12 月 19—20 日
+  /// （21 日留给超 3 小时科目）。终以研招网公告为准，可在设置里改。
+  static const String defaultLabel = '2027 考研初试';
+  static const String defaultDate = '2026-12-19';
+
+  /// 是否在专注页显示倒计时。
+  final bool enabled;
+
+  /// 目标名称，如「2027 考研初试」。
+  final String label;
+
+  /// 目标日 `YYYY-MM-DD`（本地自然日）。
+  final String date;
+
+  DateTime? get target => DateTime.tryParse(date);
+
+  /// 距目标日的自然天数：今天 0 点 → 目标日 0 点。
+  /// 正数=还剩，0=就是今天，负数=已经过去。
+  ///
+  /// 用 UTC 构造两端再相减：本地时区做差遇到夏令时会少/多一小时，
+  /// `inDays` 截断后可能整体差一天。
+  int daysFrom(DateTime now) {
+    final t = target;
+    if (t == null) return 0;
+    final today = DateTime.utc(now.year, now.month, now.day);
+    final day = DateTime.utc(t.year, t.month, t.day);
+    return day.difference(today).inDays;
+  }
+
+  Map<String, dynamic> toMap() =>
+      {'enabled': enabled, 'label': label, 'date': date};
+
+  Countdown copyWith({bool? enabled, String? label, String? date}) => Countdown(
+        enabled: enabled ?? this.enabled,
+        label: label ?? this.label,
+        date: date ?? this.date,
+      );
+
+  static Countdown fromMap(dynamic raw) {
+    if (raw is! Map) return const Countdown();
+    final label = (raw['label'] ?? '').toString().trim();
+    final date = (raw['date'] ?? '').toString().trim();
+    return Countdown(
+      enabled: raw['enabled'] != false,
+      label: label.isEmpty ? defaultLabel : label,
+      // 日期非法（空串/脏数据）一律回落到默认，避免列表里出现空倒计时。
+      date: DateTime.tryParse(date) == null ? defaultDate : date,
+    );
+  }
+}
+
 /// 完整应用数据。字段与网页端 `data` 对齐，保证云端双向兼容。
 class AppData {
   AppData({
@@ -448,11 +520,13 @@ class AppData {
     this.notifyEnabled = true,
     this.activeSession,
     SyncState? sync,
+    Countdown? countdown,
   })  : tasks = tasks ?? _defaultTasks(),
         records = records ?? [],
         todos = todos ?? {},
         settings = settings ?? const TimerSettings(),
-        sync = sync ?? const SyncState();
+        sync = sync ?? const SyncState(),
+        countdown = countdown ?? const Countdown();
 
   final List<PineTask> tasks;
   final List<FocusRecord> records;
@@ -471,6 +545,9 @@ class AppData {
   final ActiveSession? activeSession;
   final SyncState sync;
 
+  /// 考试倒计时（本地偏好，不进云端净荷，见 [toCloudMap]）。
+  final Countdown countdown;
+
   static List<PineTask> _defaultTasks() => [
         PineTask(name: '数学真题', color: kTaskPalette[0].toARGB32()),
         PineTask(name: '错题整理', color: kTaskPalette[1].toARGB32()),
@@ -481,6 +558,9 @@ class AppData {
       tasks.isEmpty ? PineTask(name: '未命名事件') : tasks[selectedIndex];
 
   /// 云端上传用的净荷：剔除推送订阅与提醒 id 等本机信息。
+  ///
+  /// 也**刻意不含 `countdown`**：网页端尚无倒计时字段，若上传后由网页端回传，
+  /// 净荷里没有该字段会让本机设置被重置为默认值（用户自定义的考试名称/日期丢失）。
   Map<String, dynamic> toCloudMap() => {
         'tasks': tasks.map((task) => task.toMap()).toList(),
         'records': records.map((record) => record.toMap()).toList(),
@@ -501,6 +581,7 @@ class AppData {
         'idleMode': idleMode.key,
         'activeSession': activeSession?.toMap(),
         'sync': sync.toMap(),
+        'countdown': countdown.toMap(),
       };
 
   AppData copyWith({
@@ -517,6 +598,7 @@ class AppData {
     ActiveSession? activeSession,
     bool clearActiveSession = false,
     SyncState? sync,
+    Countdown? countdown,
   }) =>
       AppData(
         tasks: tasks ?? this.tasks,
@@ -532,6 +614,7 @@ class AppData {
         activeSession:
             clearActiveSession ? null : (activeSession ?? this.activeSession),
         sync: sync ?? this.sync,
+        countdown: countdown ?? this.countdown,
       );
 
   /// 兼容旧版本安卓数据与网页端数据。
@@ -540,7 +623,8 @@ class AppData {
     final tasks = rawTasks is List
         ? [
             for (var i = 0; i < rawTasks.length; i++)
-              PineTask.fromMap(Map<dynamic, dynamic>.from(rawTasks[i] as Map), i),
+              PineTask.fromMap(
+                  Map<dynamic, dynamic>.from(rawTasks[i] as Map), i),
           ]
         : _defaultTasks();
 
@@ -548,7 +632,8 @@ class AppData {
     final records = rawRecords is List
         ? rawRecords
             .whereType<Map>()
-            .map((item) => FocusRecord.fromMap(Map<dynamic, dynamic>.from(item)))
+            .map(
+                (item) => FocusRecord.fromMap(Map<dynamic, dynamic>.from(item)))
             .toList()
         : <FocusRecord>[];
 
@@ -581,6 +666,7 @@ class AppData {
       notifyEnabled: map['notifyEnabled'] != false,
       activeSession: ActiveSession.fromMap(map['activeSession']),
       sync: SyncState.fromMap(map['sync']),
+      countdown: Countdown.fromMap(map['countdown']),
     );
   }
 

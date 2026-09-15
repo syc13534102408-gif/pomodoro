@@ -209,9 +209,7 @@ class BrickButton extends StatelessWidget {
             decoration: BoxDecoration(
               color: enabled ? color : PineColors.faint,
               shape: iconOnly ? BoxShape.circle : BoxShape.rectangle,
-              borderRadius: iconOnly
-                  ? null
-                  : BorderRadius.circular(height / 2),
+              borderRadius: iconOnly ? null : BorderRadius.circular(height / 2),
             ),
             child: loading
                 ? const SizedBox(
@@ -341,8 +339,7 @@ class BrickSwitch extends StatelessWidget {
                 borderRadius: BorderRadius.circular(999),
               ),
               child: Align(
-                alignment:
-                    value ? Alignment.centerRight : Alignment.centerLeft,
+                alignment: value ? Alignment.centerRight : Alignment.centerLeft,
                 child: Container(
                   width: 20,
                   height: 20,
@@ -534,8 +531,7 @@ class _ModeBrick extends StatelessWidget {
                 style: TextStyle(
                   color: selected ? PineColors.ink : PineColors.sub,
                   fontSize: 14,
-                  fontWeight:
-                      selected ? FontWeight.w600 : FontWeight.w400,
+                  fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
                   letterSpacing: 0,
                 ),
               ),
@@ -800,15 +796,13 @@ class _BrickBarsPainter extends CustomPainter {
     final gridPaint = Paint()
       ..strokeWidth = 1
       ..color = PineColors.line;
-    canvas.drawLine(Offset(0, baseline), Offset(size.width, baseline),
-        gridPaint);
+    canvas.drawLine(
+        Offset(0, baseline), Offset(size.width, baseline), gridPaint);
     final halfPaint = Paint()
       ..strokeWidth = 1
       ..color = PineColors.line.withValues(alpha: 0.6);
-    canvas.drawLine(
-        Offset(0, baseline - plotHeight / 2),
-        Offset(size.width, baseline - plotHeight / 2),
-        halfPaint);
+    canvas.drawLine(Offset(0, baseline - plotHeight / 2),
+        Offset(size.width, baseline - plotHeight / 2), halfPaint);
 
     final fill = Paint()..style = PaintingStyle.fill;
 
@@ -831,7 +825,8 @@ class _BrickBarsPainter extends CustomPainter {
       for (final segment in segments) {
         final barHeight = (segment.value / maxY) * plotHeight;
         if (barHeight <= 0) continue;
-        final rect = Rect.fromLTWH(left, cursor - barHeight, barWidth, barHeight);
+        final rect =
+            Rect.fromLTWH(left, cursor - barHeight, barWidth, barHeight);
         canvas.drawRect(rect, fill..color = segment.color);
         topRect = rect;
         topColor = segment.color;
@@ -866,4 +861,198 @@ String formatMinutes(double minutes) {
     return '$hours 小时$restText';
   }
   return '$total 分钟';
+}
+
+/// 考试倒计时。
+///
+/// - `compact = false`（默认）：独立小卡，两行——上行「色条 + 名称」、
+///   下行考试日期，右侧大号天数。用于移动端专注页顶部。
+/// - `compact = true`：单行——「色条 + 名称 + 日期」左对齐，天数右对齐。
+///   用于桌面专注舱底部信息卡内嵌（不新增卡片，维持「极简无卡」）。
+///
+/// 紧迫语义由天数派生，是模块唯一的状态语言：
+/// 剩余 > 7 天 = 松绿；1–7 天（冲刺）= 专注红；0 天 = 「今天开考」；
+/// 已过 = 淡色「考试已结束」。不额外引入新色，全部取自方案 E 令牌。
+class CountdownCard extends StatelessWidget {
+  const CountdownCard({
+    super.key,
+    required this.countdown,
+    required this.now,
+    this.compact = false,
+    this.onTap,
+  });
+
+  final Countdown countdown;
+
+  /// 计算天数用的当前时刻（由页面每秒重建时传入，组件内不取系统时钟，
+  /// 保证同帧内多处显示一致、也便于测试）。
+  final DateTime now;
+  final bool compact;
+
+  /// 点击进入倒计时设置。
+  final VoidCallback? onTap;
+
+  /// ≤7 天进入冲刺期。
+  static const int _sprintDays = 7;
+
+  @override
+  Widget build(BuildContext context) {
+    final target = countdown.target;
+    if (target == null) return const SizedBox.shrink();
+
+    final days = countdown.daysFrom(now);
+    final sprint = days > 0 && days <= _sprintDays;
+    final accent = days < 0
+        ? PineColors.faint
+        : sprint || days == 0
+            ? PineColors.focus
+            : PineColors.pine;
+
+    final bar = Container(
+      width: 3,
+      height: compact ? 12 : 14,
+      decoration: BoxDecoration(
+        color: accent,
+        borderRadius: BorderRadius.circular(2),
+      ),
+    );
+
+    if (compact) {
+      final row = Padding(
+        padding: const EdgeInsets.symmetric(vertical: 2),
+        child: Row(
+          children: [
+            bar,
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text.rich(
+                TextSpan(
+                  children: [
+                    TextSpan(
+                      text: countdown.label,
+                      style: const TextStyle(
+                        color: PineColors.ink,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    TextSpan(
+                      text: '  ${chineseDate(target, withYear: false)}',
+                      style: const TextStyle(
+                        color: PineColors.sub,
+                        fontSize: 10.5,
+                      ),
+                    ),
+                  ],
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            const SizedBox(width: 10),
+            _tail(days, compact: true),
+          ],
+        ),
+      );
+      if (onTap == null) return row;
+      return BrickPressable(onTap: onTap, shadowed: false, child: row);
+    }
+
+    return BrickCard(
+      padding: const EdgeInsets.fromLTRB(14, 11, 14, 11),
+      onTap: onTap,
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  children: [
+                    bar,
+                    const SizedBox(width: 8),
+                    Flexible(
+                      child: Text(
+                        countdown.label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: PineColors.ink,
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 5),
+                // 缩进 11 = 色条 3 + 间距 8，与上一行文字左缘对齐。
+                Padding(
+                  padding: const EdgeInsets.only(left: 11),
+                  child: Text(
+                    chineseDate(target),
+                    style: const TextStyle(
+                      color: PineColors.sub,
+                      fontSize: 10.5,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          _tail(days, compact: false),
+        ],
+      ),
+    );
+  }
+
+  /// 右侧天数区。分档文案见类注释。
+  Widget _tail(int days, {required bool compact}) {
+    if (days < 0) {
+      return const Text(
+        '考试已结束',
+        style: TextStyle(
+          color: PineColors.faint,
+          fontSize: 11.5,
+          fontWeight: FontWeight.w600,
+        ),
+      );
+    }
+    if (days == 0) {
+      return const Text(
+        '今天开考',
+        style: TextStyle(
+          color: PineColors.focus,
+          fontSize: 13,
+          fontWeight: FontWeight.w700,
+        ),
+      );
+    }
+    final sprint = days <= _sprintDays;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.baseline,
+      textBaseline: TextBaseline.alphabetic,
+      children: [
+        Text(
+          '$days',
+          style: brickNumberStyle(
+            fontSize: compact ? 18 : 24,
+            color: sprint ? PineColors.focus : PineColors.ink,
+          ),
+        ),
+        const SizedBox(width: 3),
+        const Text(
+          '天',
+          style: TextStyle(
+            color: PineColors.sub,
+            fontSize: 11,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ],
+    );
+  }
 }

@@ -183,7 +183,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       if (_deviceId.isEmpty) {
         final rand = DateTime.now().microsecondsSinceEpoch.toRadixString(16) +
             DateTime.now().hashCode.toRadixString(16);
-        _deviceId = 'pine-${rand.replaceAll('-', '').padRight(12, '0').substring(0, 12)}';
+        _deviceId =
+            'pine-${rand.replaceAll('-', '').padRight(12, '0').substring(0, 12)}';
         await prefs.setString(_deviceIdPrefsKey, _deviceId);
       }
       if (_mirrorEnabled) _startMirrorTimer();
@@ -265,8 +266,11 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       // 内容没变就不发：idle 期间 _apply 的重复调用、恢复同一状态等场景。
       if (payloadJson == _lastPublishedSessionJson) return;
       _lastPublishedSessionJson = payloadJson;
-      _sessionSeq += 1;
-      final seq = _sessionSeq;
+      // seq 用 epoch 毫秒：两端各自的独立计数器会撞号（交错发布时 N vs N），
+      // 撞号 + 严格大于判定会让对端的更新被静默忽略——「Mac 已完成、手机
+      // 还在进行」的根因。毫秒时间戳全局单调，后写者胜才真正成立。
+      final seq = DateTime.now().millisecondsSinceEpoch;
+      _sessionSeq = seq;
       await _sessionChannel!.publish(
         deviceCode: code,
         deviceId: _deviceId,
@@ -663,7 +667,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         body: Center(child: CircularProgressIndicator(color: PineColors.ink)),
       );
     }
-    // macOS 走独立桌面布局（侧边栏导航 + 双栏计时），安卓保持手机布局不变。
+    // macOS 走独立桌面布局（专注舱 + 统计/设置抽屉），安卓保持手机布局不变。
     if (_desktop) return _buildDesktop(context);
     // 手机布局：底部导航 3 Tab（专注 / 报告 / 设置），三页共享同一 AppData
     // （沿用桌面 IndexedStack 同源数据的先例；逻辑层零改动）。
@@ -721,6 +725,15 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               _dateHeader(),
+              if (_data.countdown.enabled) ...[
+                SizedBox(height: compact ? 8 : 10),
+                CountdownCard(
+                  countdown: _data.countdown,
+                  now: now,
+                  onTap: () => showCountdownSheet(context,
+                      data: _data, onChanged: _replace),
+                ),
+              ],
               SizedBox(height: compact ? 8 : 12),
               ModeSwitcher(
                 current: _data.idleMode,
@@ -1016,6 +1029,19 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          // 倒计时以单行内嵌在信息卡顶部（舱保持「极简无卡」不加新卡片）。
+          if (_data.countdown.enabled) ...[
+            CountdownCard(
+              countdown: _data.countdown,
+              now: DateTime.now(),
+              compact: true,
+              onTap: () =>
+                  showCountdownSheet(context, data: _data, onChanged: _replace),
+            ),
+            const SizedBox(height: 9),
+            const Divider(height: 1, color: PineColors.line),
+            const SizedBox(height: 9),
+          ],
           Row(
             children: [
               Text(

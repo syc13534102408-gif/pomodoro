@@ -102,8 +102,8 @@ Future<bool> _confirmDanger(
               backgroundColor: Colors.transparent,
               side: const BorderSide(color: PineColors.focus, width: 1.5),
               shape: const StadiumBorder(),
-              textStyle: const TextStyle(
-                  fontSize: 14, fontWeight: FontWeight.w600),
+              textStyle:
+                  const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
             ),
             child: Text(confirmLabel),
           ),
@@ -344,8 +344,7 @@ class _TaskRow extends StatelessWidget {
             Container(
               width: 12,
               height: 12,
-              decoration:
-                  BoxDecoration(color: swatch, shape: BoxShape.circle),
+              decoration: BoxDecoration(color: swatch, shape: BoxShape.circle),
             ),
             const SizedBox(width: 10),
             Expanded(
@@ -673,7 +672,8 @@ class _ManualSheetState extends State<_ManualSheet> {
     );
     if (picked == null) return;
     setState(() {
-      _at = DateTime(picked.year, picked.month, picked.day, _at.hour, _at.minute);
+      _at =
+          DateTime(picked.year, picked.month, picked.day, _at.hour, _at.minute);
     });
   }
 
@@ -932,12 +932,301 @@ class _DetailRow extends StatelessWidget {
               width: 72,
               child: Text(
                 label,
-                style:
-                    const TextStyle(color: PineColors.sub, fontSize: 13),
+                style: const TextStyle(color: PineColors.sub, fontSize: 13),
               ),
             ),
             Expanded(child: child),
           ],
         ),
       );
+}
+
+/// 考试倒计时设置：名称 + 目标日期。本地偏好，不参与云同步。
+Future<void> showCountdownSheet(
+  BuildContext context, {
+  required AppData data,
+  required DataChanged onChanged,
+}) =>
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: PineColors.paper,
+      builder: (context) => _CountdownSheet(data: data, onChanged: onChanged),
+    );
+
+class _CountdownSheet extends StatefulWidget {
+  const _CountdownSheet({required this.data, required this.onChanged});
+
+  final AppData data;
+  final DataChanged onChanged;
+
+  @override
+  State<_CountdownSheet> createState() => _CountdownSheetState();
+}
+
+class _CountdownSheetState extends State<_CountdownSheet> {
+  late final TextEditingController _label;
+  late DateTime _date;
+
+  @override
+  void initState() {
+    super.initState();
+    _label = TextEditingController(text: widget.data.countdown.label);
+    _date =
+        widget.data.countdown.target ?? DateTime.parse(Countdown.defaultDate);
+  }
+
+  @override
+  void dispose() {
+    _label.dispose();
+    super.dispose();
+  }
+
+  void _useDefault() {
+    setState(() {
+      _label.text = Countdown.defaultLabel;
+      _date = DateTime.parse(Countdown.defaultDate);
+    });
+  }
+
+  void _save() {
+    final label = _label.text.trim();
+    widget.onChanged(
+      widget.data.copyWith(
+        countdown: widget.data.countdown.copyWith(
+          label: label.isEmpty ? Countdown.defaultLabel : label,
+          date: ymdOf(_date),
+        ),
+      ),
+    );
+    Navigator.pop(context);
+  }
+
+  String _remainingText(int days) {
+    if (days < 0) return '已结束';
+    if (days == 0) return '就是今天';
+    return '还剩 $days 天';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final days = widget.data.countdown.daysFrom(DateTime.now());
+    return _SheetScaffold(
+      title: '考试倒计时',
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          TextField(
+            controller: _label,
+            textInputAction: TextInputAction.done,
+            style: const TextStyle(fontSize: 14),
+            decoration: const InputDecoration(
+              labelText: '考试名称',
+              hintText: '如：2027 考研初试',
+              isDense: true,
+            ),
+          ),
+          const SizedBox(height: 14),
+          _MiniCalendar(
+            value: _date,
+            onChanged: (picked) => setState(() => _date = picked),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              const Text(
+                '距考试',
+                style: TextStyle(color: PineColors.sub, fontSize: 12),
+              ),
+              const Spacer(),
+              Text(
+                _remainingText(days),
+                style: brickNumberStyle(
+                  fontSize: 12.5,
+                  color: days >= 0 && days <= 7
+                      ? PineColors.focus
+                      : PineColors.ink,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Expanded(
+                child: BrickButton(
+                  label: '恢复默认',
+                  color: PineColors.card,
+                  foregroundColor: PineColors.ink,
+                  onPressed: _useDefault,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: BrickButton(label: '保存', onPressed: _save),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 迷你月历：单月网格，选中日松绿实心圆、今日松绿描边，非本月留空。
+///
+/// 自绘而非用 `showDatePicker`：应用未挂 `flutter_localizations`，系统日期
+/// 选择器的月份/星期是英文；自绘可保持全中文与方案 E 的纸面视觉。
+class _MiniCalendar extends StatefulWidget {
+  const _MiniCalendar({required this.value, required this.onChanged});
+
+  final DateTime value;
+  final ValueChanged<DateTime> onChanged;
+
+  @override
+  State<_MiniCalendar> createState() => _MiniCalendarState();
+}
+
+class _MiniCalendarState extends State<_MiniCalendar> {
+  static const List<String> _week = ['一', '二', '三', '四', '五', '六', '日'];
+
+  /// 固定 6 行：翻月时面板高度不变，避免弹窗跳动。
+  static const int _rows = 6;
+
+  late int _year;
+  late int _month;
+
+  @override
+  void initState() {
+    super.initState();
+    _year = widget.value.year;
+    _month = widget.value.month;
+  }
+
+  void _shiftMonth(int delta) {
+    setState(() {
+      final total = _year * 12 + (_month - 1) + delta;
+      _year = total ~/ 12;
+      _month = total % 12 + 1;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final firstWeekday = DateTime(_year, _month, 1).weekday; // 周一 = 1
+    final daysInMonth = DateTime(_year, _month + 1, 0).day;
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final selected =
+        DateTime(widget.value.year, widget.value.month, widget.value.day);
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(8, 6, 8, 8),
+      decoration: BoxDecoration(
+        color: PineColors.card,
+        borderRadius: BorderRadius.circular(Paper.chipRadius),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            children: [
+              _navButton(Icons.chevron_left_rounded, () => _shiftMonth(-1)),
+              Expanded(
+                child: Center(
+                  child: Text(
+                    '$_year 年 $_month 月',
+                    style: const TextStyle(
+                      color: PineColors.ink,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+              _navButton(Icons.chevron_right_rounded, () => _shiftMonth(1)),
+            ],
+          ),
+          const SizedBox(height: 2),
+          Row(
+            children: [
+              for (final label in _week)
+                Expanded(
+                  child: Center(
+                    child: Text(
+                      label,
+                      style: const TextStyle(
+                        color: PineColors.sub,
+                        fontSize: 10.5,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          for (var row = 0; row < _rows; row++)
+            Row(
+              children: [
+                for (var col = 0; col < 7; col++)
+                  Expanded(
+                    child: _cell(
+                      row * 7 + col - (firstWeekday - 1) + 1,
+                      daysInMonth,
+                      selected,
+                      today,
+                    ),
+                  ),
+              ],
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _navButton(IconData icon, VoidCallback onTap) => InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(99),
+        child: SizedBox(
+          width: 30,
+          height: 30,
+          child: Icon(icon, size: 18, color: PineColors.sub),
+        ),
+      );
+
+  Widget _cell(int day, int daysInMonth, DateTime selected, DateTime today) {
+    if (day < 1 || day > daysInMonth) return const SizedBox(height: 32);
+    final date = DateTime(_year, _month, day);
+    final isSelected = date == selected;
+    final isToday = date == today;
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => widget.onChanged(date),
+      child: SizedBox(
+        height: 32,
+        child: Center(
+          child: Container(
+            width: 28,
+            height: 28,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: isSelected ? PineColors.pine : null,
+              shape: BoxShape.circle,
+              border: isToday && !isSelected
+                  ? Border.all(color: PineColors.pine, width: 1.2)
+                  : null,
+            ),
+            child: Text(
+              '$day',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                color: isSelected ? PineColors.card : PineColors.ink,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }

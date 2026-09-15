@@ -38,11 +38,14 @@ class Storage {
   }
 }
 
-/// 从云端净荷恢复本机数据，保留推送订阅与进行中会话。
+/// 从云端净荷恢复本机数据，保留推送订阅、进行中会话与本地偏好。
 AppData mergeFromCloud(AppData local, Map<String, dynamic> payload) {
   final restored = AppData.fromMap(payload);
   return restored.copyWith(
     activeSession: local.activeSession,
     sync: local.sync,
+    // 倒计时属本地偏好（不进云端净荷），恢复云端数据时必须保留本机设置，
+    // 否则每同步一次就被重置回默认的考试名称与日期。
+    countdown: local.countdown,
   );
 }

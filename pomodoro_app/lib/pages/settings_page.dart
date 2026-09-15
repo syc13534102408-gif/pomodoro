@@ -7,6 +7,7 @@ import '../src/cloud_auto.dart';
 import '../src/cloud_sync.dart';
 import '../src/models.dart';
 import '../src/notifications.dart';
+import '../src/sheets.dart';
 import '../src/storage.dart';
 import '../src/theme.dart';
 import '../src/widgets.dart';
@@ -278,6 +279,35 @@ class _SettingsPageState extends State<SettingsPage> {
             ),
           ),
           const SizedBox(height: 16),
+          const SectionHeader(title: '考试倒计时'),
+          const SizedBox(height: 10),
+          BrickCard(
+            child: Column(
+              children: [
+                _switchRow(
+                  title: '显示倒计时',
+                  subtitle: '专注页显示距考试天数（本地设置，不参与云同步）',
+                  value: data.countdown.enabled,
+                  onChanged: (value) => _emit(
+                    data.copyWith(
+                      countdown: data.countdown.copyWith(enabled: value),
+                    ),
+                  ),
+                ),
+                const Divider(height: 1.5),
+                _tapRow(
+                  title: '考试名称与日期',
+                  subtitle: _countdownSummary(data.countdown),
+                  onTap: () => showCountdownSheet(
+                    context,
+                    data: data,
+                    onChanged: _emit,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
           const SectionHeader(title: '提醒'),
           const SizedBox(height: 10),
           BrickCard(
@@ -481,7 +511,8 @@ class _SettingsPageState extends State<SettingsPage> {
                   child: Row(
                     children: [
                       Text('版本',
-                          style: TextStyle(color: PineColors.sub, fontSize: 13)),
+                          style:
+                              TextStyle(color: PineColors.sub, fontSize: 13)),
                       Spacer(),
                       Text('v1.2.0 · 松林手帐',
                           style: TextStyle(
@@ -497,10 +528,12 @@ class _SettingsPageState extends State<SettingsPage> {
                   child: Row(
                     children: [
                       Text('数据',
-                          style: TextStyle(color: PineColors.sub, fontSize: 13)),
+                          style:
+                              TextStyle(color: PineColors.sub, fontSize: 13)),
                       Spacer(),
                       Text('本地优先 · 云端仅备份',
-                          style: TextStyle(color: PineColors.ink, fontSize: 13)),
+                          style:
+                              TextStyle(color: PineColors.ink, fontSize: 13)),
                     ],
                   ),
                 ),
@@ -522,7 +555,8 @@ class _SettingsPageState extends State<SettingsPage> {
                   ),
                   child: const Text(
                     '清空后将删除全部专注记录与统计；事件、今日清单、设置与云端备份不受影响。此操作不可撤销。',
-                    style: TextStyle(color: PineColors.ink, fontSize: 13, height: 1.5),
+                    style: TextStyle(
+                        color: PineColors.ink, fontSize: 13, height: 1.5),
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -543,8 +577,8 @@ class _SettingsPageState extends State<SettingsPage> {
                     style: OutlinedButton.styleFrom(
                       foregroundColor: PineColors.focus,
                       backgroundColor: Colors.transparent,
-                      side: const BorderSide(
-                          color: PineColors.focus, width: 1.5),
+                      side:
+                          const BorderSide(color: PineColors.focus, width: 1.5),
                       shape: const StadiumBorder(),
                     ),
                   ),
@@ -555,6 +589,19 @@ class _SettingsPageState extends State<SettingsPage> {
         ],
       ),
     );
+  }
+
+  /// 倒计时行摘要：`2027 考研初试 · 2026年12月19日 周六 · 还剩 97 天`。
+  String _countdownSummary(Countdown countdown) {
+    final target = countdown.target;
+    if (target == null) return '未设置';
+    final days = countdown.daysFrom(DateTime.now());
+    final tail = days < 0
+        ? '已结束'
+        : days == 0
+            ? '就是今天'
+            : '还剩 $days 天';
+    return '${countdown.label} · ${chineseDate(target)} · $tail';
   }
 
   /// 描边开关行。

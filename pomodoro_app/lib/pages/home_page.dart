@@ -65,6 +65,10 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   /// 传输失败一律静默：镜像能力可降级，绝不影响本地计时。
   SessionChannel? _sessionChannel;
   Timer? _mirrorTimer;
+
+  /// 备份同步的低频定时拉取：Mac 端 App 常驻前台时 lifecycle 不变化、
+  /// 不会触发 onResume，没有它 Mac 的数据会一直停留在上次启动时刻。
+  Timer? _backupSyncTimer;
   bool _mirrorEnabled = false;
 
   /// 全局单调序号：本机发布与远端采纳共用一个计数，保证后写者胜。
@@ -125,11 +129,22 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     }
   }
 
+  /// 备份同步低频拉取：每 3 分钟一次，onResume 自带 updatedAt 与 15 秒
+  /// minInterval 保护，重复调用安全；失败静默（网络异常不影响计时）。
+  void _startBackupSyncTimer() {
+    _backupSyncTimer?.cancel();
+    _backupSyncTimer = Timer.periodic(const Duration(minutes: 3), (_) {
+      if (!mounted || !_ready) return;
+      unawaited(_autoSync.onResume(context, _data));
+    });
+  }
+
   @override
   void dispose() {
     _ticker?.cancel();
     _stampTimer?.cancel();
     _mirrorTimer?.cancel();
+    _backupSyncTimer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -145,9 +160,11 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         _startMirrorTimer();
         unawaited(_pollSessionMirror());
       }
+      _startBackupSyncTimer();
     } else if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.detached) {
       _mirrorTimer?.cancel();
+      _backupSyncTimer?.cancel();
       _persist(force: true);
     }
   }
@@ -175,6 +192,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     });
     _persist(force: true);
     _startTicker();
+    _startBackupSyncTimer();
     // 会话实时镜像：读开关与本机设备标识，开启则启动前台轮询。
     try {
       final prefs = await SharedPreferences.getInstance();

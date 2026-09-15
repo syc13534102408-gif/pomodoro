@@ -39,9 +39,22 @@ class Storage {
 }
 
 /// 从云端净荷恢复本机数据，保留推送订阅、进行中会话与本地偏好。
+///
+/// records 按**记录 id 并集**合并（2026-09-15 数据事故的根治）：
+/// - 云端独有的记录 → 补入本机；
+/// - 本机独有的记录（云端备份之后本机又新学的）→ **保留**，不再被整体
+///   替换清空——此前「恢复一次、今天的数据两端同时消失」即源于此；
+/// - 同 id 冲突 → 云端版本优先（恢复场景云端是权威快照）。
+/// 其余字段（任务/清单/设置）仍以云端为准。
 AppData mergeFromCloud(AppData local, Map<String, dynamic> payload) {
   final restored = AppData.fromMap(payload);
+  final cloudIds = {for (final r in restored.records) r.id};
+  final localOnly =
+      local.records.where((r) => !cloudIds.contains(r.id)).toList();
+  final merged = [...restored.records, ...localOnly]
+    ..sort((a, b) => b.at.compareTo(a.at));
   return restored.copyWith(
+    records: merged,
     activeSession: local.activeSession,
     sync: local.sync,
     // 倒计时属本地偏好（不进云端净荷），恢复云端数据时必须保留本机设置，

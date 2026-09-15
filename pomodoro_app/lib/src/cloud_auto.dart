@@ -1,6 +1,10 @@
 import 'dart:convert';
 
+import 'dart:async';
+
+
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'cloud_sync.dart';
 import 'models.dart';
@@ -77,6 +81,30 @@ class AutoCloudSync {
       data.sync.deviceCode.isNotEmpty &&
       _clock().difference(_lastRun) >= _minInterval;
 
+  /// 采用/恢复云端前，把本机数据存一份安全副本（保留最近 3 份）。
+  /// 误恢复后可按时间戳找回本机当时的数据（2026-09-15 事故教训：
+  /// 「恢复云端」曾整体替换本机 records，今天的数据两端同时清空）。
+  Future<void> _saveSafetyCopy(AppData data) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final stamp =
+          _clock().toIso8601String().replaceAll(':', '-').split('.').first;
+      await prefs.setString(
+          'pine-safety-copy-$stamp', jsonEncode(data.toMap()));
+      final keys = prefs
+          .getKeys()
+          .where((k) => k.startsWith('flutter.pine-safety-copy-') ||
+              k.startsWith('pine-safety-copy-'))
+          .toList()
+        ..sort();
+      for (final k in keys.take(keys.length - 3)) {
+        await prefs.remove(k);
+      }
+    } catch (_) {
+      // 副本失败不阻断恢复主流程。
+    }
+  }
+
   /// 完成一次专注后调用：把本机新数据推上云端。
   ///
   /// 网络失败静默跳过——数据仍在本地，下次同步会补上。
@@ -133,7 +161,9 @@ class AutoCloudSync {
         return; // 云端没有比上次同步更新的内容
       }
       if (!hasLocalChanges(data)) {
-        // 本机自上次同步后没有改动：直接采用云端版本。
+        // 本机自上次同步后没有改动：直接采用云端版本（先存安全副本）。
+        // 副本异步落盘，不阻塞恢复主流程。
+        unawaited(_saveSafetyCopy(data));
         final merged = mergeFromCloud(data, backup.payload);
         await _apply(merged.copyWith(
           sync: data.sync.copyWith(
@@ -147,6 +177,7 @@ class AutoCloudSync {
       if (!askOnConflict || context == null || !context.mounted) return;
       final restore = await _askRestore(context, backup);
       if (restore != true) return;
+      unawaited(_saveSafetyCopy(data));
       final merged = mergeFromCloud(data, backup.payload);
       await _apply(merged.copyWith(
         sync: data.sync.copyWith(

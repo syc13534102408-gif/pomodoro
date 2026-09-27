@@ -350,7 +350,7 @@ class LockTimer {
       if (baseMs == null) {
         await _plugin.show(
           ForegroundRunner._serviceId,
-          fallbackText ?? '松果',
+          fallbackText ?? 'pinecore',
           null,
           const NotificationDetails(
             android: AndroidNotificationDetails(
@@ -680,7 +680,8 @@ class Notifier {
   static void cancelAlarmSilently() {
     _scheduledDeadlineMs = null;
     if (!androidSupported) return;
-    unawaited(_plugin.cancel(pineAlarmNotificationId).catchError((Object _) {}));
+    unawaited(
+        _plugin.cancel(pineAlarmNotificationId).catchError((Object _) {}));
   }
 
   static Future<void> alert({

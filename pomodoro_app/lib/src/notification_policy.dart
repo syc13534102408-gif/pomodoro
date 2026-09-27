@@ -44,14 +44,14 @@ EndAlarmCopy endAlarmCopyFor({required SessionMode mode, String? taskName}) {
   if (mode.isFocus) {
     final name = (taskName == null || taskName.isEmpty) ? null : taskName;
     return EndAlarmCopy(
-      title: '松果 · 计划时长已到',
+      title: 'pinecore · 计划时长已到',
       body: name == null
           ? '这一轮计划时长已到，继续专注会累计更多时长。'
           : '「$name」计划时长已到，继续专注会累计更多时长。',
     );
   }
   return const EndAlarmCopy(
-    title: '松果 · 休息结束',
+    title: 'pinecore · 休息结束',
     body: '休息结束，可以开始下一轮专注。',
   );
 }
@@ -64,10 +64,10 @@ EndAlarmCopy endAlarmCopyFor({required SessionMode mode, String? taskName}) {
 String lockTimerTitle({required bool targetReached, String? taskName}) {
   if (taskName != null && taskName.isNotEmpty) {
     return targetReached
-        ? '松果 · 已超时：$taskName'
-        : '松果 · 专注：$taskName';
+        ? 'pinecore · 已超时：$taskName'
+        : 'pinecore · 专注：$taskName';
   }
-  return targetReached ? '松果 · 已超时' : '松果 · 计时中';
+  return targetReached ? 'pinecore · 已超时' : 'pinecore · 计时中';
 }
 
 /// 是否应为正在进行的会话预排系统级 911 到点闹钟。

@@ -22,6 +22,9 @@ class MainFlutterWindow: NSWindow, NSMenuDelegate {
   /// 菜单栏「悬浮计时器」开关条目，展开菜单时同步勾选状态。
   private var overlayMenuItem: NSMenuItem?
 
+  /// 菜单栏「悬浮窗模式」子菜单条目，展开时重建以同步勾选与文案。
+  private var styleMenuItem: NSMenuItem?
+
   private enum MenuTag: Int {
     case head = 1
     case detail
@@ -29,6 +32,7 @@ class MainFlutterWindow: NSWindow, NSMenuDelegate {
     case confirm
     case reset
     case overlay
+    case style
     case open
     case quit
   }
@@ -68,10 +72,10 @@ class MainFlutterWindow: NSWindow, NSMenuDelegate {
       // 同时设置 image 与 title 时会只绘制图标，因此这里使用纯文字按钮。
       button.image = nil
       button.imagePosition = .noImage
-      button.toolTip = "松果 · 专注时光（点击查看菜单）"
+      button.toolTip = "pinecore（点击查看菜单）"
     }
     // 首帧占位：Dart 就绪后（约 1 秒内）会被真实状态覆盖。
-    render(title: "松果", tintArgb: PineARGB.muted)
+    render(title: "pinecore", tintArgb: PineARGB.muted)
 
     let menu = buildStatusBarMenu()
     menu.delegate = self
@@ -118,7 +122,7 @@ class MainFlutterWindow: NSWindow, NSMenuDelegate {
     // 手动控制每个条目的可用性，避免 AppKit 自动禁用无 target 的条目之外的内容。
     menu.autoenablesItems = false
 
-    let head = NSMenuItem(title: "松果 · 专注时光", action: nil, keyEquivalent: "")
+    let head = NSMenuItem(title: "pinecore", action: nil, keyEquivalent: "")
     head.tag = MenuTag.head.rawValue
     head.isEnabled = false
     menu.addItem(head)
@@ -142,8 +146,17 @@ class MainFlutterWindow: NSWindow, NSMenuDelegate {
 
     menu.addItem(NSMenuItem.separator())
 
-    menu.addItem(actionItem(title: "打开松果", tag: .open))
-    menu.addItem(actionItem(title: "退出松果", tag: .quit))
+    menu.addItem(actionItem(title: "打开 pinecore", tag: .open))
+
+    // 悬浮窗显示模式：子菜单由 FloatingTimerPanel 构造，与胶囊右键菜单共用一套
+    // 构造逻辑（文案与勾选状态只有一处定义）。
+    let style = NSMenuItem(title: "悬浮窗模式", action: nil, keyEquivalent: "")
+    style.tag = MenuTag.style.rawValue
+    style.submenu = FloatingTimerPanel.shared.styleSubmenu()
+    styleMenuItem = style
+    menu.addItem(style)
+
+    menu.addItem(actionItem(title: "退出 pinecore", tag: .quit))
     return menu
   }
 
@@ -161,7 +174,7 @@ class MainFlutterWindow: NSWindow, NSMenuDelegate {
   func menuWillOpen(_ menu: NSMenu) {
     let state = menuState
     menu.item(withTag: MenuTag.head.rawValue)?.title =
-      string(state, "head") ?? "松果 · 专注时光"
+      string(state, "head") ?? "pinecore"
     menu.item(withTag: MenuTag.detail.rawValue)?.title = string(state, "detail") ?? ""
     menu.item(withTag: MenuTag.primary.rawValue)?.title = string(state, "primary") ?? "开始"
     menu.item(withTag: MenuTag.confirm.rawValue)?.title = string(state, "confirm") ?? "完成"
@@ -169,10 +182,12 @@ class MainFlutterWindow: NSWindow, NSMenuDelegate {
       (state["canReset"] as? NSNumber)?.boolValue ?? false
     let overlay = menu.item(withTag: MenuTag.overlay.rawValue)
     overlay?.state = FloatingTimerPanel.shared.isUserEnabled() ? .on : .off
+    // 子菜单每次展开重建：勾选状态跟随后续在胶囊右键菜单里的切换。
+    styleMenuItem?.submenu = FloatingTimerPanel.shared.styleSubmenu()
   }
 
   private func applyState(_ state: [String: Any]) {
-    let title = string(state, "title") ?? "松果"
+    let title = string(state, "title") ?? "pinecore"
     let tintArgb = (state["tint"] as? NSNumber)?.intValue ?? PineARGB.muted
     // 悬浮窗自己判断变化，必须放在菜单栏重绘的短路之前，否则暂停时不会刷新。
     updateOverlay(state, tintArgb: tintArgb)
@@ -188,6 +203,8 @@ class MainFlutterWindow: NSWindow, NSMenuDelegate {
       phase: string(state, "phase") ?? "专注中",
       elapsed: string(state, "elapsed") ?? "00:00",
       progress: (state["progress"] as? NSNumber)?.doubleValue ?? 0,
+      // 溢出比例：进度模式的水位封顶在 100%，超时量靠它画「泡沫痕」。
+      over: (state["over"] as? NSNumber)?.doubleValue ?? 0,
       tintArgb: tintArgb,
       active: (state["active"] as? NSNumber)?.boolValue ?? false)
   }

@@ -118,19 +118,44 @@ class _SettingsPageState extends State<SettingsPage> {
       );
       _emit(data);
     }
-    final updatedAt = await _sync.upload(
-      deviceCode: data.sync.deviceCode,
-      payload: data.toCloudMap(),
-      baseUpdatedAt: data.sync.lastSyncedAt,
-    );
-    _emit(data.copyWith(
-      sync: data.sync.copyWith(
-        lastUploadedAt: updatedAt,
-        lastSyncedAt: updatedAt,
-        lastSyncedHash: cloudFingerprint(data),
-      ),
-    ));
-    setState(() => _syncMessage = '已上传到云端');
+    try {
+      final updatedAt = await _sync.upload(
+        deviceCode: data.sync.deviceCode,
+        payload: data.toCloudMap(),
+        baseUpdatedAt: data.sync.lastSyncedAt,
+      );
+      _emit(data.copyWith(
+        sync: data.sync.copyWith(
+          lastUploadedAt: updatedAt,
+          lastSyncedAt: updatedAt,
+          lastSyncedHash: cloudFingerprint(data),
+        ),
+      ));
+      setState(() => _syncMessage = '已上传到云端');
+    } on CloudSyncException catch (error) {
+      if (!error.conflict) rethrow;
+      // 云端已被其他设备更新（409）：先拉取并按 id 并集合并（本机独有的
+      // 记录保留），再自动重试上传——用户不必手动「先恢复再上传」。
+      setState(() => _syncMessage = '云端有新数据，正在合并后重试…');
+      final backup = await _sync.download(data.sync.deviceCode);
+      final merged = mergeFromCloud(data, backup.payload).copyWith(
+        sync: data.sync.copyWith(lastSyncedAt: backup.updatedAt),
+      );
+      _emit(merged);
+      final updatedAt = await _sync.upload(
+        deviceCode: merged.sync.deviceCode,
+        payload: merged.toCloudMap(),
+        baseUpdatedAt: backup.updatedAt,
+      );
+      _emit(merged.copyWith(
+        sync: merged.sync.copyWith(
+          lastUploadedAt: updatedAt,
+          lastSyncedAt: updatedAt,
+          lastSyncedHash: cloudFingerprint(merged),
+        ),
+      ));
+      setState(() => _syncMessage = '已合并云端更新并上传');
+    }
   }
 
   Future<void> _restore() async {
@@ -347,7 +372,7 @@ class _SettingsPageState extends State<SettingsPage> {
                   onTap: () async {
                     await Notifier.requestPermission();
                     await Notifier.alert(
-                      title: '松果 · 测试提醒',
+                      title: 'pinecore · 测试提醒',
                       body: '这是专注结束时的提醒效果。',
                     );
                     if (data.soundEnabled) await Notifier.chime();

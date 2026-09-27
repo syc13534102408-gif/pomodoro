@@ -22,7 +22,7 @@ class PomodoroApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => MaterialApp(
-        title: '专注时光',
+        title: 'pinecore',
         debugShowCheckedModeBanner: false,
         theme: buildPineTheme(),
         themeMode: ThemeMode.light,

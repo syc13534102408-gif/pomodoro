@@ -58,11 +58,11 @@ void main() {
       ],
       settings: const TimerSettings(focus: 25, short: 5, long: 15),
     );
-    await tester.pumpWidget(MaterialApp(home: StatsPage(data: withData)));
+    await tester.pumpWidget(MaterialApp(home: StatsPage(data: withData, onChanged: (_) {})));
     expect(find.text('本月回顾'), findsOneWidget);
     expect(find.text('本月累计'), findsOneWidget);
 
-    await tester.pumpWidget(MaterialApp(home: StatsPage(data: AppData())));
+    await tester.pumpWidget(MaterialApp(home: StatsPage(data: AppData(), onChanged: (_) {})));
     expect(find.text('本月回顾'), findsOneWidget);
     expect(find.text('本月还没有专注记录'), findsOneWidget);
   });

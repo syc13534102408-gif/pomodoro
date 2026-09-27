@@ -254,6 +254,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   }
 
   void _apply(AppData next, {bool force = false, bool fromRemote = false}) {
+    final hadSession = _data.activeSession != null;
     setState(() => _data = next);
     _persist(force: force);
     // 用户一操作就刷新菜单栏，别等下一秒的 tick。
@@ -261,13 +262,26 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     unawaited(_syncForeground());
     // 会话镜像：本机状态变化即广播（采纳远端状态时抑制，防乒乓）。
     unawaited(_publishSession(next, fromRemote: fromRemote));
+    // 会话有无变化 → 重算轮询周期（空闲降频省云端调用费用）。
+    if (_mirrorEnabled && hadSession != (next.activeSession != null)) {
+      _startMirrorTimer();
+    }
   }
 
   // ==================== 会话实时镜像 ====================
 
+  /// 会话镜像轮询（自适应周期，2026-09-27 费用优化）。
+  ///
+  /// 有进行中会话：3 秒一次（实时跟随是镜像的核心体验）；
+  /// 无会话空闲：30 秒一次——云端 SCF/COS 按调用计费，空闲期高频轮询
+  /// 纯属浪费（每天后台待机 10 小时可省 ~1.4 万次云端调用/端）。
+  /// 会话有无变化时由 [_apply] 调用本方法重算周期。
   void _startMirrorTimer() {
     _mirrorTimer?.cancel();
-    _mirrorTimer = Timer.periodic(const Duration(seconds: 3), (_) {
+    final period = _data.activeSession != null
+        ? const Duration(seconds: 3)
+        : const Duration(seconds: 30);
+    _mirrorTimer = Timer.periodic(period, (_) {
       unawaited(_pollSessionMirror());
     });
   }
@@ -375,6 +389,14 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       ));
     }
     if (decision.playChime) unawaited(Notifier.chime());
+  }
+
+  /// 该任务当前「进行中」事件的名字（无则 null）——用于任务行事件徽标。
+  String? _runningEventName(String taskName) {
+    for (final event in _data.events) {
+      if (event.taskName == taskName && event.isRunning) return event.name;
+    }
+    return null;
   }
 
   /// 当前会话的任务名：仅专注阶段返回（取记录里 inProgress 的 taskName，
@@ -695,7 +717,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
           index: _tab,
           children: [
             _timerTab(),
-            StatsPage(data: _data),
+            StatsPage(data: _data, onChanged: _replace),
             SettingsPage(
               data: _data,
               onChanged: _replace,
@@ -986,6 +1008,31 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                             ),
                           ),
                           const SizedBox(width: 4),
+                          // 事件徽标：当前任务有进行中事件时显示，
+                          // 提示「接下来的记录会归入这个事件」。
+                          if (_runningEventName(_data.selectedTask.name)
+                              case final name?) ...[
+                            const SizedBox(width: 2),
+                            ConstrainedBox(
+                              constraints:
+                                  const BoxConstraints(maxWidth: 130),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: PineColors.tint(PineColors.pine),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  name,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                      color: PineColors.pine, fontSize: 10),
+                                ),
+                              ),
+                            ),
+                          ],
                           const Icon(Icons.chevron_right,
                               size: 15, color: PineColors.faint),
                         ],
@@ -1177,7 +1224,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     final width =
         (MediaQuery.sizeOf(context).width - 16).clamp(300.0, 356.0).toDouble();
     final page = _desktopOverlay == _overlayStats
-        ? StatsPage(data: _data)
+        ? StatsPage(data: _data, onChanged: _replace)
         : SettingsPage(
             data: _data,
             onChanged: _replace,

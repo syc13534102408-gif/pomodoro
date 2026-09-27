@@ -36,6 +36,7 @@ class MenuBarState {
     required this.progress,
     required this.active,
     this.phase = '',
+    this.over = 0,
   });
 
   /// 菜单栏常驻文本，与叶子图标并排，尽量短。
@@ -70,6 +71,19 @@ class MenuBarState {
 
   /// 阶段短标签：专注中 / 短休息 / 长休息 / 已超时 / 已暂停（悬浮窗 V3 用）。
   final String phase;
+
+  /// 溢出比例 0..1：超时后又走了几个「计划时长」，封顶 1（＝又干满一整轮）。
+  ///
+  /// 专供悬浮窗「进度模式」的泡沫痕——那里没有数字，[progress] 又封顶在 1，
+  /// 光靠它区分不出「刚超一点」和「又超一整轮」。超过一轮的精确量仍由
+  /// 菜单栏文字承担（`elapsed` 无上限）。非超时状态恒为 0。
+  final double over;
+}
+
+/// 溢出比例：`超时秒数 / 计划秒数`，封顶 1。非超时或计划时长为 0 时返回 0。
+double _overRatio(SessionView view) {
+  if (!view.targetReached || view.plannedSeconds <= 0) return 0;
+  return (view.overtimeSeconds / view.plannedSeconds).clamp(0.0, 1.0);
 }
 
 String _modeShort(SessionMode mode) => switch (mode) {
@@ -80,7 +94,7 @@ String _modeShort(SessionMode mode) => switch (mode) {
 
 /// 由 [AppData] 推导菜单栏状态的纯函数。
 ///
-/// - 空闲：只显示「松果」，中性灰
+/// - 空闲：只显示「pinecore」，中性灰
 /// - 专注中：番茄红；短休/长休：薄荷绿
 /// - 到点后继续计时：金色，clockText 自带 `+` 前缀
 /// - 暂停：中性灰，冻结在剩余时刻
@@ -91,7 +105,7 @@ MenuBarState menuBarStateOf(AppData data, DateTime now) {
   if (view == null) {
     final stats = StatsView.of(data, now);
     return MenuBarState(
-      title: '松果',
+      title: 'pinecore',
       phase: '',
       head: '未开始 · ${data.idleMode.label}',
       detail: '今日 ${stats.todayMinutes.round()} / ${data.goalMinutes} 分钟',
@@ -128,6 +142,8 @@ MenuBarState menuBarStateOf(AppData data, DateTime now) {
       elapsed: view.elapsedText,
       progress: view.progress,
       active: true,
+      // 暂停时也可能已经超时：泡沫痕冻结在溢出位置，与水位一起静止。
+      over: _overRatio(view),
     );
   }
 
@@ -145,6 +161,7 @@ MenuBarState menuBarStateOf(AppData data, DateTime now) {
       elapsed: view.elapsedText,
       progress: 1,
       active: true,
+      over: _overRatio(view),
     );
   }
 
@@ -160,6 +177,7 @@ MenuBarState menuBarStateOf(AppData data, DateTime now) {
     elapsed: view.elapsedText,
     progress: view.progress,
     active: true,
+    over: _overRatio(view),
   );
 }
 
@@ -208,6 +226,7 @@ class MenuBarTimer {
       'progress': state.progress,
       'active': state.active,
       'phase': state.phase,
+      'over': state.over,
     }).catchError((Object _) {
       // 菜单栏是可降级能力：原生未就绪时不影响计时本身。
     });

@@ -1,7 +1,5 @@
-import 'dart:convert';
-
 import 'dart:async';
-
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -27,6 +25,16 @@ String cloudFingerprint(AppData data) {
           'minutes': record.minutes,
           'date': record.dayKey,
           'status': record.status.key,
+        },
+    ],
+    'events': [
+      for (final event in data.events)
+        {
+          'name': event.name,
+          'task': event.taskName,
+          'started': event.startedAt.toIso8601String(),
+          'paused': event.pausedAt?.toIso8601String(),
+          'finished': event.finishedAt?.toIso8601String(),
         },
     ],
     'todos': {
@@ -206,7 +214,8 @@ class AutoCloudSync {
         title: const Text('云端有更新'),
         content: Text(
           '另一台设备在 $time 更新了云端数据（${backup.recordCount} 条记录），'
-          '本机也有未同步的改动。\n\n恢复云端版本会覆盖本机改动，请确认。',
+          '本机也有未同步的改动。\n\n恢复云端会与本机数据**合并**'
+          '（本机独有的记录会保留，不会丢失），请确认。',
         ),
         actions: [
           TextButton(

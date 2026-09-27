@@ -17,12 +17,12 @@ class AppDelegate: FlutterAppDelegate {
 
   /// 关掉窗口不退出 App：菜单栏倒计时依赖 Dart 侧每秒 tick，
   /// 若随窗口一起退出，最小化到菜单栏的意义就没了。
-  /// 退出走 Cmd+Q 或菜单栏「退出松果」。
+  /// 退出走 Cmd+Q 或菜单栏「退出 pinecore」。
   override func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
     return false
   }
 
-  /// 窗口关闭后点 Dock 图标（或菜单栏「打开松果」）重新唤出主窗口。
+  /// 窗口关闭后点 Dock 图标（或菜单栏「打开 pinecore」）重新唤出主窗口。
   override func applicationShouldHandleReopen(
     _ sender: NSApplication, hasVisibleWindows flag: Bool
   ) -> Bool {

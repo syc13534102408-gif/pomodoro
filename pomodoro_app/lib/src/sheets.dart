@@ -1230,3 +1230,184 @@ class _MiniCalendarState extends State<_MiniCalendar> {
     );
   }
 }
+
+/// 开启专注事件：填名称 + 选绑定任务（同任务已有的进行中事件会被自动暂停）。
+Future<void> showEventSheet(
+  BuildContext context, {
+  required AppData data,
+  required DataChanged onChanged,
+}) {
+  return showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: PineColors.paper,
+    builder: (context) => _EventSheet(data: data, onChanged: onChanged),
+  );
+}
+
+class _EventSheet extends StatefulWidget {
+  const _EventSheet({required this.data, required this.onChanged});
+
+  final AppData data;
+  final DataChanged onChanged;
+
+  @override
+  State<_EventSheet> createState() => _EventSheetState();
+}
+
+class _EventSheetState extends State<_EventSheet> {
+  final _name = TextEditingController();
+  late String _taskName;
+
+  @override
+  void initState() {
+    super.initState();
+    _taskName = widget.data.selectedTask.name;
+  }
+
+  @override
+  void dispose() {
+    _name.dispose();
+    super.dispose();
+  }
+
+  void _save() {
+    final name = _name.text.trim();
+    if (name.isEmpty) return;
+    widget.onChanged(TimerEngine.startEvent(
+      widget.data,
+      name: name,
+      taskName: _taskName,
+      now: DateTime.now(),
+    ));
+    Navigator.pop(context);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final tasks = widget.data.tasks;
+    return _SheetScaffold(
+      title: '开启专注事件',
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          TextField(
+            controller: _name,
+            autofocus: true,
+            decoration: const InputDecoration(
+                labelText: '事件名称（如「高数第六章」）', isDense: true),
+          ),
+          const SizedBox(height: 14),
+          DropdownButtonFormField<String>(
+            initialValue: _taskName,
+            decoration: const InputDecoration(labelText: '绑定任务', isDense: true),
+            items: [
+              for (final task in tasks)
+                DropdownMenuItem<String>(
+                  value: task.name,
+                  child: Text(task.name),
+                ),
+            ],
+            onChanged: (value) {
+              if (value != null) setState(() => _taskName = value);
+            },
+          ),
+          const SizedBox(height: 10),
+          const Text(
+            '开启后，该任务的每一次专注（含补记）都会累计到这个事件里，'
+            '直到你暂停或完成它。',
+            style: TextStyle(color: PineColors.sub, fontSize: 11),
+          ),
+          const SizedBox(height: 12),
+          BrickButton(
+            label: '开始累计',
+            onPressed: _save,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 事件明细：列出该事件下的全部记录（按完成时刻倒序）。
+Future<void> showEventDetailSheet(
+  BuildContext context, {
+  required AppData data,
+  required FocusEvent event,
+  required Color Function(String taskName) colorFor,
+}) {
+  final stats = eventStatsOf(data, event.id);
+  final start = event.startedAt;
+  final end = event.finishedAt ?? DateTime.now();
+  String fmt(DateTime d) =>
+      '${d.month}/${d.day} ${d.hour.toString().padLeft(2, '0')}:'
+      '${d.minute.toString().padLeft(2, '0')}';
+  return showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: PineColors.paper,
+    builder: (context) => _SheetScaffold(
+      title: event.name,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            '${event.statusLabel} · ${fmt(start)} → ${fmt(end)}',
+            style: const TextStyle(color: PineColors.sub, fontSize: 11),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            '累计 ${formatMinutes(stats.minutes)} · ${stats.tomatoCount} 番茄 · '
+            '${stats.days} 天 · ${stats.records.length} 次',
+            style: brickNumberStyle(fontSize: 13),
+          ),
+          const SizedBox(height: 12),
+          if (stats.records.isEmpty)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 12),
+              child: Text('还没有归入的记录',
+                  style: TextStyle(color: PineColors.sub, fontSize: 12)),
+            )
+          else
+            for (final record in stats.records)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 5),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 9,
+                      height: 9,
+                      decoration: BoxDecoration(
+                        color: colorFor(record.taskName),
+                        borderRadius: BorderRadius.circular(3),
+                      ),
+                    ),
+                    const SizedBox(width: 9),
+                    Expanded(
+                      child: Text(
+                        record.taskName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                            color: PineColors.ink, fontSize: 12),
+                      ),
+                    ),
+                    Text(
+                      '${record.dayKey} ${record.at.hour.toString().padLeft(2, '0')}:'
+                      '${record.at.minute.toString().padLeft(2, '0')}',
+                      style: const TextStyle(
+                          color: PineColors.sub, fontSize: 10.5),
+                    ),
+                    const SizedBox(width: 10),
+                    Text(formatMinutes(record.minutes),
+                        style: brickNumberStyle(fontSize: 12)),
+                  ],
+                ),
+              ),
+        ],
+      ),
+    ),
+  );
+}

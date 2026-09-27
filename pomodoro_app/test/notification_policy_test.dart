@@ -7,13 +7,13 @@ void main() {
   group('endAlarmCopyFor 到点文案', () {
     test('专注到点：标题与正文（无任务名）', () {
       final copy = endAlarmCopyFor(mode: SessionMode.focus);
-      expect(copy.title, '松果 · 计划时长已到');
+      expect(copy.title, 'pinecore · 计划时长已到');
       expect(copy.body, '这一轮计划时长已到，继续专注会累计更多时长。');
     });
 
     test('专注到点：正文拼接任务名', () {
       final copy = endAlarmCopyFor(mode: SessionMode.focus, taskName: '数学真题');
-      expect(copy.title, '松果 · 计划时长已到');
+      expect(copy.title, 'pinecore · 计划时长已到');
       expect(copy.body, contains('数学真题'));
       expect(copy.body, '「数学真题」计划时长已到，继续专注会累计更多时长。');
     });
@@ -21,7 +21,7 @@ void main() {
     test('短休息/长休息到点：同一套休息文案', () {
       for (final mode in [SessionMode.shortBreak, SessionMode.longBreak]) {
         final copy = endAlarmCopyFor(mode: mode, taskName: '数学真题');
-        expect(copy.title, '松果 · 休息结束');
+        expect(copy.title, 'pinecore · 休息结束');
         expect(copy.body, '休息结束，可以开始下一轮专注。');
       }
     });
@@ -31,22 +31,22 @@ void main() {
     test('专注中：标题含任务名（锁屏与通知栏完整可见）', () {
       expect(
         lockTimerTitle(targetReached: false, taskName: '数学真题'),
-        '松果 · 专注：数学真题',
+        'pinecore · 专注：数学真题',
       );
     });
 
     test('已超时：标题含任务名', () {
       expect(
         lockTimerTitle(targetReached: true, taskName: '错题整理'),
-        '松果 · 已超时：错题整理',
+        'pinecore · 已超时：错题整理',
       );
     });
 
     test('无任务名（休息/取不到）：维持原文案', () {
-      expect(lockTimerTitle(targetReached: false), '松果 · 计时中');
-      expect(lockTimerTitle(targetReached: true), '松果 · 已超时');
-      expect(lockTimerTitle(targetReached: false, taskName: ''),
-          '松果 · 计时中');
+      expect(lockTimerTitle(targetReached: false), 'pinecore · 计时中');
+      expect(lockTimerTitle(targetReached: true), 'pinecore · 已超时');
+      expect(
+          lockTimerTitle(targetReached: false, taskName: ''), 'pinecore · 计时中');
     });
   });
 
@@ -127,7 +127,7 @@ void main() {
       final decision = decide(restoreCompensation: true);
       expect(decision.showLocalAlert, isTrue);
       expect(decision.playChime, isFalse);
-      expect(decision.copy.title, '松果 · 计划时长已到');
+      expect(decision.copy.title, 'pinecore · 计划时长已到');
     });
 
     test('Android 补偿但 notifyEnabled=false：静默', () {
@@ -137,8 +137,7 @@ void main() {
     });
 
     test('Android 补偿但系统权限未授予：静默', () {
-      final decision =
-          decide(restoreCompensation: true, granted: false);
+      final decision = decide(restoreCompensation: true, granted: false);
       expect(decision.showLocalAlert, isFalse);
     });
 
@@ -175,7 +174,7 @@ void main() {
         mode: SessionMode.shortBreak,
         restoreCompensation: true,
       );
-      expect(decision.copy.title, '松果 · 休息结束');
+      expect(decision.copy.title, 'pinecore · 休息结束');
     });
 
     test('桌面到点带任务名：正文拼接任务名', () {

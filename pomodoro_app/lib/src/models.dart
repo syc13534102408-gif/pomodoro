@@ -157,12 +157,17 @@ class FocusRecord {
     required this.status,
     DateTime? at,
     this.completedFlag = false,
+    this.eventId,
   })  : id = id ?? DateTime.now().microsecondsSinceEpoch.toString(),
         at = at ?? DateTime.now();
 
   final String id;
   final String taskName;
   final double minutes;
+
+  /// 所属专注事件 id（创建记录时按「该任务是否有进行中事件」确定；
+  /// null = 不属于任何事件）。事件删除时记录保留、仅解除关联。
+  final String? eventId;
 
   /// 本地日期键 `YYYY-MM-DD`，序列化为 JSON 的 `date` 字段。
   ///
@@ -190,6 +195,7 @@ class FocusRecord {
         'date': dayKey,
         'at': at.toIso8601String(),
         if (completedFlag) 'completed': true,
+        if (eventId != null) 'eventId': eventId,
       };
 
   FocusRecord copyWith({
@@ -207,6 +213,7 @@ class FocusRecord {
         status: status ?? this.status,
         at: at ?? this.at,
         completedFlag: completedFlag,
+        eventId: eventId,
       );
 
   static FocusRecord fromMap(Map<dynamic, dynamic> map) {
@@ -235,8 +242,82 @@ class FocusRecord {
           completedFlag: map['completed'] == true),
       at: at,
       completedFlag: map['completed'] == true,
+      eventId: map['eventId']?.toString(),
     );
   }
+}
+
+/// 专注事件：跨轮次的累计容器（如「高数第六章」聚合该任务的一段学习期）。
+///
+/// 生命周期：进行中 → （暂停 ⇄ 继续）→ 完成。状态由时间字段派生：
+/// finishedAt 非空 → 已完成；pausedAt 非空 → 已暂停；两者皆空 → 进行中。
+/// 同一任务同时只允许一个进行中事件（由 TimerEngine 保证）。
+/// 暂停期间与完成之后产生的记录不再归入（见 FocusRecord.eventId）。
+class FocusEvent {
+  FocusEvent({
+    String? id,
+    required this.name,
+    required this.taskName,
+    required this.startedAt,
+    this.pausedAt,
+    this.finishedAt,
+  }) : id = id ?? DateTime.now().microsecondsSinceEpoch.toString();
+
+  final String id;
+  final String name;
+
+  /// 绑定的任务名（与记录一致，按名称匹配）。
+  final String taskName;
+  final DateTime startedAt;
+
+  /// 暂停时刻；继续时清空。
+  final DateTime? pausedAt;
+  final DateTime? finishedAt;
+
+  bool get isFinished => finishedAt != null;
+  bool get isPaused => !isFinished && pausedAt != null;
+  bool get isRunning => !isFinished && pausedAt == null;
+
+  String get statusLabel =>
+      isFinished ? '已完成' : (isPaused ? '已暂停' : '进行中');
+
+  Map<String, dynamic> toMap() => {
+        'id': id,
+        'name': name,
+        'taskName': taskName,
+        'startedAt': startedAt.toIso8601String(),
+        if (pausedAt != null) 'pausedAt': pausedAt!.toIso8601String(),
+        if (finishedAt != null) 'finishedAt': finishedAt!.toIso8601String(),
+      };
+
+  FocusEvent copyWith({
+    String? name,
+    String? taskName,
+    DateTime? pausedAt,
+    bool clearPaused = false,
+    DateTime? finishedAt,
+  }) =>
+      FocusEvent(
+        id: id,
+        name: name ?? this.name,
+        taskName: taskName ?? this.taskName,
+        startedAt: startedAt,
+        pausedAt: clearPaused ? null : (pausedAt ?? this.pausedAt),
+        finishedAt: finishedAt ?? this.finishedAt,
+      );
+
+  static FocusEvent fromMap(Map<dynamic, dynamic> map) => FocusEvent(
+        id: map['id']?.toString(),
+        name: (map['name'] ?? '未命名事件').toString(),
+        taskName: (map['taskName'] ?? '').toString(),
+        startedAt:
+            DateTime.tryParse(map['startedAt']?.toString() ?? '')?.toLocal() ??
+                DateTime.now(),
+        pausedAt:
+            DateTime.tryParse(map['pausedAt']?.toString() ?? '')?.toLocal(),
+        finishedAt:
+            DateTime.tryParse(map['finishedAt']?.toString() ?? '')?.toLocal(),
+      );
 }
 
 class TodoItem {
@@ -510,6 +591,7 @@ class AppData {
   AppData({
     List<PineTask>? tasks,
     List<FocusRecord>? records,
+    List<FocusEvent>? events,
     Map<String, List<TodoItem>>? todos,
     TimerSettings? settings,
     this.idleMode = SessionMode.focus,
@@ -523,6 +605,7 @@ class AppData {
     Countdown? countdown,
   })  : tasks = tasks ?? _defaultTasks(),
         records = records ?? [],
+        events = events ?? [],
         todos = todos ?? {},
         settings = settings ?? const TimerSettings(),
         sync = sync ?? const SyncState(),
@@ -530,6 +613,9 @@ class AppData {
 
   final List<PineTask> tasks;
   final List<FocusRecord> records;
+
+  /// 专注事件列表（进云端净荷，两端同步）。
+  final List<FocusEvent> events;
   final Map<String, List<TodoItem>> todos;
   final TimerSettings settings;
 
@@ -564,6 +650,7 @@ class AppData {
   Map<String, dynamic> toCloudMap() => {
         'tasks': tasks.map((task) => task.toMap()).toList(),
         'records': records.map((record) => record.toMap()).toList(),
+        'events': events.map((event) => event.toMap()).toList(),
         'todos': {
           for (final entry in todos.entries)
             entry.key: entry.value.map((item) => item.toMap()).toList(),
@@ -588,6 +675,7 @@ class AppData {
     List<PineTask>? tasks,
     SessionMode? idleMode,
     List<FocusRecord>? records,
+    List<FocusEvent>? events,
     Map<String, List<TodoItem>>? todos,
     TimerSettings? settings,
     int? selectedIndex,
@@ -604,6 +692,7 @@ class AppData {
         tasks: tasks ?? this.tasks,
         idleMode: idleMode ?? this.idleMode,
         records: records ?? this.records,
+        events: events ?? this.events,
         todos: todos ?? this.todos,
         settings: settings ?? this.settings,
         selectedIndex: selectedIndex ?? this.selectedIndex,
@@ -649,12 +738,21 @@ class AppData {
       });
     }
 
+    final rawEvents = map['events'];
+    final events = rawEvents is List
+        ? rawEvents
+            .whereType<Map>()
+            .map((item) => FocusEvent.fromMap(Map<dynamic, dynamic>.from(item)))
+            .toList()
+        : <FocusEvent>[];
+
     final settings = TimerSettings.fromMap(map['settings']);
     final selected = (map['selected'] as num?)?.toInt() ?? 0;
 
     return AppData(
       tasks: tasks,
       records: records,
+      events: events,
       todos: todos,
       settings: settings,
       idleMode: SessionModeX.from(map['idleMode']),

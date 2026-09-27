@@ -2,13 +2,17 @@ import 'package:flutter/material.dart';
 
 import '../src/engine.dart';
 import '../src/models.dart';
+import '../src/sheets.dart';
 import '../src/theme.dart';
 import '../src/widgets.dart';
 
 class StatsPage extends StatefulWidget {
-  const StatsPage({super.key, required this.data});
+  const StatsPage({super.key, required this.data, required this.onChanged});
 
   final AppData data;
+
+  /// 事件操作（开启/暂停/完成）回写数据。
+  final DataChanged onChanged;
 
   @override
   State<StatsPage> createState() => _StatsPageState();
@@ -102,6 +106,12 @@ class _StatsPageState extends State<StatsPage> {
           ),
           const SizedBox(height: 16),
           _MonthlyReview(data: data),
+          const SizedBox(height: 16),
+          _EventsSection(
+            data: data,
+            onChanged: widget.onChanged,
+            colorFor: _colorFor,
+          ),
           const SizedBox(height: 16),
           BrickCard(
             child: Column(
@@ -263,6 +273,205 @@ class _LegendRow extends StatelessWidget {
 
 /// 本月回顾：累计/次数/日均/天数 + 月历打卡格（底色=分钟、数字=番茄数）
 /// + 按事件分布。纯 UI 只读（D2），不改 engine 周聚合逻辑。
+/// 专注事件区域：进行中事件大卡片（累计/番茄/覆盖天数 + 暂停/完成），
+/// 下方为已完成事件列表（点击查看该事件的记录明细）。
+class _EventsSection extends StatelessWidget {
+  const _EventsSection({
+    required this.data,
+    required this.onChanged,
+    required this.colorFor,
+  });
+
+  final AppData data;
+  final DataChanged onChanged;
+  final Color Function(String taskName) colorFor;
+
+  @override
+  Widget build(BuildContext context) {
+    final running = data.events.where((e) => e.isRunning).toList();
+    final paused = data.events.where((e) => e.isPaused).toList();
+    final finished = data.events.where((e) => e.isFinished).toList()
+      ..sort((a, b) => (b.finishedAt ?? b.startedAt)
+          .compareTo(a.finishedAt ?? a.startedAt));
+    final now = DateTime.now();
+
+    return BrickCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SectionHeader(
+            title: '专注事件',
+            trailing: Text('累计 · 番茄 · 覆盖天数',
+                style: TextStyle(color: PineColors.sub, fontSize: 11)),
+          ),
+          const SizedBox(height: 12),
+          for (final event in [...running, ...paused])
+            _eventCard(context, event, now),
+          if (running.isEmpty && paused.isEmpty)
+            const Padding(
+              padding: EdgeInsets.only(bottom: 4),
+              child: Text(
+                '还没有进行中的事件——开启一个，之后该任务的每次专注都会累计进去。',
+                style: TextStyle(color: PineColors.sub, fontSize: 11.5),
+              ),
+            ),
+          const SizedBox(height: 8),
+          BrickButton(
+            label: '＋ 开启事件',
+            onPressed: () =>
+                showEventSheet(context, data: data, onChanged: onChanged),
+          ),
+          if (finished.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            const Text('已完成',
+                style: TextStyle(color: PineColors.sub, fontSize: 11)),
+            const SizedBox(height: 4),
+            for (final event in finished.take(6)) _finishedRow(context, event),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _eventCard(BuildContext context, FocusEvent event, DateTime now) {
+    final stats = eventStatsOf(data, event.id);
+    final accent = colorFor(event.taskName);
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 9),
+      decoration: BoxDecoration(
+        color: PineColors.tint(accent),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 9,
+                height: 9,
+                decoration: BoxDecoration(
+                  color: accent,
+                  borderRadius: BorderRadius.circular(3),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  event.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                      color: PineColors.ink,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600),
+                ),
+              ),
+              Text(
+                '${event.statusLabel} · ${event.taskName}',
+                style: TextStyle(
+                  color: event.isPaused ? PineColors.gold : PineColors.pine,
+                  fontSize: 10.5,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: MetricTile(
+                    value: formatMinutes(stats.minutes), label: '累计'),
+              ),
+              Expanded(
+                child: MetricTile(
+                  value: '${stats.tomatoCount} 个',
+                  label: '番茄',
+                  accent: PineColors.pine,
+                ),
+              ),
+              Expanded(
+                child: MetricTile(value: '${stats.days} 天', label: '覆盖'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Row(
+            children: [
+              Expanded(
+                child: BrickButton(
+                  label: event.isPaused ? '继续' : '暂停',
+                  color: PineColors.card,
+                  foregroundColor: PineColors.ink,
+                  onPressed: () => onChanged(
+                    event.isPaused
+                        ? TimerEngine.resumeEvent(data, event.id, now)
+                        : TimerEngine.pauseEvent(data, event.id, now),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: BrickButton(
+                  label: '完成',
+                  onPressed: () =>
+                      onChanged(TimerEngine.finishEvent(data, event.id, now)),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _finishedRow(BuildContext context, FocusEvent event) {
+    final stats = eventStatsOf(data, event.id);
+    final done = event.finishedAt ?? event.startedAt;
+    return InkWell(
+      borderRadius: BorderRadius.circular(8),
+      onTap: () => showEventDetailSheet(
+        context,
+        data: data,
+        event: event,
+        colorFor: colorFor,
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 6),
+        child: Row(
+          children: [
+            Container(
+              width: 9,
+              height: 9,
+              decoration: BoxDecoration(
+                color: colorFor(event.taskName),
+                borderRadius: BorderRadius.circular(3),
+              ),
+            ),
+            const SizedBox(width: 9),
+            Expanded(
+              child: Text(
+                event.name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(color: PineColors.ink, fontSize: 12),
+              ),
+            ),
+            Text(
+              '${done.month}/${done.day} 完成',
+              style: const TextStyle(color: PineColors.sub, fontSize: 10.5),
+            ),
+            const SizedBox(width: 10),
+            Text(formatMinutes(stats.minutes),
+                style: brickNumberStyle(fontSize: 12)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _MonthlyReview extends StatelessWidget {
   const _MonthlyReview({required this.data});
 

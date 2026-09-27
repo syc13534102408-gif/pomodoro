@@ -262,6 +262,8 @@ class TimerEngine {
             dayKey: dateKey(now),
             status: RecordStatus.inProgress,
             at: now,
+            // 归属：该任务若有进行中事件，本轮记录自动计入（暂停/已完成不归入）。
+            eventId: _runningEventIdFor(data, data.selectedTask.name),
           )
         : null;
     return data.copyWith(
@@ -455,6 +457,8 @@ class TimerEngine {
             dayKey: dateKey(at),
             status: RecordStatus.manual,
             at: at,
+            // 补记也归属该任务的进行中事件（用户在事件期间补的是这轮的账）。
+            eventId: _runningEventIdFor(data, taskName),
           ),
           ...data.records,
         ],
@@ -463,6 +467,137 @@ class TimerEngine {
   /// 冷启动恢复：补齐跨过截止点的状态。
   static AppData restore(AppData data, DateTime now) =>
       syncMinutes(advance(data, now), now);
+
+  // ==================== 专注事件 ====================
+
+  /// 当前任务名对应的「进行中」事件 id（无则 null）。记录归属的唯一判据。
+  static String? _runningEventIdFor(AppData data, String taskName) {
+    for (final event in data.events) {
+      if (event.taskName == taskName && event.isRunning) return event.id;
+    }
+    return null;
+  }
+
+  /// 开启事件。同一任务同时只允许一个进行中事件——已有的自动暂停
+  /// （语义：「我换到新阶段了」，旧事件保留时长可随时继续）。
+  static AppData startEvent(
+    AppData data, {
+    required String name,
+    required String taskName,
+    required DateTime now,
+  }) {
+    if (name.trim().isEmpty || taskName.isEmpty) return data;
+    final paused = [
+      for (final event in data.events)
+        event.taskName == taskName && event.isRunning
+            ? event.copyWith(pausedAt: now)
+            : event,
+    ];
+    return data.copyWith(
+      events: [
+        FocusEvent(name: name.trim(), taskName: taskName, startedAt: now),
+        ...paused,
+      ],
+    );
+  }
+
+  /// 暂停事件（暂停期间该任务的记录不再归入）。
+  static AppData pauseEvent(AppData data, String eventId, DateTime now) =>
+      data.copyWith(
+        events: [
+          for (final event in data.events)
+            event.id == eventId && event.isRunning
+                ? event.copyWith(pausedAt: now)
+                : event,
+        ],
+      );
+
+  /// 继续已暂停的事件（同任务的其他进行中事件自动暂停，保持「同时一个」）。
+  static AppData resumeEvent(AppData data, String eventId, DateTime now) {
+    FocusEvent? target;
+    for (final event in data.events) {
+      if (event.id == eventId && event.isPaused) target = event;
+    }
+    if (target == null) return data;
+    return data.copyWith(
+      events: [
+        for (final event in data.events)
+          if (event.id == eventId && event.isPaused)
+            event.copyWith(clearPaused: true)
+          else if (event.taskName == target.taskName && event.isRunning)
+            event.copyWith(pausedAt: now)
+          else
+            event,
+      ],
+    );
+  }
+
+  /// 完成事件（归档保留，统计页进入已完成列表）。
+  static AppData finishEvent(AppData data, String eventId, DateTime now) =>
+      data.copyWith(
+        events: [
+          for (final event in data.events)
+            event.id == eventId && !event.isFinished
+                ? event.copyWith(finishedAt: now, clearPaused: true)
+                : event,
+        ],
+      );
+
+  /// 删除事件：事件本身移除，**记录保留**但解除事件关联（统计不受影响）。
+  static AppData deleteEvent(AppData data, String eventId) => data.copyWith(
+        events: [
+          for (final event in data.events)
+            if (event.id != eventId) event,
+        ],
+        records: [
+          for (final record in data.records)
+            if (record.eventId == eventId)
+              FocusRecord(
+                id: record.id,
+                taskName: record.taskName,
+                minutes: record.minutes,
+                dayKey: record.dayKey,
+                status: record.status,
+                at: record.at,
+                completedFlag: record.completedFlag,
+              )
+            else
+              record,
+        ],
+      );
+}
+
+/// 事件聚合结果（统计页展示用）。
+class EventStats {
+  const EventStats({
+    required this.minutes,
+    required this.records,
+    required this.days,
+  });
+
+  final double minutes;
+  final List<FocusRecord> records;
+
+  /// 该事件覆盖的专注天数（按归属日去重）。
+  final int days;
+
+  int get tomatoCount => pomodoroEquiv(minutes);
+}
+
+/// 计算事件的累计时长 / 番茄 / 天数 / 明细（只计 counted 记录）。
+EventStats eventStatsOf(AppData data, String eventId) {
+  final records = data.records
+      .where((r) => r.eventId == eventId && r.counted)
+      .toList()
+    ..sort((a, b) => b.at.compareTo(a.at));
+  var minutes = 0.0;
+  final dayKeys = <String>{};
+  for (final record in records) {
+    minutes += record.minutes;
+    dayKeys.add(record.dayKey);
+  }
+  return EventStats(
+      minutes: minutes, records: records, days: dayKeys.length);
 }
 
 /// 是否应采纳远端会话快照（纯函数，供镜像轮询与单测使用）。

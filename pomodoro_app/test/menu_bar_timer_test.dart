@@ -13,7 +13,7 @@ void main() {
   test('空闲：只显示品牌名，配色中性，无可重置会话', () {
     final state = menuBarStateOf(_base(), DateTime(2026, 9, 6, 10));
 
-    expect(state.title, '松果');
+    expect(state.title, 'pinecore');
     expect(state.tint, PineColors.sub.toARGB32());
     expect(state.primary, '开始');
     expect(state.canReset, false);

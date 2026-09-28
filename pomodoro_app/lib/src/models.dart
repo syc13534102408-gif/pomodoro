@@ -98,21 +98,12 @@ DateTime mondayOf(DateTime date) {
   return day.subtract(Duration(days: day.weekday - 1));
 }
 
-/// 番茄当量（0.5 精度，向下取整）：每 25 分钟记 0.5 个（50 分钟 1 个），
-/// 不足 25 分钟的部分直接舍去。示例：24→0、25→0.5、49→0.5、50→1.0、
-/// 74→1.0、75→1.5、100→2.0。
-///
-/// 番茄数是**派生指标**（由记录分钟数实时换算，云端不存储），改口径后
-/// 历史记录自动按新口径展示，无需迁移数据。
-double pomodoroEquiv(double minutes) {
+/// 番茄当量：每满 50 分钟记 1 个番茄；距整段缺口不足 15 分钟时补齐进位，
+/// 否则向下取整。示例：34→0、35→1、49→1、50→1、84→1、85→2。
+int pomodoroEquiv(double minutes) {
   if (minutes <= 0) return 0;
-  return (minutes / 25).floor() * 0.5;
+  return (minutes + 15) ~/ 50;
 }
-
-/// 番茄数展示：整数省略小数位（2 → "2"），半整数保留一位（1.5 → "1.5"）。
-String formatTomato(double value) => value == value.roundToDouble()
-    ? value.round().toString()
-    : value.toStringAsFixed(1);
 
 class PineTask {
   PineTask({

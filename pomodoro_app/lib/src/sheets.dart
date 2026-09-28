@@ -1359,7 +1359,8 @@ Future<void> showEventDetailSheet(
           ),
           const SizedBox(height: 6),
           Text(
-            '累计 ${formatMinutes(stats.minutes)} · ${stats.tomatoCount} 番茄 · '
+            '累计 ${formatMinutes(stats.minutes)} · '
+            '${formatTomato(stats.tomatoCount)} 番茄 · '
             '${stats.days} 天 · ${stats.records.length} 次',
             style: brickNumberStyle(fontSize: 13),
           ),
@@ -1433,7 +1434,8 @@ Future<void> showEventActionSheet(
         children: [
           Text(
             '${event.statusLabel} · 绑定「${event.taskName}」'
-            ' · 累计 ${formatMinutes(stats.minutes)} · ${stats.tomatoCount} 番茄',
+            ' · 累计 ${formatMinutes(stats.minutes)} · '
+            '${formatTomato(stats.tomatoCount)} 番茄',
             style: const TextStyle(color: PineColors.sub, fontSize: 11.5),
           ),
           const SizedBox(height: 14),

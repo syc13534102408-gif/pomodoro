@@ -83,19 +83,22 @@ void main() {
     });
   });
 
-  group('pomodoroEquiv：满 50 分钟 1 个，缺口不足 15 分钟补齐', () {
+  group('pomodoroEquiv：0.5 精度向下取整（每 25 分钟 0.5 个）', () {
     test('边界表', () {
       expect(pomodoroEquiv(0), 0);
       expect(pomodoroEquiv(14), 0);
-      expect(pomodoroEquiv(34), 0); // 差 16，不补
-      expect(pomodoroEquiv(35), 1); // 差 15，补齐
-      expect(pomodoroEquiv(49), 1); // 差 1，补齐
-      expect(pomodoroEquiv(50), 1);
-      expect(pomodoroEquiv(74), 1); // 差 26，不补
-      expect(pomodoroEquiv(85), 2); // 差 15，补齐
-      expect(pomodoroEquiv(100), 2);
-      expect(pomodoroEquiv(134), 2);
-      expect(pomodoroEquiv(135), 3);
+      expect(pomodoroEquiv(24), 0); // 不足 25，舍去
+      expect(pomodoroEquiv(25), 0.5); // 首档 0.5
+      expect(pomodoroEquiv(34), 0.5);
+      expect(pomodoroEquiv(49), 0.5);
+      expect(pomodoroEquiv(50), 1.0);
+      expect(pomodoroEquiv(74), 1.0);
+      expect(pomodoroEquiv(75), 1.5);
+      expect(pomodoroEquiv(85), 1.5);
+      expect(pomodoroEquiv(100), 2.0);
+      expect(pomodoroEquiv(134), 2.5);
+      expect(pomodoroEquiv(135), 2.5);
+      expect(pomodoroEquiv(150), 3.0);
     });
   });
 

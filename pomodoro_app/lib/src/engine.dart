@@ -99,8 +99,8 @@ class StatsView {
 
   final double todayMinutes;
   final double weekMinutes;
-  final int todayCount;
-  final int weekCount;
+  final double todayCount;
+  final double weekCount;
   final int streak;
 
   /// 键为 0=周一 … 6=周日，值为 任务名 -> 分钟数。
@@ -186,8 +186,8 @@ class StatsView {
     // models.pomodoroEquiv），日/周/月历统一口径。原「完成次数」口径仅保留
     // 在 complete() 的休息轮换里。
     final todayCount = pomodoroEquiv(todayMinutes);
-    final weekCount =
-        weekDayMinutes.fold<int>(0, (sum, m) => sum + pomodoroEquiv(m));
+    final weekCount = weekDayMinutes
+        .fold<double>(0, (sum, m) => sum + pomodoroEquiv(m));
 
     // 连续天数按统计日序列回溯（dateKey 已是统计日口径，cursor 用统计日零点
     // 直接格式化，避免 0~3 点时段错位）。
@@ -581,7 +581,7 @@ class EventStats {
   /// 该事件覆盖的专注天数（按归属日去重）。
   final int days;
 
-  int get tomatoCount => pomodoroEquiv(minutes);
+  double get tomatoCount => pomodoroEquiv(minutes);
 }
 
 /// 计算事件的累计时长 / 番茄 / 天数 / 明细（只计 counted 记录）。

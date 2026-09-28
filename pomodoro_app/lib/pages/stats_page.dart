@@ -168,8 +168,8 @@ class _StatsPageState extends State<StatsPage> {
     final count = stats.weekCount;
     final remain = goal - count;
     return remain > 0
-        ? '本周 $count / $goal 个番茄 · 还差 $remain 个'
-        : '本周 $count / $goal 个番茄 · 已达成';
+        ? '本周 ${formatTomato(count)} / $goal 个番茄 · 还差 ${formatTomato(remain)} 个'
+        : '本周 ${formatTomato(count)} / $goal 个番茄 · 已达成';
   }
 
   Widget _periodChip(String label, int offset) {
@@ -388,7 +388,7 @@ class _EventsSection extends StatelessWidget {
               ),
               Expanded(
                 child: MetricTile(
-                  value: '${stats.tomatoCount} 个',
+                  value: '${formatTomato(stats.tomatoCount)} 个',
                   label: '番茄',
                   accent: PineColors.pine,
                 ),
@@ -466,7 +466,7 @@ class _MonthlyReview extends StatelessWidget {
     final monthRecords = data.records.where((record) =>
         record.counted && record.dayKey.startsWith(ym)).toList();
     final minutes = monthRecords.fold<double>(0, (sum, r) => sum + r.minutes);
-    // 番茄数统一走时长当量（满 50 分钟 1 个，缺口不足 15 分钟补齐）。
+    // 番茄数统一走时长当量（0.5 精度，向下取整）。
     final count = pomodoroEquiv(minutes);
     final activeDays = monthRecords.map((r) => r.dayKey.substring(8)).toSet().length;
     final daysInMonth = DateTime(statNow.year, statNow.month + 1, 0).day;
@@ -602,7 +602,7 @@ class _MonthGrid extends StatelessWidget {
   final int year;
   final int month;
   final List<double> dayValues;
-  final List<int> dayCounts;
+  final List<double> dayCounts;
   final int todayDay;
 
   static const List<String> _week = ['一', '二', '三', '四', '五', '六', '日'];
@@ -662,7 +662,7 @@ class _MonthGrid extends StatelessWidget {
               : null,
         ),
         child: Text(
-          '$count',
+          formatTomato(count),
           style: TextStyle(
             fontFamily: 'monospace',
             fontSize: 11,

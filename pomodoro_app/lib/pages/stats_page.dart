@@ -311,16 +311,10 @@ class _EventsSection extends StatelessWidget {
             const Padding(
               padding: EdgeInsets.only(bottom: 4),
               child: Text(
-                '还没有进行中的事件——开启一个，之后该任务的每次专注都会累计进去。',
+                '还没有进行中的事件（在计时页任务行开启）',
                 style: TextStyle(color: PineColors.sub, fontSize: 11.5),
               ),
             ),
-          const SizedBox(height: 8),
-          BrickButton(
-            label: '＋ 开启事件',
-            onPressed: () =>
-                showEventSheet(context, data: data, onChanged: onChanged),
-          ),
           if (finished.isNotEmpty) ...[
             const SizedBox(height: 16),
             const Text('已完成',
@@ -336,14 +330,22 @@ class _EventsSection extends StatelessWidget {
   Widget _eventCard(BuildContext context, FocusEvent event, DateTime now) {
     final stats = eventStatsOf(data, event.id);
     final accent = colorFor(event.taskName);
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.fromLTRB(12, 10, 12, 9),
-      decoration: BoxDecoration(
-        color: PineColors.tint(accent),
-        borderRadius: BorderRadius.circular(14),
+    return InkWell(
+      borderRadius: BorderRadius.circular(14),
+      onTap: () => showEventDetailSheet(
+        context,
+        data: data,
+        event: event,
+        colorFor: colorFor,
       ),
-      child: Column(
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.fromLTRB(12, 10, 12, 9),
+        decoration: BoxDecoration(
+          color: PineColors.tint(accent),
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
@@ -396,32 +398,8 @@ class _EventsSection extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 4),
-          Row(
-            children: [
-              Expanded(
-                child: BrickButton(
-                  label: event.isPaused ? '继续' : '暂停',
-                  color: PineColors.card,
-                  foregroundColor: PineColors.ink,
-                  onPressed: () => onChanged(
-                    event.isPaused
-                        ? TimerEngine.resumeEvent(data, event.id, now)
-                        : TimerEngine.pauseEvent(data, event.id, now),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: BrickButton(
-                  label: '完成',
-                  onPressed: () =>
-                      onChanged(TimerEngine.finishEvent(data, event.id, now)),
-                ),
-              ),
-            ],
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

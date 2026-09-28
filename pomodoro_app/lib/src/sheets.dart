@@ -1411,3 +1411,91 @@ Future<void> showEventDetailSheet(
     ),
   );
 }
+
+/// 事件操作面板（统计页只做展示，操作集中在这里/首页任务行）。
+Future<void> showEventActionSheet(
+  BuildContext context, {
+  required AppData data,
+  required FocusEvent event,
+  required DataChanged onChanged,
+}) {
+  final stats = eventStatsOf(data, event.id);
+  final now = DateTime.now();
+  return showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: PineColors.paper,
+    builder: (context) => _SheetScaffold(
+      title: event.name,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            '${event.statusLabel} · 绑定「${event.taskName}」'
+            ' · 累计 ${formatMinutes(stats.minutes)} · ${stats.tomatoCount} 番茄',
+            style: const TextStyle(color: PineColors.sub, fontSize: 11.5),
+          ),
+          const SizedBox(height: 14),
+          if (event.isRunning)
+            BrickButton(
+              label: '暂停累计（暂停期间的记录不归入）',
+              icon: Icons.pause,
+              color: PineColors.card,
+              foregroundColor: PineColors.ink,
+              onPressed: () {
+                onChanged(TimerEngine.pauseEvent(data, event.id, now));
+                Navigator.pop(context);
+              },
+            )
+          else
+            BrickButton(
+              label: '继续累计',
+              icon: Icons.play_arrow,
+              onPressed: () {
+                onChanged(TimerEngine.resumeEvent(data, event.id, now));
+                Navigator.pop(context);
+              },
+            ),
+          const SizedBox(height: 10),
+          BrickButton(
+            label: '完成此事件（归档保留）',
+            icon: Icons.check,
+            onPressed: () {
+              onChanged(TimerEngine.finishEvent(data, event.id, now));
+              Navigator.pop(context);
+            },
+          ),
+          const SizedBox(height: 10),
+          BrickButton(
+            label: '开启新事件（此事件自动暂停）',
+            icon: Icons.add,
+            color: PineColors.card,
+            foregroundColor: PineColors.pine,
+            onPressed: () {
+              Navigator.pop(context);
+              showEventSheet(context, data: data, onChanged: onChanged);
+            },
+          ),
+          const SizedBox(height: 10),
+          TextButton(
+            onPressed: () async {
+              final confirmed = await _confirmDanger(
+                context,
+                title: '删除事件？',
+                message: '事件「${event.name}」会被移除，'
+                    '已累计的记录保留在统计中（仅解除关联）。',
+                confirmLabel: '删除',
+              );
+              if (!confirmed) return;
+              onChanged(TimerEngine.deleteEvent(data, event.id));
+              if (context.mounted) Navigator.pop(context);
+            },
+            child: const Text('删除事件',
+                style: TextStyle(color: PineColors.sub, fontSize: 12)),
+          ),
+        ],
+      ),
+    ),
+  );
+}

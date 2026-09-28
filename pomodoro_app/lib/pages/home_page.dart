@@ -391,6 +391,18 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     if (decision.playChime) unawaited(Notifier.chime());
   }
 
+  /// 打开当前任务「进行中」事件的操作面板（暂停/继续/完成/换事件/删除）。
+  void _openEventActions() {
+    final taskName = _data.selectedTask.name;
+    for (final event in _data.events) {
+      if (event.taskName == taskName && event.isRunning) {
+        showEventActionSheet(context,
+            data: _data, event: event, onChanged: _replace);
+        return;
+      }
+    }
+  }
+
   /// 该任务当前「进行中」事件的名字（无则 null）——用于任务行事件徽标。
   String? _runningEventName(String taskName) {
     for (final event in _data.events) {
@@ -1008,28 +1020,51 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                             ),
                           ),
                           const SizedBox(width: 4),
-                          // 事件徽标：当前任务有进行中事件时显示，
-                          // 提示「接下来的记录会归入这个事件」。
+                          // 事件入口（操作集中在这里，统计页只做展示）：
+                          // 有进行中事件 → 显示可点击的事件徽标（弹出暂停/完成等操作）；
+                          // 无事件 → 显示轻量「＋事件」开启入口。
                           if (_runningEventName(_data.selectedTask.name)
                               case final name?) ...[
                             const SizedBox(width: 2),
                             ConstrainedBox(
                               constraints:
                                   const BoxConstraints(maxWidth: 130),
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(6),
+                                onTap: _openEventActions,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: PineColors.tint(PineColors.pine),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Text(
+                                    name,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                        color: PineColors.pine, fontSize: 10),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ] else ...[
+                            const SizedBox(width: 2),
+                            InkWell(
+                              borderRadius: BorderRadius.circular(6),
+                              onTap: () => showEventSheet(context,
+                                  data: _data, onChanged: _replace),
                               child: Container(
                                 padding: const EdgeInsets.symmetric(
                                     horizontal: 6, vertical: 2),
                                 decoration: BoxDecoration(
-                                  color: PineColors.tint(PineColors.pine),
                                   borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(color: PineColors.line),
                                 ),
-                                child: Text(
-                                  name,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                      color: PineColors.pine, fontSize: 10),
-                                ),
+                                child: const Text('＋事件',
+                                    style: TextStyle(
+                                        color: PineColors.sub, fontSize: 10)),
                               ),
                             ),
                           ],

@@ -629,15 +629,20 @@ class MetricTile extends StatelessWidget {
                 Text(parts.number, maxLines: 1, style: numberStyle),
                 if (parts.unit.isNotEmpty) ...[
                   const SizedBox(width: 3),
-                  Text(
-                    parts.unit,
-                    maxLines: 1,
-                    style: const TextStyle(
-                      color: PineColors.sub,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w500,
+                  // 「个番茄」的单位改用松果图案（2026-09-30）——只此一处改动，
+                  // 所有统计格子（本周/本月/日均/事件构成…）一起生效。
+                  if (parts.unit == '个番茄')
+                    PineconeMark(size: 12, color: accent ?? PineColors.sub)
+                  else
+                    Text(
+                      parts.unit,
+                      maxLines: 1,
+                      style: const TextStyle(
+                        color: PineColors.sub,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
-                  ),
                 ],
               ],
             ),
@@ -852,23 +857,130 @@ class _BrickBarsPainter extends CustomPainter {
 }
 
 /// 分钟数格式化：统一保留到整数分钟。
-/// 时长文案：**统计口径一律说番茄**（每 50 分钟 1 个）。
+/// 时长拆成「数字 + 是否用番茄口径」，**取整规则的唯一来源**。
 ///
-/// - 不足 1 小时：仍是「45 分钟」；
-/// - 正好整小时：按番茄当量取整（180 → 「3 个番茄」、240 → 「5 个番茄」）；
-/// - 含分钟：给精确值、保留一位小数（185 → 「3.7 个番茄」、173 → 「3.5 个番茄」）。
+/// - 不足 1 小时：`45 分钟`，`useMark = false`；
+/// - 正好整小时：按番茄当量取整（180 → `3`、240 → `5`）；
+/// - 含分钟：精确到一位小数（185 → `3.7`、173 → `3.5`）。
 ///
-/// 规则来自 2026-09-29 的产品决定（详见 CHANGELOG）；改这里会同时影响
-/// 统计页、首页今日/本周、以及各面板里的时长文案。
-String formatMinutes(double minutes) {
+/// 规则来自 2026-09-29 的产品决定（见 CHANGELOG）；2026-09-30 起单位文字改成
+/// 松果图案（见 [MinutesText]），所以这里只出**数字**。
+({String text, bool useMark}) minutesLabel(double minutes) {
   final total = minutes.round();
-  if (total < 60) return '$total 分钟';
-  if (total % 60 == 0) return '${pomodoroEquiv(total.toDouble())} 个番茄';
+  if (total < 60) return (text: '$total 分钟', useMark: false);
+  if (total % 60 == 0) {
+    return (text: '${pomodoroEquiv(total.toDouble())}', useMark: true);
+  }
   // 一位小数：total/50 的十分位 = round(total / 5)
   final tenths = (total / 5).round();
-  return tenths % 10 == 0
-      ? '${tenths ~/ 10} 个番茄'
-      : '${tenths ~/ 10}.${tenths % 10} 个番茄';
+  return (
+    text:
+        tenths % 10 == 0 ? '${tenths ~/ 10}' : '${tenths ~/ 10}.${tenths % 10}',
+    useMark: true,
+  );
+}
+
+/// 时长文案（**纯字符串**，带「个番茄」字样）。
+///
+/// 只用于无法内嵌图案的地方——对话框正文、语义标签等；界面上的统计数字请用
+/// [MinutesText]，它把单位换成松果图案。两者共用 [minutesLabel]，口径不会分叉。
+String formatMinutes(double minutes) {
+  final label = minutesLabel(minutes);
+  return label.useMark ? '${label.text} 个番茄' : label.text;
+}
+
+/// 松果图案：统计口径里「1 个番茄」的单位标记。
+///
+/// 线稿而非填充：填充版必须在果体上"抠"出鳞片，就会依赖所在底色；线稿不挑背景，
+/// 也贴合「纸面 + ink、无渐变无阴影」的基调。缩到 11–13px 仍要认得出是松果，
+/// 靠的就是中间那 3 道鳞片弧线——别为了"简洁"把它们删掉。
+class PineconeMark extends StatelessWidget {
+  const PineconeMark({super.key, required this.color, this.size = 12});
+
+  final Color color;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) => SizedBox(
+        width: size * 0.82,
+        height: size,
+        child: CustomPaint(painter: _PineconePainter(color)),
+      );
+}
+
+class _PineconePainter extends CustomPainter {
+  const _PineconePainter(this.color);
+
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final w = size.width;
+    final h = size.height;
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = (size.shortestSide * 0.11).clamp(0.9, 1.6)
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+
+    // 果体：上窄下宽的卵形（顶端收尖、底端钝圆）
+    final body = Path()
+      ..moveTo(w * 0.5, h * 0.07)
+      ..cubicTo(w * 0.97, h * 0.24, w * 0.96, h * 0.8, w * 0.5, h * 0.96)
+      ..cubicTo(w * 0.04, h * 0.8, w * 0.03, h * 0.24, w * 0.5, h * 0.07);
+    canvas.drawPath(body, paint);
+
+    // 3 道鳞片弧线：越靠下越宽，都留一点余量不顶到轮廓上
+    const rows = [0.36, 0.58, 0.79];
+    const halves = [0.19, 0.31, 0.24];
+    for (var i = 0; i < rows.length; i++) {
+      final y = h * rows[i];
+      final half = w * halves[i];
+      canvas.drawPath(
+        Path()
+          ..moveTo(w * 0.5 - half, y)
+          ..quadraticBezierTo(w * 0.5, y + h * 0.1, w * 0.5 + half, y),
+        paint,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _PineconePainter old) => old.color != color;
+}
+
+/// 统计口径的时长：数字 + 松果图案（代替「个番茄」文字）。
+///
+/// 不足 1 小时仍是「45 分钟」（没有单位图案）。用具名 style 传入，颜色随之继承；
+/// 图案不额外着色，避免在同一行里跟任务色抢注意力。
+class MinutesText extends StatelessWidget {
+  const MinutesText(this.minutes, {super.key, this.style});
+
+  final double minutes;
+  final TextStyle? style;
+
+  @override
+  Widget build(BuildContext context) {
+    final label = minutesLabel(minutes);
+    final base = style ?? const TextStyle();
+    if (!label.useMark) return Text(label.text, style: base);
+    final markColor = base.color ?? PineColors.ink;
+    final markSize = ((base.fontSize ?? 14) * 0.95).clamp(9.0, 18.0);
+    return Text.rich(
+      TextSpan(children: [
+        TextSpan(text: label.text),
+        WidgetSpan(
+          alignment: PlaceholderAlignment.middle,
+          child: Padding(
+            padding: EdgeInsets.only(left: markSize * 0.28),
+            child: PineconeMark(size: markSize, color: markColor),
+          ),
+        ),
+      ]),
+      style: base,
+    );
+  }
 }
 
 /// 考试倒计时。

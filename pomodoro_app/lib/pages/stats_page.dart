@@ -83,8 +83,8 @@ class _StatsPageState extends State<StatsPage> {
                 const Text('本周累计 · 已专注',
                     style: TextStyle(color: PineColors.sub, fontSize: 12)),
                 const SizedBox(height: 4),
-                Text(
-                  formatMinutes(stats.weekMinutes),
+                MinutesText(
+                  stats.weekMinutes,
                   style: brickNumberStyle(fontSize: 30),
                 ),
                 const SizedBox(height: 8),
@@ -255,8 +255,8 @@ class _LegendRow extends StatelessWidget {
               style: const TextStyle(color: PineColors.ink, fontSize: 12),
             ),
           ),
-          Text(
-            formatMinutes(minutes),
+          MinutesText(
+            minutes,
             style: brickNumberStyle(fontSize: 11, color: PineColors.sub),
           ),
           const SizedBox(width: 10),
@@ -304,13 +304,23 @@ class _EventsSection extends StatelessWidget {
         children: [
           SectionHeader(
             title: '事件进展',
-            trailing: Text(
-              live.isEmpty
-                  ? '暂无进行中'
-                  : '${live.length} 个进行中 · 共 '
-                      '${formatMinutes(live.fold<double>(0, (sum, e) => sum + eventStatsOf(data, e.id).minutes))}',
-              style: const TextStyle(color: PineColors.sub, fontSize: 11),
-            ),
+            trailing: live.isEmpty
+                ? const Text('暂无进行中',
+                    style: TextStyle(color: PineColors.sub, fontSize: 11))
+                : Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text('${live.length} 个进行中 · 共 ',
+                          style: const TextStyle(
+                              color: PineColors.sub, fontSize: 11)),
+                      MinutesText(
+                        live.fold<double>(0,
+                            (sum, e) => sum + eventStatsOf(data, e.id).minutes),
+                        style: const TextStyle(
+                            color: PineColors.sub, fontSize: 11),
+                      ),
+                    ],
+                  ),
           ),
           const SizedBox(height: 4),
           if (live.isEmpty)
@@ -501,7 +511,7 @@ class _EventsSection extends StatelessWidget {
               style: const TextStyle(color: PineColors.sub, fontSize: 10.5),
             ),
             const SizedBox(width: 10),
-            Text(formatMinutes(stats.minutes),
+            MinutesText(stats.minutes,
                 style: brickNumberStyle(fontSize: 12, color: PineColors.sub)),
           ],
         ),
@@ -831,8 +841,8 @@ class _TaskBar extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 8),
-            Text(
-              formatMinutes(minutes),
+            MinutesText(
+              minutes,
               style: brickNumberStyle(fontSize: 12, color: PineColors.sub),
             ),
           ],

@@ -857,7 +857,7 @@ class _RecordDetailSheet extends StatelessWidget {
           ),
           _DetailRow(
             label: '时长',
-            child: Text(formatMinutes(record.minutes),
+            child: MinutesText(record.minutes,
                 style: brickNumberStyle(fontSize: 14)),
           ),
           _DetailRow(
@@ -1549,7 +1549,7 @@ Future<void> showEventDetailSheet(
                           color: PineColors.sub, fontSize: 10.5),
                     ),
                     const SizedBox(width: 10),
-                    Text(formatMinutes(record.minutes),
+                    MinutesText(record.minutes,
                         style: brickNumberStyle(fontSize: 12)),
                   ],
                 ),
@@ -1755,7 +1755,7 @@ Widget _finishedEventTile(
                     style:
                         const TextStyle(color: PineColors.sub, fontSize: 10.5)),
                 const SizedBox(width: 8),
-                Text(formatMinutes(stats.minutes),
+                MinutesText(stats.minutes,
                     style:
                         brickNumberStyle(fontSize: 12, color: PineColors.sub)),
               ],
@@ -2002,8 +2002,7 @@ Widget _recordTile(
             style: const TextStyle(color: PineColors.sub, fontSize: 10.5),
           ),
           const SizedBox(width: 10),
-          Text(formatMinutes(record.minutes),
-              style: brickNumberStyle(fontSize: 12)),
+          MinutesText(record.minutes, style: brickNumberStyle(fontSize: 12)),
         ],
       ),
     ),

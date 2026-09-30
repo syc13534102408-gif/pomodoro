@@ -1,3 +1,4 @@
+// ignore_for_file: prefer_const_constructors
 // 设计走查工具（**不是测试**）：把真实的统计页离屏渲染成 PNG。
 //
 // 文件名不以 `_test.dart` 结尾，所以 `flutter test` 的默认收集不会带上它——
@@ -21,6 +22,7 @@ import 'package:pomodoro_app/pages/stats_page.dart';
 import 'package:pomodoro_app/src/models.dart';
 import 'package:pomodoro_app/src/sheets.dart';
 import 'package:pomodoro_app/src/theme.dart';
+import 'package:pomodoro_app/src/widgets.dart';
 
 /// 测试环境默认字体渲染成方块，必须显式加载一个含中文的字体。
 /// 同时把 'monospace' 也指向它——`brickNumberStyle` 显式指定了该族。
@@ -158,7 +160,9 @@ void main() {
       child: MaterialApp(
         theme: themed,
         debugShowCheckedModeBanner: false,
-        home: StatsPage(data: _sample(), onChanged: (_) {}),
+        home: Platform.environment['PREVIEW_MARKS'] == '1'
+            ? const _MarkBoard()
+            : StatsPage(data: _sample(), onChanged: (_) {}),
       ),
     ));
     await tester.pumpAndSettle();
@@ -195,4 +199,101 @@ void main() {
     // ignore: avoid_print
     print('渲染完成 → ${out.path}  ${image.width}×${image.height}');
   });
+}
+
+/// 造型板：在真实尺寸下看松果，再放两个大尺寸看形状。
+class _MarkBoard extends StatelessWidget {
+  const _MarkBoard();
+
+  @override
+  Widget build(BuildContext context) => Container(
+        color: PineColors.paper,
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: 20),
+            for (final size in const [11.0, 12.0, 14.0, 17.0])
+              Padding(
+                padding: const EdgeInsets.only(bottom: 16),
+                child: Row(
+                  children: [
+                    SizedBox(
+                      width: 46,
+                      child: Text('$size px',
+                          style: const TextStyle(
+                              fontSize: 11, color: PineColors.sub)),
+                    ),
+                    Text.rich(
+                      TextSpan(children: [
+                        const TextSpan(text: '3.7'),
+                        WidgetSpan(
+                          alignment: PlaceholderAlignment.middle,
+                          child: Padding(
+                            padding: const EdgeInsets.only(left: 3),
+                            child:
+                                PineconeMark(size: size, color: PineColors.ink),
+                          ),
+                        ),
+                      ]),
+                      style: TextStyle(fontSize: size, color: PineColors.ink),
+                    ),
+                  ],
+                ),
+              ),
+            const SizedBox(height: 8),
+            const Text('番茄（跟随文字色 / 语义红）',
+                style: TextStyle(fontSize: 11, color: PineColors.sub)),
+            const SizedBox(height: 10),
+            for (final size in const [12.0, 17.0])
+              Padding(
+                padding: const EdgeInsets.only(bottom: 14),
+                child: Row(
+                  children: [
+                    Text.rich(
+                      TextSpan(children: [
+                        const TextSpan(text: '3.7'),
+                        WidgetSpan(
+                          alignment: PlaceholderAlignment.middle,
+                          child: Padding(
+                            padding: const EdgeInsets.only(left: 3),
+                            child:
+                                TomatoMark(size: size, color: PineColors.ink),
+                          ),
+                        ),
+                      ]),
+                      style: TextStyle(fontSize: size, color: PineColors.ink),
+                    ),
+                    const SizedBox(width: 28),
+                    Text.rich(
+                      TextSpan(children: [
+                        const TextSpan(text: '3.7'),
+                        WidgetSpan(
+                          alignment: PlaceholderAlignment.middle,
+                          child: Padding(
+                            padding: const EdgeInsets.only(left: 3),
+                            child:
+                                TomatoMark(size: size, color: PineColors.focus),
+                          ),
+                        ),
+                      ]),
+                      style: TextStyle(fontSize: size, color: PineColors.ink),
+                    ),
+                  ],
+                ),
+              ),
+            const SizedBox(height: 16),
+            const Text('大图看造型',
+                style: TextStyle(fontSize: 11, color: PineColors.sub)),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                PineconeMark(size: 120, color: PineColors.pine),
+                const SizedBox(width: 20),
+                TomatoMark(size: 120, color: PineColors.focus),
+              ],
+            ),
+          ],
+        ),
+      );
 }

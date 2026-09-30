@@ -852,15 +852,23 @@ class _BrickBarsPainter extends CustomPainter {
 }
 
 /// 分钟数格式化：统一保留到整数分钟。
+/// 时长文案：**统计口径一律说番茄**（每 50 分钟 1 个）。
+///
+/// - 不足 1 小时：仍是「45 分钟」；
+/// - 正好整小时：按番茄当量取整（180 → 「3 个番茄」、240 → 「5 个番茄」）；
+/// - 含分钟：给精确值、保留一位小数（185 → 「3.7 个番茄」、173 → 「3.5 个番茄」）。
+///
+/// 规则来自 2026-09-29 的产品决定（详见 CHANGELOG）；改这里会同时影响
+/// 统计页、首页今日/本周、以及各面板里的时长文案。
 String formatMinutes(double minutes) {
   final total = minutes.round();
-  if (total >= 60) {
-    final hours = total ~/ 60;
-    final rest = total - hours * 60;
-    final restText = rest == 0 ? '' : ' $rest分';
-    return '$hours 小时$restText';
-  }
-  return '$total 分钟';
+  if (total < 60) return '$total 分钟';
+  if (total % 60 == 0) return '${pomodoroEquiv(total.toDouble())} 个番茄';
+  // 一位小数：total/50 的十分位 = round(total / 5)
+  final tenths = (total / 5).round();
+  return tenths % 10 == 0
+      ? '${tenths ~/ 10} 个番茄'
+      : '${tenths ~/ 10}.${tenths % 10} 个番茄';
 }
 
 /// 考试倒计时。

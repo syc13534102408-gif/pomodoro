@@ -81,8 +81,7 @@ class _StatsPageState extends State<StatsPage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text('本周累计 · 已专注',
-                    style:
-                        TextStyle(color: PineColors.sub, fontSize: 12)),
+                    style: TextStyle(color: PineColors.sub, fontSize: 12)),
                 const SizedBox(height: 4),
                 Text(
                   formatMinutes(stats.weekMinutes),
@@ -91,8 +90,7 @@ class _StatsPageState extends State<StatsPage> {
                 const SizedBox(height: 8),
                 Text(
                   _weekGoalCaption(stats),
-                  style: brickNumberStyle(
-                      fontSize: 12, color: PineColors.sub),
+                  style: brickNumberStyle(fontSize: 12, color: PineColors.sub),
                 ),
                 const SizedBox(height: 10),
                 BrickProgress(
@@ -105,13 +103,14 @@ class _StatsPageState extends State<StatsPage> {
             ),
           ),
           const SizedBox(height: 16),
-          _MonthlyReview(data: data),
-          const SizedBox(height: 16),
+          // 专注事件是「正在做的事」，排在两个历史报表之前：当下 → 回看。
           _EventsSection(
             data: data,
             onChanged: widget.onChanged,
             colorFor: _colorFor,
           ),
+          const SizedBox(height: 16),
+          _MonthlyReview(data: data),
           const SizedBox(height: 16),
           BrickCard(
             child: Column(
@@ -138,7 +137,7 @@ class _StatsPageState extends State<StatsPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const SectionHeader(title: '事件构成'),
+                const SectionHeader(title: '任务构成'),
                 const SizedBox(height: 8),
                 if (legend.isEmpty)
                   const Text(
@@ -273,8 +272,12 @@ class _LegendRow extends StatelessWidget {
 
 /// 本月回顾：累计/次数/日均/天数 + 月历打卡格（底色=分钟、数字=番茄数）
 /// + 按事件分布。纯 UI 只读（D2），不改 engine 周聚合逻辑。
-/// 专注事件区域：进行中事件大卡片（累计/番茄/覆盖天数 + 暂停/完成），
-/// 下方为已完成事件列表（点击查看该事件的记录明细）。
+/// 专注事件区域：进行中/已暂停以「行」列出（左任务色条 + 事件名 + 状态点、
+/// 任务名 + 累计时长、近 7 天节奏微柱 + 番茄/覆盖），已完成折叠在下方同一套行语言里。
+///
+/// 刻意不用大面积 tint 底：`PineColors.tint` 的约定是「小面积语义」
+/// （段选 / 选中行 / 徽章底），铺成整卡背景会让页面出现两块最重的色斑，
+/// 且那颜色来自任务色、与状态色同框打架。色只留 3px 色条与小圆点。
 class _EventsSection extends StatelessWidget {
   const _EventsSection({
     required this.data,
@@ -291,113 +294,169 @@ class _EventsSection extends StatelessWidget {
     final running = data.events.where((e) => e.isRunning).toList();
     final paused = data.events.where((e) => e.isPaused).toList();
     final finished = data.events.where((e) => e.isFinished).toList()
-      ..sort((a, b) => (b.finishedAt ?? b.startedAt)
-          .compareTo(a.finishedAt ?? a.startedAt));
-    final now = DateTime.now();
+      ..sort((a, b) =>
+          (b.finishedAt ?? b.startedAt).compareTo(a.finishedAt ?? a.startedAt));
+    final live = [...running, ...paused];
 
     return BrickCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const SectionHeader(
-            title: '专注事件',
-            trailing: Text('累计 · 番茄 · 覆盖天数',
-                style: TextStyle(color: PineColors.sub, fontSize: 11)),
+          SectionHeader(
+            title: '事件进展',
+            trailing: Text(
+              live.isEmpty
+                  ? '暂无进行中'
+                  : '${live.length} 个进行中 · 共 '
+                      '${formatMinutes(live.fold<double>(0, (sum, e) => sum + eventStatsOf(data, e.id).minutes))}',
+              style: const TextStyle(color: PineColors.sub, fontSize: 11),
+            ),
           ),
-          const SizedBox(height: 12),
-          for (final event in [...running, ...paused])
-            _eventCard(context, event, now),
-          if (running.isEmpty && paused.isEmpty)
+          const SizedBox(height: 4),
+          if (live.isEmpty)
             const Padding(
-              padding: EdgeInsets.only(bottom: 4),
+              padding: EdgeInsets.symmetric(vertical: 6),
               child: Text(
                 '还没有进行中的事件（在计时页任务行开启）',
                 style: TextStyle(color: PineColors.sub, fontSize: 11.5),
               ),
-            ),
+            )
+          else
+            for (var i = 0; i < live.length; i++) ...[
+              if (i > 0) const Divider(height: 1, color: PineColors.line),
+              _eventRow(context, live[i]),
+            ],
           if (finished.isNotEmpty) ...[
-            const SizedBox(height: 16),
-            const Text('已完成',
-                style: TextStyle(color: PineColors.sub, fontSize: 11)),
-            const SizedBox(height: 4),
-            for (final event in finished.take(6)) _finishedRow(context, event),
+            const SizedBox(height: 14),
+            const Divider(height: 1, color: PineColors.line),
+            const SizedBox(height: 10),
+            // 这里只列最近 5 个；完整清单（含重命名/删除）在统计页的这个入口里。
+            InkWell(
+              borderRadius: BorderRadius.circular(6),
+              onTap: () => showFinishedEventsSheet(
+                context,
+                data: data,
+                colorFor: colorFor,
+                onChanged: onChanged,
+              ),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 2, horizontal: 2),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      '已完成 ${finished.length} 个',
+                      style:
+                          const TextStyle(color: PineColors.sub, fontSize: 11),
+                    ),
+                    const SizedBox(width: 3),
+                    const Text('查看全部',
+                        style: TextStyle(color: PineColors.pine, fontSize: 11)),
+                    const Icon(Icons.chevron_right,
+                        size: 13, color: PineColors.pine),
+                  ],
+                ),
+              ),
+            ),
+            for (final event in finished.take(5)) _finishedRow(context, event),
           ],
         ],
       ),
     );
   }
 
-  Widget _eventCard(BuildContext context, FocusEvent event, DateTime now) {
-    final stats = eventStatsOf(data, event.id);
-    final accent = colorFor(event.taskName);
-    return InkWell(
-      borderRadius: BorderRadius.circular(14),
-      onTap: () => showEventDetailSheet(
-        context,
-        data: data,
-        event: event,
-        colorFor: colorFor,
-      ),
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 10),
-        padding: const EdgeInsets.fromLTRB(12, 10, 12, 9),
-        decoration: BoxDecoration(
-          color: PineColors.tint(accent),
-          borderRadius: BorderRadius.circular(14),
+  Widget _open(BuildContext context, FocusEvent event, Widget child) => InkWell(
+        borderRadius: BorderRadius.circular(8),
+        onTap: () => showEventDetailSheet(
+          context,
+          data: data,
+          event: event,
+          colorFor: colorFor,
         ),
-        child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        child: child,
+      );
+
+  /// 事件名（主语）。已暂停才追加状态标记——进行中是常态，不给默认态加标签，
+  /// 少一个字反而让"暂停"更跳。
+  Widget _nameRow(FocusEvent event) => Row(
         children: [
-          Row(
-            children: [
-              Container(
-                width: 9,
-                height: 9,
-                decoration: BoxDecoration(
-                  color: accent,
-                  borderRadius: BorderRadius.circular(3),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  event.name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                      color: PineColors.ink,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600),
-                ),
-              ),
-              Text(
-                '${event.statusLabel} · ${event.taskName}',
-                style: TextStyle(
-                  color: event.isPaused ? PineColors.gold : PineColors.pine,
-                  fontSize: 10.5,
-                ),
-              ),
-            ],
+          Container(
+            width: 3,
+            height: 14,
+            decoration: BoxDecoration(
+              color: colorFor(event.taskName),
+              borderRadius: BorderRadius.circular(2),
+            ),
           ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Expanded(
-                child: MetricTile(
-                    value: formatMinutes(stats.minutes), label: '累计'),
+          const SizedBox(width: 8),
+          // Flexible 而非 Expanded：让名字收缩包紧，状态标记才会紧贴名字，
+          // 而不是被推到右端贴着数字（会被误读成数字的修饰）。
+          Flexible(
+            child: Text(
+              event.name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: PineColors.ink,
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
               ),
-              Expanded(
-                child: MetricTile(
-                  value: '${stats.tomatoCount} 个',
-                  label: '番茄',
-                  accent: PineColors.pine,
+            ),
+          ),
+          if (event.isPaused) ...[
+            const SizedBox(width: 8),
+            const Text(
+              '已暂停',
+              style: TextStyle(
+                color: PineColors.gold,
+                fontSize: 10.5,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ],
+      );
+
+  Widget _minutes(FocusEvent event) => Text(
+        formatMinutes(eventStatsOf(data, event.id).minutes),
+        style: brickNumberStyle(fontSize: 17),
+      );
+
+  /// 事件行（定稿）：色条 + 事件名（仅暂停时带状态标）+ 轮次方块 + 累计时长。
+  ///
+  /// 轮次方块 = 已完成轮数（每满 50 分钟 1 个当量），把「跨轮次累积」变成数得出来的
+  /// 单位，超过 8 轮折叠为「+N」。任务名 / 番茄数 / 覆盖天数 / 逐日节奏都留在详情页里，
+  /// 概览只讲三件事：这是什么、累积了几轮、一共多久。
+  Widget _eventRow(BuildContext context, FocusEvent event) {
+    final count = eventStatsOf(data, event.id).tomatoCount;
+    final accent = colorFor(event.taskName);
+    final shown = count <= 8 ? count : 7;
+    return _open(
+      context,
+      event,
+      Padding(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        child: Row(
+          children: [
+            Expanded(child: _nameRow(event)),
+            const SizedBox(width: 8),
+            for (var i = 0; i < shown; i++)
+              Padding(
+                padding: const EdgeInsets.only(right: 2),
+                child: Container(
+                  width: 5,
+                  height: 11,
+                  decoration: BoxDecoration(
+                    color: accent.withAlpha(190),
+                    borderRadius: BorderRadius.circular(1.5),
+                  ),
                 ),
               ),
-              Expanded(
-                child: MetricTile(value: '${stats.days} 天', label: '覆盖'),
-              ),
-            ],
-          ),
+            if (count > 8)
+              Text('+${count - 7}',
+                  style: const TextStyle(color: PineColors.sub, fontSize: 9.5)),
+            const SizedBox(width: 10),
+            _minutes(event),
           ],
         ),
       ),
@@ -416,24 +475,25 @@ class _EventsSection extends StatelessWidget {
         colorFor: colorFor,
       ),
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 6),
+        padding: const EdgeInsets.symmetric(vertical: 7),
         child: Row(
           children: [
+            // 已完成整体降一档：色条用半透明，不与进行中抢。
             Container(
-              width: 9,
-              height: 9,
+              width: 3,
+              height: 13,
               decoration: BoxDecoration(
-                color: colorFor(event.taskName),
-                borderRadius: BorderRadius.circular(3),
+                color: colorFor(event.taskName).withAlpha(168),
+                borderRadius: BorderRadius.circular(2),
               ),
             ),
-            const SizedBox(width: 9),
+            const SizedBox(width: 8),
             Expanded(
               child: Text(
                 event.name,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(color: PineColors.ink, fontSize: 12),
+                style: const TextStyle(color: PineColors.ink, fontSize: 12.5),
               ),
             ),
             Text(
@@ -442,7 +502,7 @@ class _EventsSection extends StatelessWidget {
             ),
             const SizedBox(width: 10),
             Text(formatMinutes(stats.minutes),
-                style: brickNumberStyle(fontSize: 12)),
+                style: brickNumberStyle(fontSize: 12, color: PineColors.sub)),
           ],
         ),
       ),
@@ -463,12 +523,14 @@ class _MonthlyReview extends StatelessWidget {
     // 会把整天的记录错分到前一天（2026-09-10 数据事故根因之一）。
     final statNow = statDayOf(now);
     final ym = '${statNow.year}-${statNow.month.toString().padLeft(2, '0')}';
-    final monthRecords = data.records.where((record) =>
-        record.counted && record.dayKey.startsWith(ym)).toList();
+    final monthRecords = data.records
+        .where((record) => record.counted && record.dayKey.startsWith(ym))
+        .toList();
     final minutes = monthRecords.fold<double>(0, (sum, r) => sum + r.minutes);
     // 番茄数统一走时长当量（满 50 分钟 1 个，缺口不足 15 分钟补齐）。
     final count = pomodoroEquiv(minutes);
-    final activeDays = monthRecords.map((r) => r.dayKey.substring(8)).toSet().length;
+    final activeDays =
+        monthRecords.map((r) => r.dayKey.substring(8)).toSet().length;
     final daysInMonth = DateTime(statNow.year, statNow.month + 1, 0).day;
     final dayValues = List<double>.filled(daysInMonth, 0);
     final byTask = <String, double>{};
@@ -516,9 +578,10 @@ class _MonthlyReview extends StatelessWidget {
               Expanded(
                 child: MetricTile(
                   // 日均只除以有学习的天数：完全没学的一天不计入分母。
+                  // 走 formatMinutes：与其它统计口径一致（≥1 小时说番茄）
                   value: activeDays > 0
-                      ? '${(minutes / activeDays).round()} 分'
-                      : '0 分',
+                      ? formatMinutes(minutes / activeDays)
+                      : '0 分钟',
                   label: '日均(学习日)',
                 ),
               ),
@@ -689,7 +752,8 @@ class _MonthGrid extends StatelessWidget {
       rows.add(Row(
         children: [
           for (final c in cells.skip(start).take(7)) ...[
-            Expanded(child: Padding(padding: const EdgeInsets.all(1.5), child: c)),
+            Expanded(
+                child: Padding(padding: const EdgeInsets.all(1.5), child: c)),
           ],
         ],
       ));
@@ -725,8 +789,7 @@ class _MonthGrid extends StatelessWidget {
                 child: Center(
                   child: Text(
                     w,
-                    style: const TextStyle(
-                        color: PineColors.sub, fontSize: 10),
+                    style: const TextStyle(color: PineColors.sub, fontSize: 10),
                   ),
                 ),
               ),

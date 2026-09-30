@@ -677,12 +677,6 @@ class _ManualSheetState extends State<_ManualSheet> {
     });
   }
 
-  /// 日期按钮上的星期标签。
-  String _weekdayLabel(DateTime d) {
-    const week = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
-    return week[d.weekday - 1];
-  }
-
   void _save() {
     final minutes = double.tryParse(_minutes.text);
     if (minutes == null || minutes <= 0) return;
@@ -707,7 +701,7 @@ class _ManualSheetState extends State<_ManualSheet> {
         children: [
           DropdownButtonFormField<String>(
             initialValue: _taskName,
-            decoration: const InputDecoration(labelText: '专注事件', isDense: true),
+            decoration: const InputDecoration(labelText: '任务', isDense: true),
             items: [
               for (final task in tasks)
                 DropdownMenuItem<String>(
@@ -876,6 +870,14 @@ class _RecordDetailSheet extends StatelessWidget {
           const SizedBox(height: 16),
           SizedBox(
             height: 46,
+            child: BrickButton(
+              label: '修改这条记录',
+              onPressed: () => _edit(context),
+            ),
+          ),
+          const SizedBox(height: 10),
+          SizedBox(
+            height: 46,
             child: OutlinedButton.icon(
               onPressed: () => _delete(context),
               icon: const Icon(Icons.delete_outline,
@@ -899,6 +901,152 @@ class _RecordDetailSheet extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  /// 修改这条记录：时长 + 完成时刻。保存时重算归属日（与补记面板共用同一套选择器）。
+  Future<void> _edit(BuildContext context) async {
+    final rounded = record.minutes == record.minutes.roundToDouble()
+        ? record.minutes.toStringAsFixed(0)
+        : record.minutes.toStringAsFixed(1);
+    final controller = TextEditingController(text: rounded);
+    var at = record.at;
+    // '' = 不属于任何事件（下拉 value 不能为 null，否则显示的是 hint 而不是选中项）
+    var eventId = record.eventId ?? '';
+    final eventOptions = <String, String>{
+      '': '不属于任何事件',
+      for (final event in data.events)
+        event.id: '${event.name}（${event.taskName}）${event.statusLabel}',
+    };
+    // 旧数据可能残留指向已删除事件的 id：补一个可显示的项，避免下拉断言失败
+    if (!eventOptions.containsKey(eventId)) {
+      eventOptions[eventId] = '（原事件已删除）';
+    }
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) {
+          String two(int value) => value.toString().padLeft(2, '0');
+          return AlertDialog(
+            title: const Text('修改这条记录', style: TextStyle(fontSize: 15)),
+            // 固定宽度：AlertDialog 按内在宽度测量，而 stretch/Expanded 需要有界宽度，
+            // 两者相遇会触发 hasSize 布局断言。
+            content: SizedBox(
+              width: 300,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  TextField(
+                    controller: controller,
+                    autofocus: true,
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
+                    style: brickNumberStyle(fontSize: 14),
+                    decoration: const InputDecoration(
+                        labelText: '专注时长', suffixText: '分钟', isDense: true),
+                  ),
+                  const SizedBox(height: 14),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: BrickButton(
+                          label:
+                              '${at.month}/${at.day}（${at.year == DateTime.now().year ? '' : '${at.year}/'}${_weekdayLabel(at)}）',
+                          icon: Icons.event,
+                          color: PineColors.card,
+                          foregroundColor: PineColors.ink,
+                          onPressed: () async {
+                            final picked = await showDatePicker(
+                              context: dialogContext,
+                              initialDate: at,
+                              firstDate: DateTime(2020),
+                              lastDate:
+                                  DateTime.now().add(const Duration(days: 1)),
+                            );
+                            if (picked != null) {
+                              setDialogState(() => at = DateTime(
+                                  picked.year,
+                                  picked.month,
+                                  picked.day,
+                                  at.hour,
+                                  at.minute));
+                            }
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: BrickButton(
+                          label: '${two(at.hour)}:${two(at.minute)}',
+                          icon: Icons.schedule,
+                          color: PineColors.card,
+                          foregroundColor: PineColors.ink,
+                          onPressed: () async {
+                            final picked = await showTimePicker(
+                              context: dialogContext,
+                              initialTime: TimeOfDay.fromDateTime(at),
+                            );
+                            if (picked != null) {
+                              setDialogState(() => at = DateTime(
+                                  at.year,
+                                  at.month,
+                                  at.day,
+                                  picked.hour,
+                                  picked.minute));
+                            }
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  // 归入哪条专注事件：把漏归 / 悬空的记录接回正确事件（数据修复入口）
+                  DropdownButtonFormField<String>(
+                    initialValue: eventId,
+                    isDense: true,
+                    decoration: const InputDecoration(
+                        labelText: '归入专注事件', isDense: true),
+                    items: [
+                      for (final entry in eventOptions.entries)
+                        DropdownMenuItem<String>(
+                          value: entry.key,
+                          child: Text(
+                            entry.value,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontSize: 13),
+                          ),
+                        ),
+                    ],
+                    onChanged: (value) =>
+                        setDialogState(() => eventId = value ?? ''),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext, false),
+                child: const Text('取消'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext, true),
+                child: const Text('保存'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+    if (saved != true) return;
+    final minutes = double.tryParse(controller.text.trim());
+    if (minutes == null || minutes < 0) return;
+    var next =
+        TimerEngine.updateRecord(data, record.id, minutes: minutes, at: at);
+    next = TimerEngine.setRecordEvent(
+        next, record.id, eventId.isEmpty ? null : eventId);
+    onChanged(next);
+    if (context.mounted) Navigator.pop(context);
   }
 
   Future<void> _delete(BuildContext context) async {
@@ -1494,6 +1642,368 @@ Future<void> showEventActionSheet(
             child: const Text('删除事件',
                 style: TextStyle(color: PineColors.sub, fontSize: 12)),
           ),
+        ],
+      ),
+    ),
+  );
+}
+
+/// 全部已完成事件清单（统计页「已完成 N 个 · 查看全部」的入口）。
+///
+/// 与统计页只列最近 5 条不同，这里列出全部；每条可重命名或删除，点条目看记录明细。
+/// 用 StatefulBuilder 就地刷新，避免增删后关掉面板再打开。
+Future<void> showFinishedEventsSheet(
+  BuildContext context, {
+  required AppData data,
+  required Color Function(String taskName) colorFor,
+  required DataChanged onChanged,
+}) {
+  return showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: PineColors.paper,
+    builder: (sheetContext) {
+      var current = data;
+      return StatefulBuilder(
+        builder: (sheetContext, setSheetState) {
+          final finished = current.events.where((e) => e.isFinished).toList()
+            ..sort((a, b) => (b.finishedAt ?? b.startedAt)
+                .compareTo(a.finishedAt ?? a.startedAt));
+          void apply(AppData next) {
+            onChanged(next);
+            setSheetState(() => current = next);
+          }
+
+          return _SheetScaffold(
+            title: '已完成事件',
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  '共 ${finished.length} 个 · 点条目看记录明细',
+                  style: const TextStyle(color: PineColors.sub, fontSize: 11),
+                ),
+                const SizedBox(height: 6),
+                if (finished.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 18),
+                    child: Text('还没有已完成的事件',
+                        style: TextStyle(color: PineColors.sub, fontSize: 12)),
+                  )
+                else
+                  for (final event in finished)
+                    _finishedEventTile(
+                      sheetContext,
+                      current,
+                      event,
+                      colorFor,
+                      apply,
+                    ),
+              ],
+            ),
+          );
+        },
+      );
+    },
+  );
+}
+
+/// 清单里的一行：点左侧进详情，右侧「⋯」重命名/删除。
+Widget _finishedEventTile(
+  BuildContext context,
+  AppData data,
+  FocusEvent event,
+  Color Function(String taskName) colorFor,
+  void Function(AppData next) apply,
+) {
+  final stats = eventStatsOf(data, event.id);
+  final done = event.finishedAt ?? event.startedAt;
+  return Row(
+    children: [
+      Expanded(
+        child: InkWell(
+          borderRadius: BorderRadius.circular(8),
+          onTap: () => showEventDetailSheet(
+            context,
+            data: data,
+            event: event,
+            colorFor: colorFor,
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 10),
+            child: Row(
+              children: [
+                Container(
+                  width: 3,
+                  height: 13,
+                  decoration: BoxDecoration(
+                    color: colorFor(event.taskName).withAlpha(168),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    event.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(color: PineColors.ink, fontSize: 13),
+                  ),
+                ),
+                Text('${done.month}/${done.day} 完成',
+                    style:
+                        const TextStyle(color: PineColors.sub, fontSize: 10.5)),
+                const SizedBox(width: 8),
+                Text(formatMinutes(stats.minutes),
+                    style:
+                        brickNumberStyle(fontSize: 12, color: PineColors.sub)),
+              ],
+            ),
+          ),
+        ),
+      ),
+      IconButton(
+        icon: const Icon(Icons.more_horiz, size: 18, color: PineColors.sub),
+        tooltip: '重命名 / 删除',
+        onPressed: () => _eventTileActions(context, data, event, apply),
+      ),
+    ],
+  );
+}
+
+/// 条目操作：重命名（就地弹输入）/ 删除（二次确认，记录保留只解除关联）。
+Future<void> _eventTileActions(
+  BuildContext context,
+  AppData data,
+  FocusEvent event,
+  void Function(AppData next) apply,
+) async {
+  final action = await showModalBottomSheet<String>(
+    context: context,
+    backgroundColor: PineColors.paper,
+    builder: (sheetContext) => SafeArea(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          ListTile(
+            leading: const Icon(Icons.edit_outlined, size: 20),
+            title: const Text('重命名', style: TextStyle(fontSize: 14)),
+            onTap: () => Navigator.pop(sheetContext, 'rename'),
+          ),
+          ListTile(
+            leading: const Icon(Icons.delete_outline,
+                size: 20, color: PineColors.focus),
+            title: const Text('删除事件',
+                style: TextStyle(fontSize: 14, color: PineColors.focus)),
+            subtitle: const Text('事件移除，专注记录保留（只解除关联）',
+                style: TextStyle(fontSize: 10.5, color: PineColors.sub)),
+            onTap: () => Navigator.pop(sheetContext, 'delete'),
+          ),
+          const SizedBox(height: 6),
+        ],
+      ),
+    ),
+  );
+  if (action == null || !context.mounted) return;
+
+  if (action == 'rename') {
+    final controller = TextEditingController(text: event.name);
+    final name = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('重命名事件', style: TextStyle(fontSize: 15)),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: const InputDecoration(labelText: '事件名称', isDense: true),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('取消'),
+          ),
+          TextButton(
+            onPressed: () =>
+                Navigator.pop(dialogContext, controller.text.trim()),
+            child: const Text('保存'),
+          ),
+        ],
+      ),
+    );
+    if (name == null || name.isEmpty) return;
+    apply(TimerEngine.renameEvent(data, event.id, name));
+    return;
+  }
+
+  final stats = eventStatsOf(data, event.id);
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (dialogContext) => AlertDialog(
+      title: const Text('删除这个事件？', style: TextStyle(fontSize: 15)),
+      content: Text(
+        '「${event.name}」会被移除，它的 ${stats.records.length} 条专注记录'
+        '（${formatMinutes(stats.minutes)}）保留在统计里，只是不再归属这个事件。',
+        style: const TextStyle(fontSize: 12.5),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(dialogContext, false),
+          child: const Text('取消'),
+        ),
+        TextButton(
+          onPressed: () => Navigator.pop(dialogContext, true),
+          child: const Text('删除', style: TextStyle(color: PineColors.focus)),
+        ),
+      ],
+    ),
+  );
+  if (confirmed != true) return;
+  apply(TimerEngine.deleteEvent(data, event.id));
+}
+
+/// 日期上的星期标签（补记/修改记录与全部记录清单共用）。
+String _weekdayLabel(DateTime d) {
+  const week = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
+  return week[d.weekday - 1];
+}
+
+/// 估算记录清单高度（每行约 34），超过 [maxHeight] 就封顶、由内部 ListView 滚动。
+double _listHeight(List<Widget> tiles, double maxHeight) {
+  final estimate = tiles.length * 34.0;
+  return estimate > maxHeight ? maxHeight : estimate;
+}
+
+/// 全部专注记录（首页「最近完成 → 全部 ›」的入口）。
+///
+/// 与首页只列最近 3 条不同：这里列出**所有计入统计的记录**，按统计日倒序分组，
+/// 可滚动（记录量级上百条）；点条目录进记录详情，可修改或删除。
+Future<void> showAllRecordsSheet(
+  BuildContext context, {
+  required AppData data,
+  required Color Function(String taskName) colorFor,
+  required DataChanged onChanged,
+}) {
+  return showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: PineColors.paper,
+    builder: (sheetContext) {
+      var current = data;
+      return StatefulBuilder(
+        builder: (sheetContext, setSheetState) {
+          final items = current.records.where((r) => r.counted).toList()
+            ..sort((a, b) => b.at.compareTo(a.at));
+          void apply(AppData next) {
+            onChanged(next);
+            setSheetState(() => current = next);
+          }
+
+          final tiles = <Widget>[];
+          String? lastDay;
+          for (final record in items) {
+            if (record.dayKey != lastDay) {
+              lastDay = record.dayKey;
+              final day = DateTime.parse(record.dayKey);
+              tiles.add(Padding(
+                padding:
+                    EdgeInsets.only(top: tiles.isEmpty ? 2 : 14, bottom: 4),
+                child: Text(
+                  '${day.month}/${day.day} ${_weekdayLabel(day)}',
+                  style: const TextStyle(color: PineColors.sub, fontSize: 11),
+                ),
+              ));
+            }
+            tiles.add(
+                _recordTile(sheetContext, current, record, colorFor, apply));
+          }
+
+          final total = items.fold<double>(0, (sum, r) => sum + r.minutes);
+          return _SheetScaffold(
+            title: '全部记录',
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  '${items.length} 条 · 合计 ${formatMinutes(total)}',
+                  style: const TextStyle(color: PineColors.sub, fontSize: 11),
+                ),
+                const SizedBox(height: 4),
+                if (items.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 18),
+                    child: Text('还没有计入统计的记录',
+                        style: TextStyle(color: PineColors.sub, fontSize: 12)),
+                  )
+                else
+                  // `_SheetScaffold` 本身不滚动，而记录可达上百条：
+                  // 这里给列表一个显式高度（短则贴合内容、长则封顶后内部滚动）。
+                  // 不用 Flexible——它在 mainAxisSize.min 的 Column 里没有剩余空间可分，
+                  // 会触发 hasSize 布局断言。
+                  SizedBox(
+                    height: _listHeight(
+                        tiles, MediaQuery.of(sheetContext).size.height * 0.6),
+                    child: ListView(
+                      padding: EdgeInsets.zero,
+                      children: tiles,
+                    ),
+                  ),
+              ],
+            ),
+          );
+        },
+      );
+    },
+  );
+}
+
+/// 单条记录：色点 + 任务名 + 时刻 + 时长（与首页「最近完成」同一套行语言）。
+Widget _recordTile(
+  BuildContext context,
+  AppData data,
+  FocusRecord record,
+  Color Function(String taskName) colorFor,
+  void Function(AppData next) apply,
+) {
+  String two(int value) => value.toString().padLeft(2, '0');
+  return InkWell(
+    borderRadius: BorderRadius.circular(8),
+    onTap: () => showRecordDetailSheet(
+      context,
+      data: data,
+      record: record,
+      color: colorFor(record.taskName),
+      onChanged: apply,
+    ),
+    child: Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 7),
+      child: Row(
+        children: [
+          Container(
+            width: 9,
+            height: 9,
+            decoration: BoxDecoration(
+              color: colorFor(record.taskName),
+              borderRadius: BorderRadius.circular(3),
+            ),
+          ),
+          const SizedBox(width: 9),
+          Expanded(
+            child: Text(
+              record.taskName,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(color: PineColors.ink, fontSize: 12.5),
+            ),
+          ),
+          Text(
+            '${two(record.at.hour)}:${two(record.at.minute)}',
+            style: const TextStyle(color: PineColors.sub, fontSize: 10.5),
+          ),
+          const SizedBox(width: 10),
+          Text(formatMinutes(record.minutes),
+              style: brickNumberStyle(fontSize: 12)),
         ],
       ),
     ),

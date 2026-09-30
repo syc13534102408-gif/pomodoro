@@ -1027,8 +1027,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                               case final name?) ...[
                             const SizedBox(width: 2),
                             ConstrainedBox(
-                              constraints:
-                                  const BoxConstraints(maxWidth: 130),
+                              constraints: const BoxConstraints(maxWidth: 130),
                               child: InkWell(
                                 borderRadius: BorderRadius.circular(6),
                                 onTap: _openEventActions,
@@ -1181,6 +1180,24 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                     fontWeight: FontWeight.w600),
               ),
               const Spacer(),
+              // 「全部」入口：首页只列最近 3 条，完整清单（可修改/删除）在这里。
+              InkWell(
+                borderRadius: BorderRadius.circular(99),
+                onTap: () => showAllRecordsSheet(
+                  context,
+                  data: _data,
+                  colorFor: _colorFor,
+                  onChanged: _replace,
+                ),
+                child: const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                  child: Text(
+                    '全部 ›',
+                    style: TextStyle(color: PineColors.sub, fontSize: 11),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 2),
               InkWell(
                 borderRadius: BorderRadius.circular(99),
                 onTap: () =>

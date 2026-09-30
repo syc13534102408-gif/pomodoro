@@ -71,7 +71,9 @@ class SessionView {
       remaining = 0;
       final started = session.overtimeStartedAt;
       overtime = session.overtimeElapsed +
-          (started == null ? 0 : now.difference(started).inSeconds.clamp(0, 86400));
+          (started == null
+              ? 0
+              : now.difference(started).inSeconds.clamp(0, 86400));
     }
 
     return SessionView(
@@ -565,6 +567,78 @@ class TimerEngine {
               record,
         ],
       );
+
+  /// 重命名事件。事件 id 不变，因此既有记录的关联不受影响
+  /// （这与「删除后重建」有本质区别——后者会让记录变成悬空引用）。
+  static AppData renameEvent(AppData data, String eventId, String name) {
+    final trimmed = name.trim();
+    if (trimmed.isEmpty) return data;
+    return data.copyWith(
+      events: [
+        for (final event in data.events)
+          event.id == eventId ? event.copyWith(name: trimmed) : event,
+      ],
+    );
+  }
+
+  /// 修改一条记录的时长 / 完成时刻（手动纠错入口）。
+  ///
+  /// **`at` 变更时必须同步重算 `dayKey`**：统计与"今日/本周"全按归属日聚合，
+  /// 只改时刻不改归属日，这条记录会留在错误的一天（口径见 docs/07 §2 #11）。
+  static AppData updateRecord(
+    AppData data,
+    String recordId, {
+    double? minutes,
+    DateTime? at,
+  }) =>
+      data.copyWith(
+        records: [
+          for (final record in data.records)
+            if (record.id == recordId)
+              record.copyWith(
+                minutes: minutes ?? record.minutes,
+                at: at ?? record.at,
+                dayKey: at == null ? record.dayKey : dateKey(at),
+              )
+            else
+              record,
+        ],
+      );
+
+  /// 改一条记录归属的专注事件（`null` = 解除归属、不属于任何事件）。
+  ///
+  /// 与「删事件重建」有本质区别：这里只改记录的 `eventId`，事件本身不动。
+  /// 用途：把早期漏归的记录，或事件重建后变成**悬空引用**的记录接回正确的事件
+  /// （2026-09-29 那 41.5 分钟就是这种情况，见 CHANGELOG）。
+  ///
+  /// **护栏**：只接受存在的事件 id 或 null——写进一个不存在的 id，就等于亲手
+  /// 制造悬空引用（统计时那条记录会"隐身"，且没有任何地方会报错）。
+  static AppData setRecordEvent(
+    AppData data,
+    String recordId,
+    String? eventId,
+  ) {
+    final valid = eventId == null || data.events.any((e) => e.id == eventId);
+    if (!valid) return data;
+    return data.copyWith(
+      records: [
+        for (final record in data.records)
+          if (record.id == recordId)
+            FocusRecord(
+              id: record.id,
+              taskName: record.taskName,
+              minutes: record.minutes,
+              dayKey: record.dayKey,
+              status: record.status,
+              at: record.at,
+              completedFlag: record.completedFlag,
+              eventId: eventId,
+            )
+          else
+            record,
+      ],
+    );
+  }
 }
 
 /// 事件聚合结果（统计页展示用）。
@@ -596,8 +670,7 @@ EventStats eventStatsOf(AppData data, String eventId) {
     minutes += record.minutes;
     dayKeys.add(record.dayKey);
   }
-  return EventStats(
-      minutes: minutes, records: records, days: dayKeys.length);
+  return EventStats(minutes: minutes, records: records, days: dayKeys.length);
 }
 
 /// 是否应采纳远端会话快照（纯函数，供镜像轮询与单测使用）。

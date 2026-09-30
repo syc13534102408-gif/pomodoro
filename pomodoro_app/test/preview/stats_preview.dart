@@ -1,4 +1,4 @@
-// ignore_for_file: prefer_const_constructors
+// ignore_for_file: prefer_const_constructors, prefer_const_literals_to_create_immutables
 // 设计走查工具（**不是测试**）：把真实的统计页离屏渲染成 PNG。
 //
 // 文件名不以 `_test.dart` 结尾，所以 `flutter test` 的默认收集不会带上它——

@@ -880,13 +880,18 @@ class _BrickBarsPainter extends CustomPainter {
   );
 }
 
-/// 时长文案（**纯字符串**，带「个番茄」字样）。
+/// 时长文案：`3 小时 5 分` / `3 小时` / `45 分钟`。
 ///
-/// 只用于无法内嵌图案的地方——对话框正文、语义标签等；界面上的统计数字请用
-/// [MinutesText]，它把单位换成松果图案。两者共用 [minutesLabel]，口径不会分叉。
+/// 曾于 2026-09-29 改成「说番茄」，2026-10-01 按需求**全部退回小时/分钟**。
 String formatMinutes(double minutes) {
-  final label = minutesLabel(minutes);
-  return label.useMark ? '${label.text} 个番茄' : label.text;
+  final total = minutes.round();
+  if (total >= 60) {
+    final hours = total ~/ 60;
+    final rest = total - hours * 60;
+    final restText = rest == 0 ? '' : ' $rest分';
+    return '$hours 小时$restText';
+  }
+  return '$total 分钟';
 }
 
 /// 松果图案：统计口径里「1 个番茄」的单位标记。
@@ -917,118 +922,37 @@ class _PineconePainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final w = size.width;
     final h = size.height;
-
-    // 轮廓本身做成鳞片状（每层外凸一次，越往下越宽、顶部收尖）——
-    // 小尺寸下"看得出是松果"靠的就是这道锯齿外缘，内部线条是次要的。
-    // 右缘：in/out 交替
-    const right = <({double y, double x})>[
-      (y: 0.00, x: 0.00), // 顶点
-      (y: 0.14, x: 0.16),
-      (y: 0.30, x: 0.34),
-      (y: 0.46, x: 0.22),
-      (y: 0.62, x: 0.42),
-      (y: 0.78, x: 0.28),
-      (y: 0.90, x: 0.26),
-    ];
-    final body = Path()..moveTo(w * 0.5, 0);
-    for (var i = 1; i < right.length; i++) {
-      final a = right[i - 1];
-      final b = right[i];
-      body.quadraticBezierTo(
-        w * (0.5 + b.x + 0.06), // 控制点再往外一点，形成外凸的弧
-        h * (a.y + b.y) / 2,
-        w * (0.5 + b.x),
-        h * b.y,
-      );
-    }
-    body.quadraticBezierTo(w * 0.62, h * 0.97, w * 0.5, h); // 底部钝圆
-    body.quadraticBezierTo(
-        w * 0.38, h * 0.97, w * (0.5 - right.last.x), h * right.last.y);
-    for (var i = right.length - 2; i >= 1; i--) {
-      final a = right[i + 1];
-      final b = right[i];
-      body.quadraticBezierTo(
-        w * (0.5 - b.x - 0.06),
-        h * (a.y + b.y) / 2,
-        w * (0.5 - b.x),
-        h * b.y,
-      );
-    }
-    body.close();
-    canvas.drawPath(body, Paint()..color = color);
-
-    // 鳞片层次：用比填充更浅的同色描 3 道弧（浅底上可见；应用是刻意只有浅色主题）
-    final scale = Paint()
-      ..color = color.withAlpha(115)
+    final paint = Paint()
+      ..color = color
       ..style = PaintingStyle.stroke
-      ..strokeWidth = (size.shortestSide * 0.09).clamp(0.7, 1.3)
-      ..strokeCap = StrokeCap.round;
-    for (final row in const [0.31, 0.55, 0.79]) {
-      final half = w * (0.20 + 0.24 * (row - 0.31) / 0.48);
+      ..strokeWidth = (size.shortestSide * 0.11).clamp(0.9, 1.6)
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+
+    // 果体：上窄下宽的卵形（顶端收尖、底端钝圆）
+    final body = Path()
+      ..moveTo(w * 0.5, h * 0.07)
+      ..cubicTo(w * 0.97, h * 0.24, w * 0.96, h * 0.8, w * 0.5, h * 0.96)
+      ..cubicTo(w * 0.04, h * 0.8, w * 0.03, h * 0.24, w * 0.5, h * 0.07);
+    canvas.drawPath(body, paint);
+
+    // 3 道鳞片弧线：越靠下越宽，都留一点余量不顶到轮廓上
+    const rows = [0.36, 0.58, 0.79];
+    const halves = [0.19, 0.31, 0.24];
+    for (var i = 0; i < rows.length; i++) {
+      final y = h * rows[i];
+      final half = w * halves[i];
       canvas.drawPath(
         Path()
-          ..moveTo(w * 0.5 - half, h * row)
-          ..quadraticBezierTo(
-              w * 0.5, h * (row + 0.09), w * 0.5 + half, h * row),
-        scale,
+          ..moveTo(w * 0.5 - half, y)
+          ..quadraticBezierTo(w * 0.5, y + h * 0.1, w * 0.5 + half, y),
+        paint,
       );
     }
   }
 
   @override
   bool shouldRepaint(covariant _PineconePainter old) => old.color != color;
-}
-
-/// 番茄图案（与 [PineconeMark] 同规格的备选单位标记）。
-///
-/// 造型：横向略宽的果体 + 顶上一小撮萼片。圆润的果体在小尺寸下比松果更"一眼可读"，
-/// 代价是与品牌（松果）无关、且和文字同色时容易被读成"红色圆点"。
-class TomatoMark extends StatelessWidget {
-  const TomatoMark({super.key, required this.color, this.size = 12});
-
-  final Color color;
-  final double size;
-
-  @override
-  Widget build(BuildContext context) => SizedBox(
-        width: size,
-        height: size,
-        child: CustomPaint(painter: _TomatoPainter(color)),
-      );
-}
-
-class _TomatoPainter extends CustomPainter {
-  const _TomatoPainter(this.color);
-
-  final Color color;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final w = size.width;
-    final h = size.height;
-    // 果体：横宽的卵形，中心略低（给萼片留出顶部空间）
-    canvas.drawOval(
-      Rect.fromCenter(
-        center: Offset(w * 0.5, h * 0.58),
-        width: w * 0.92,
-        height: h * 0.74,
-      ),
-      Paint()..color = color,
-    );
-    // 萼片：从顶部中心外撇的三小段 + 短柄
-    final stem = Paint()
-      ..color = color
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = (size.shortestSide * 0.1).clamp(0.8, 1.5)
-      ..strokeCap = StrokeCap.round;
-    final top = Offset(w * 0.5, h * 0.3);
-    canvas.drawLine(Offset(w * 0.5, h * 0.3), Offset(w * 0.5, h * 0.06), stem);
-    canvas.drawLine(top, Offset(w * 0.16, h * 0.16), stem);
-    canvas.drawLine(top, Offset(w * 0.84, h * 0.16), stem);
-  }
-
-  @override
-  bool shouldRepaint(covariant _TomatoPainter old) => old.color != color;
 }
 
 /// 统计口径的时长：数字 + 松果图案（代替「个番茄」文字）。

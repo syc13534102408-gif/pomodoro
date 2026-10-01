@@ -2,7 +2,6 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:pomodoro_app/src/engine.dart';
 import 'package:pomodoro_app/src/models.dart';
-import 'package:pomodoro_app/src/widgets.dart';
 
 const _settings = TimerSettings(focus: 25, short: 5, long: 15);
 
@@ -85,23 +84,19 @@ void main() {
     });
   });
 
-  group('pomodoroEquiv：满 50 分钟 1 个，余数满 40 分钟进位', () {
+  group('pomodoroEquiv：满 50 分钟 1 个，缺口不足 15 分钟补齐', () {
     test('边界表', () {
       expect(pomodoroEquiv(0), 0);
       expect(pomodoroEquiv(14), 0);
-      expect(pomodoroEquiv(34), 0);
-      expect(pomodoroEquiv(35), 0); // 余 35 < 40，舍去
+      expect(pomodoroEquiv(34), 0); // 差 16，不补
+      expect(pomodoroEquiv(35), 1); // 差 15，补齐
       expect(pomodoroEquiv(49), 1); // 差 1，补齐
       expect(pomodoroEquiv(50), 1);
-      expect(pomodoroEquiv(74), 1);
-      expect(pomodoroEquiv(85), 1); // 余 35 < 40，舍去
+      expect(pomodoroEquiv(74), 1); // 差 26，不补
+      expect(pomodoroEquiv(85), 2); // 差 15，补齐
       expect(pomodoroEquiv(100), 2);
       expect(pomodoroEquiv(134), 2);
-      expect(pomodoroEquiv(135), 2); // 余 35 < 40，舍去
-      expect(pomodoroEquiv(39), 0); // 余 39，舍去
-      expect(pomodoroEquiv(40), 1); // 余 40，进位（新阈值边界）
-      expect(pomodoroEquiv(90), 2); // 余 40，进位
-      expect(pomodoroEquiv(89), 1); // 余 39，舍去
+      expect(pomodoroEquiv(135), 3);
     });
   });
 
@@ -147,30 +142,6 @@ void main() {
         at: at,
       );
       expect(data.records.first.dayKey, '2026-09-08');
-    });
-  });
-
-  group('formatMinutes：统计时长说番茄', () {
-    test('不足 1 小时仍说分钟', () {
-      expect(formatMinutes(0), '0 分钟');
-      expect(formatMinutes(45), '45 分钟');
-      expect(formatMinutes(59), '59 分钟');
-    });
-
-    test('正好整小时：按番茄当量取整（余数满 40 进位）', () {
-      expect(formatMinutes(60), '1 个番茄'); // 余 10，舍
-      expect(formatMinutes(120), '2 个番茄'); // 余 20，舍
-      expect(formatMinutes(180), '3 个番茄'); // 余 30，舍
-      expect(formatMinutes(240), '5 个番茄'); // 余 40，进位
-      expect(formatMinutes(300), '6 个番茄');
-    });
-
-    test('含分钟：精确到一位小数', () {
-      expect(formatMinutes(185), '3.7 个番茄');
-      expect(formatMinutes(173), '3.5 个番茄');
-      expect(formatMinutes(190), '3.8 个番茄');
-      expect(formatMinutes(61), '1.2 个番茄');
-      expect(formatMinutes(100), '2 个番茄'); // 2.0 不带小数尾巴
     });
   });
 }

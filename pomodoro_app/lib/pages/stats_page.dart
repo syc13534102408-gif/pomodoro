@@ -588,10 +588,9 @@ class _MonthlyReview extends StatelessWidget {
               Expanded(
                 child: MetricTile(
                   // 日均只除以有学习的天数：完全没学的一天不计入分母。
-                  // 走 formatMinutes：与其它统计口径一致（≥1 小时说番茄）
                   value: activeDays > 0
-                      ? formatMinutes(minutes / activeDays)
-                      : '0 分钟',
+                      ? '${(minutes / activeDays).round()} 分'
+                      : '0 分',
                   label: '日均(学习日)',
                 ),
               ),

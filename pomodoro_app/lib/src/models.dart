@@ -98,12 +98,11 @@ DateTime mondayOf(DateTime date) {
   return day.subtract(Duration(days: day.weekday - 1));
 }
 
-/// 番茄当量：每满 50 分钟记 1 个番茄；**余数满 40 分钟进位**，不足则舍去
-/// 否则向下取整。示例：34→0、35→1、49→1、50→1、84→1、85→2。
+/// 番茄当量：每满 50 分钟记 1 个番茄；距整段缺口不足 15 分钟时补齐进位，
+/// 否则只记整数段（2026-09-29 曾改成"余数满 40 进位"，2026-10-01 按需求退回）。
 int pomodoroEquiv(double minutes) {
   if (minutes <= 0) return 0;
-  // 余数满 40 分钟进位：(m + 10) ~/ 50 ⟺ 余数 >= 40 时多记 1 个
-  return (minutes + 10) ~/ 50;
+  return (minutes + 15) ~/ 50;
 }
 
 class PineTask {

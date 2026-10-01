@@ -524,10 +524,18 @@ class _EventsSection extends StatelessWidget {
   }
 }
 
-class _MonthlyReview extends StatelessWidget {
+class _MonthlyReview extends StatefulWidget {
   const _MonthlyReview({required this.data});
 
   final AppData data;
+
+  @override
+  State<_MonthlyReview> createState() => _MonthlyReviewState();
+}
+
+class _MonthlyReviewState extends State<_MonthlyReview> {
+  /// 月份偏移：0 = 本月（当前统计月），1 = 上月……历史月份只读回看。
+  int _monthOffset = 0;
 
   @override
   Widget build(BuildContext context) {
@@ -536,8 +544,11 @@ class _MonthlyReview extends StatelessWidget {
     // 不用 record.at——at 可能是恢复时合成的零点占位值（00:00），按 at 分桶
     // 会把整天的记录错分到前一天（2026-09-10 数据事故根因之一）。
     final statNow = statDayOf(now);
-    final ym = '${statNow.year}-${statNow.month.toString().padLeft(2, '0')}';
-    final monthRecords = data.records
+    // 目标月：从当前统计月回退 _monthOffset 个月（取该月 15 日做代表日，
+    // 避开月末/月初的日期溢出）。
+    final target = DateTime(statNow.year, statNow.month - _monthOffset, 15);
+    final ym = '${target.year}-${target.month.toString().padLeft(2, '0')}';
+    final monthRecords = widget.data.records
         .where((record) => record.counted && record.dayKey.startsWith(ym))
         .toList();
     final minutes = monthRecords.fold<double>(0, (sum, r) => sum + r.minutes);
@@ -545,7 +556,7 @@ class _MonthlyReview extends StatelessWidget {
     final count = pomodoroEquiv(minutes);
     final activeDays =
         monthRecords.map((r) => r.dayKey.substring(8)).toSet().length;
-    final daysInMonth = DateTime(statNow.year, statNow.month + 1, 0).day;
+    final daysInMonth = DateTime(target.year, target.month + 1, 0).day;
     final dayValues = List<double>.filled(daysInMonth, 0);
     final byTask = <String, double>{};
     for (final record in monthRecords) {
@@ -557,29 +568,61 @@ class _MonthlyReview extends StatelessWidget {
     final dayCounts = [
       for (final m in dayValues) pomodoroEquiv(m),
     ];
-    final monthName = '${statNow.year}年${statNow.month}月';
+    final monthName = '${target.year}年${target.month}月';
     final tasks = byTask.entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value));
     final taskPeak = tasks.isEmpty ? 1.0 : tasks.first.value;
 
+    final isCurrentMonth = _monthOffset == 0;
     return BrickCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SectionHeader(
-            title: '本月回顾',
-            trailing: Text(
-              monthName,
-              style: const TextStyle(color: PineColors.sub, fontSize: 11),
+            title: isCurrentMonth ? '本月回顾' : '月份回顾',
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // ‹ 更早一个月
+                _MonthArrow(
+                  icon: Icons.chevron_left,
+                  onTap: () => setState(() => _monthOffset += 1),
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  monthName,
+                  style: const TextStyle(
+                      color: PineColors.ink,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(width: 4),
+                // › 更近一个月（回到本月后禁用）
+                _MonthArrow(
+                  icon: Icons.chevron_right,
+                  enabled: !isCurrentMonth,
+                  onTap: () => setState(() => _monthOffset -= 1),
+                ),
+              ],
             ),
           ),
+          if (!isCurrentMonth) ...[
+            const SizedBox(height: 2),
+            GestureDetector(
+              onTap: () => setState(() => _monthOffset = 0),
+              child: const Text(
+                '回到本月',
+                style: TextStyle(color: PineColors.pine, fontSize: 10.5),
+              ),
+            ),
+          ],
           const SizedBox(height: 14),
           Row(
             children: [
               Expanded(
                 child: MetricTile(
                   value: formatMinutes(minutes),
-                  label: '本月累计',
+                  label: isCurrentMonth ? '本月累计' : '当月累计',
                 ),
               ),
               Expanded(
@@ -622,11 +665,11 @@ class _MonthlyReview extends StatelessWidget {
           ),
           const SizedBox(height: 10),
           _MonthGrid(
-            year: statNow.year,
-            month: statNow.month,
+            year: target.year,
+            month: target.month,
             dayValues: dayValues,
             dayCounts: dayCounts,
-            todayDay: statNow.day,
+            todayDay: isCurrentMonth ? statNow.day : null,
           ),
           if (tasks.isNotEmpty) ...[
             const SizedBox(height: 18),
@@ -657,7 +700,7 @@ class _MonthlyReview extends StatelessWidget {
   }
 
   Color _colorFor(String taskName) {
-    for (final task in data.tasks) {
+    for (final task in widget.data.tasks) {
       if (task.name == taskName) return task.swatch;
     }
     return PineColors.sub;
@@ -679,7 +722,9 @@ class _MonthGrid extends StatelessWidget {
   final int month;
   final List<double> dayValues;
   final List<int> dayCounts;
-  final int todayDay;
+
+  /// 今日的日号；回看历史月份时为 null（不标"今"）。
+  final int? todayDay;
 
   static const List<String> _week = ['一', '二', '三', '四', '五', '六', '日'];
 
@@ -853,6 +898,33 @@ class _TaskBar extends StatelessWidget {
         const SizedBox(height: 8),
         BrickProgress(value: ratio, color: color),
       ],
+    );
+  }
+}
+
+
+/// 月切换箭头按钮（‹ ›）：enabled=false 时降为浅色不可点。
+class _MonthArrow extends StatelessWidget {
+  const _MonthArrow({
+    required this.icon,
+    required this.onTap,
+    this.enabled = true,
+  });
+
+  final IconData icon;
+  final VoidCallback onTap;
+  final bool enabled;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = enabled ? PineColors.pine : PineColors.faint;
+    return InkWell(
+      borderRadius: BorderRadius.circular(8),
+      onTap: enabled ? onTap : null,
+      child: Padding(
+        padding: const EdgeInsets.all(2),
+        child: Icon(icon, size: 18, color: color),
+      ),
     );
   }
 }

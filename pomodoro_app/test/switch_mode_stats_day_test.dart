@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:pomodoro_app/src/engine.dart';
 import 'package:pomodoro_app/src/models.dart';
+import 'package:pomodoro_app/src/widgets.dart';
 
 const _settings = TimerSettings(focus: 25, short: 5, long: 15);
 
@@ -84,19 +85,19 @@ void main() {
     });
   });
 
-  group('pomodoroEquiv：满 50 分钟 1 个，缺口不足 15 分钟补齐', () {
+  group('pomodoroEquiv：满 50 分钟 1 个，余数满 40 分钟进位', () {
     test('边界表', () {
       expect(pomodoroEquiv(0), 0);
       expect(pomodoroEquiv(14), 0);
-      expect(pomodoroEquiv(34), 0); // 差 16，不补
-      expect(pomodoroEquiv(35), 1); // 差 15，补齐
+      expect(pomodoroEquiv(34), 0);
+      expect(pomodoroEquiv(35), 0); // 余 35 < 40，舍去
       expect(pomodoroEquiv(49), 1); // 差 1，补齐
       expect(pomodoroEquiv(50), 1);
-      expect(pomodoroEquiv(74), 1); // 差 26，不补
-      expect(pomodoroEquiv(85), 2); // 差 15，补齐
+      expect(pomodoroEquiv(74), 1);
+      expect(pomodoroEquiv(85), 1); // 余 35 < 40，舍去
       expect(pomodoroEquiv(100), 2);
       expect(pomodoroEquiv(134), 2);
-      expect(pomodoroEquiv(135), 3);
+      expect(pomodoroEquiv(135), 2); // 余 35 < 40，舍去
     });
   });
 
@@ -142,6 +143,15 @@ void main() {
         at: at,
       );
       expect(data.records.first.dayKey, '2026-09-08');
+    });
+  });
+
+  group('formatMinutes：番茄口径（单位是文字）', () {
+    test('不足 1 小时说分钟，其余说番茄', () {
+      expect(formatMinutes(45), '45 分钟');
+      expect(formatMinutes(180), '3 番茄');
+      expect(formatMinutes(185), '3.7 番茄');
+      expect(formatMinutes(240), '5 番茄');
     });
   });
 }

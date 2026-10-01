@@ -313,11 +313,15 @@ class _EventsSection extends StatelessWidget {
                       Text('${live.length} 个进行中 · 共 ',
                           style: const TextStyle(
                               color: PineColors.sub, fontSize: 11)),
-                      MinutesText(
-                        live.fold<double>(0,
-                            (sum, e) => sum + eventStatsOf(data, e.id).minutes),
-                        style: const TextStyle(
-                            color: PineColors.sub, fontSize: 11),
+                      Text.rich(
+                        minutesRichSpan(
+                          live.fold<double>(
+                              0,
+                              (sum, e) =>
+                                  sum + eventStatsOf(data, e.id).minutes),
+                          style: const TextStyle(
+                              color: PineColors.sub, fontSize: 11),
+                        ),
                       ),
                     ],
                   ),
@@ -589,8 +593,8 @@ class _MonthlyReview extends StatelessWidget {
                 child: MetricTile(
                   // 日均只除以有学习的天数：完全没学的一天不计入分母。
                   value: activeDays > 0
-                      ? '${(minutes / activeDays).round()} 分'
-                      : '0 分',
+                      ? formatMinutes(minutes / activeDays)
+                      : '0 分钟',
                   label: '日均(学习日)',
                 ),
               ),

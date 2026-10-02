@@ -890,6 +890,19 @@ String formatMinutes(double minutes) {
       : '${tenths ~/ 10}.${tenths % 10} 番茄';
 }
 
+/// 时长显示为 时:分:秒（最近完成列表用——记录时长常有零头，
+/// 秒级精度才看得出 46.4 与 46.9 的差别）。满一小时为 h:mm:ss，
+/// 不足一小时为 mm:ss。仅用于记录行展示，聚合统计仍走 [formatMinutes]。
+String formatClock(double minutes) {
+  final totalSeconds = (minutes * 60).round();
+  final h = totalSeconds ~/ 3600;
+  final m = (totalSeconds % 3600) ~/ 60;
+  final s = totalSeconds % 60;
+  final mm = m.toString().padLeft(2, '0');
+  final ss = s.toString().padLeft(2, '0');
+  return h > 0 ? '$h:$mm:$ss' : '$mm:$ss';
+}
+
 /// 「大数字 + 小单位」的富文本：单位按 [unitScale] 缩小（默认 0.62）。
 ///
 /// 单位是文字而非图案——2026-10-01 结论见 CHANGELOG：这个尺寸下图案做不好看。

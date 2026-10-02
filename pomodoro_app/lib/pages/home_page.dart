@@ -1009,8 +1009,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                           _TaskSwatch(
                               color: _data.selectedTask.swatch, size: 9),
                           const SizedBox(width: 8),
-                          ConstrainedBox(
-                            constraints: const BoxConstraints(maxWidth: 300),
+                          // Flexible 而非固定宽：窄屏（手机）上任务名自动收缩，
+                          // 保证右侧的事件入口/徽标不被裁出屏外。
+                          Flexible(
                             child: Text(
                               _data.selectedTask.name,
                               maxLines: 1,
@@ -1259,7 +1260,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                       ),
                       const SizedBox(width: 10),
                       Text(
-                        formatMinutes(record.minutes),
+                        formatClock(record.minutes),
                         style: brickNumberStyle(fontSize: 12),
                       ),
                     ],
@@ -1597,7 +1598,7 @@ class _RecentRow extends StatelessWidget {
             ),
             const SizedBox(width: 8),
             Text(
-              formatMinutes(record.minutes),
+              formatClock(record.minutes),
               style: brickNumberStyle(fontSize: 13),
             ),
             const SizedBox(width: 4),

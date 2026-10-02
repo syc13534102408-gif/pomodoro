@@ -503,6 +503,44 @@ class TimerEngine {
     );
   }
 
+  /// 编辑事件：改名 / 换绑任务。
+  ///
+  /// - 换绑任务时，**已归入的记录跟着换**（编辑 = 纠正建错的归属，
+  ///   记录与事件保持一体；记录的 taskName 同步更新，统计归组随之变化）；
+  /// - 换绑到的任务若已有其他进行中事件 → 自动暂停它（保持同任务
+  ///   「同时一个进行中」的约束，与 startEvent 一致）。
+  static AppData editEvent(
+    AppData data,
+    String eventId, {
+    required String name,
+    required String taskName,
+    required DateTime now,
+  }) {
+    if (name.trim().isEmpty || taskName.isEmpty) return data;
+    final events = data.events.map((event) {
+      if (event.id != eventId) {
+        return event.taskName == taskName && event.isRunning
+            ? event.copyWith(pausedAt: now)
+            : event;
+      }
+      return event.copyWith(name: name.trim(), taskName: taskName);
+    }).toList();
+    final records = data.records.map((record) {
+      if (record.eventId != eventId) return record;
+      return FocusRecord(
+        id: record.id,
+        taskName: taskName,
+        minutes: record.minutes,
+        dayKey: record.dayKey,
+        status: record.status,
+        at: record.at,
+        completedFlag: record.completedFlag,
+        eventId: record.eventId,
+      );
+    }).toList();
+    return data.copyWith(events: events, records: records);
+  }
+
   /// 暂停事件（暂停期间该任务的记录不再归入）。
   static AppData pauseEvent(AppData data, String eventId, DateTime now) =>
       data.copyWith(

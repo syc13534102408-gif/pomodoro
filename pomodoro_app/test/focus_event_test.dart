@@ -107,6 +107,62 @@ void main() {
     });
   });
 
+  group('事件编辑', () {
+    test('改名：事件更新，记录通过 eventId 关联不受影响', () {
+      final t0 = DateTime(2026, 10, 2, 10);
+      var data = TimerEngine.startEvent(_base(),
+          name: '第六章', taskName: '高数', now: t0);
+      final eventId = data.events.first.id;
+      data = TimerEngine.addManual(data,
+          taskName: '高数', minutes: 50, at: t0);
+
+      data = TimerEngine.editEvent(data, eventId,
+          name: '第六章 · 习题篇', taskName: '高数', now: t0);
+      expect(data.events.first.name, '第六章 · 习题篇');
+      expect(data.events.first.taskName, '高数');
+      expect(data.records.first.taskName, '高数'); // 任务未换，记录不变
+      expect(data.records.first.minutes, 50);
+    });
+
+    test('换绑任务：已归入的记录跟着换，同任务旧事件自动暂停', () {
+      final t0 = DateTime(2026, 10, 2, 10);
+      var data = TimerEngine.startEvent(_base(),
+          name: '建错的', taskName: '英语', now: t0);
+      final eventId = data.events.first.id;
+      data = TimerEngine.addManual(data,
+          taskName: '英语', minutes: 30, at: t0);
+      // 高数另有一个进行中事件
+      data = TimerEngine.startEvent(data,
+          name: '高数第六章', taskName: '高数', now: t0);
+
+      data = TimerEngine.editEvent(data, eventId,
+          name: '其实该归高数', taskName: '高数', now: t0);
+
+      // 事件换绑成功
+      final edited = data.events.firstWhere((e) => e.id == eventId);
+      expect(edited.taskName, '高数');
+      // 已归入的记录跟着换
+      expect(data.records.first.taskName, '高数');
+      expect(data.records.first.eventId, eventId);
+      // 「同时一个进行中」：换绑后高数只有一个 running（旧的高数事件被暂停）
+      final running = data.events.where((e) => e.taskName == '高数' && e.isRunning);
+      expect(running.length, 1);
+      expect(running.first.id, eventId);
+    });
+
+    test('删除语义不受编辑影响：finish 后仍可编辑名称', () {
+      final t0 = DateTime(2026, 10, 2, 10);
+      var data = TimerEngine.startEvent(_base(),
+          name: '旧名', taskName: '高数', now: t0);
+      final eventId = data.events.first.id;
+      data = TimerEngine.finishEvent(data, eventId, t0);
+      data = TimerEngine.editEvent(data, eventId,
+          name: '改名存档', taskName: '高数', now: t0);
+      expect(data.events.first.name, '改名存档');
+      expect(data.events.first.isFinished, isTrue); // 完成状态保留
+    });
+  });
+
   group('事件聚合', () {
     test('累计时长 / 番茄 / 天数', () {
       final t0 = DateTime(2026, 9, 27, 10);

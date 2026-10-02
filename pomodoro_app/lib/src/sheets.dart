@@ -1379,25 +1379,38 @@ class _MiniCalendarState extends State<_MiniCalendar> {
   }
 }
 
-/// 开启专注事件：填名称 + 选绑定任务（同任务已有的进行中事件会被自动暂停）。
+/// 开启 / 编辑专注事件。
+///
+/// [event] 为空 = 开启模式（填名称 + 选绑定任务，同任务已有的进行中事件
+/// 会被自动暂停）；非空 = 编辑模式（名称与任务预填，保存走 [TimerEngine.editEvent]，
+/// 换绑任务时已归入的记录跟着更新）。
 Future<void> showEventSheet(
   BuildContext context, {
   required AppData data,
   required DataChanged onChanged,
+  FocusEvent? event,
 }) {
   return showModalBottomSheet(
     context: context,
     isScrollControlled: true,
     backgroundColor: PineColors.paper,
-    builder: (context) => _EventSheet(data: data, onChanged: onChanged),
+    builder: (context) =>
+        _EventSheet(data: data, onChanged: onChanged, event: event),
   );
 }
 
 class _EventSheet extends StatefulWidget {
-  const _EventSheet({required this.data, required this.onChanged});
+  const _EventSheet({
+    required this.data,
+    required this.onChanged,
+    this.event,
+  });
 
   final AppData data;
   final DataChanged onChanged;
+
+  /// 非空 = 编辑模式。
+  final FocusEvent? event;
 
   @override
   State<_EventSheet> createState() => _EventSheetState();
@@ -1407,10 +1420,13 @@ class _EventSheetState extends State<_EventSheet> {
   final _name = TextEditingController();
   late String _taskName;
 
+  bool get _editing => widget.event != null;
+
   @override
   void initState() {
     super.initState();
-    _taskName = widget.data.selectedTask.name;
+    _name.text = widget.event?.name ?? '';
+    _taskName = widget.event?.taskName ?? widget.data.selectedTask.name;
   }
 
   @override
@@ -1422,12 +1438,22 @@ class _EventSheetState extends State<_EventSheet> {
   void _save() {
     final name = _name.text.trim();
     if (name.isEmpty) return;
-    widget.onChanged(TimerEngine.startEvent(
-      widget.data,
-      name: name,
-      taskName: _taskName,
-      now: DateTime.now(),
-    ));
+    if (_editing) {
+      widget.onChanged(TimerEngine.editEvent(
+        widget.data,
+        widget.event!.id,
+        name: name,
+        taskName: _taskName,
+        now: DateTime.now(),
+      ));
+    } else {
+      widget.onChanged(TimerEngine.startEvent(
+        widget.data,
+        name: name,
+        taskName: _taskName,
+        now: DateTime.now(),
+      ));
+    }
     Navigator.pop(context);
   }
 
@@ -1435,14 +1461,14 @@ class _EventSheetState extends State<_EventSheet> {
   Widget build(BuildContext context) {
     final tasks = widget.data.tasks;
     return _SheetScaffold(
-      title: '开启专注事件',
+      title: _editing ? '编辑事件' : '开启专注事件',
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           TextField(
             controller: _name,
-            autofocus: true,
+            autofocus: !_editing,
             decoration: const InputDecoration(
                 labelText: '事件名称（如「高数第六章」）', isDense: true),
           ),
@@ -1462,14 +1488,16 @@ class _EventSheetState extends State<_EventSheet> {
             },
           ),
           const SizedBox(height: 10),
-          const Text(
-            '开启后，该任务的每一次专注（含补记）都会累计到这个事件里，'
-            '直到你暂停或完成它。',
-            style: TextStyle(color: PineColors.sub, fontSize: 11),
+          Text(
+            _editing
+                ? '改名或换绑任务后，已归入这个事件的记录会跟着更新。'
+                : '开启后，该任务的每一次专注（含补记）都会累计到这个事件里，'
+                    '直到你暂停或完成它。',
+            style: const TextStyle(color: PineColors.sub, fontSize: 11),
           ),
           const SizedBox(height: 12),
           BrickButton(
-            label: '开始累计',
+            label: _editing ? '保存修改' : '开始累计',
             onPressed: _save,
           ),
         ],
@@ -1585,6 +1613,18 @@ Future<void> showEventActionSheet(
             style: const TextStyle(color: PineColors.sub, fontSize: 11.5),
           ),
           const SizedBox(height: 14),
+          BrickButton(
+            label: '编辑事件（名称 / 绑定任务）',
+            icon: Icons.edit,
+            color: PineColors.card,
+            foregroundColor: PineColors.pine,
+            onPressed: () {
+              Navigator.pop(context);
+              showEventSheet(context,
+                  data: data, onChanged: onChanged, event: event);
+            },
+          ),
+          const SizedBox(height: 10),
           if (event.isRunning)
             BrickButton(
               label: '暂停累计（暂停期间的记录不归入）',

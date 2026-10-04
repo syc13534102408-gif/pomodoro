@@ -55,7 +55,7 @@ void main() {
     final state = menuBarStateOf(data, after);
 
     // 25:00 计划 + 1:30 超时 = 26:30 已专注。
-    expect(state.title, '🍅 专注 26:30');
+    expect(state.title, '⏰ 专注 26:30');
     expect(state.elapsed, '26:30');
     expect(state.tint, PineColors.gold.toARGB32());
     expect(state.detail, contains('超出计划 +01:30'));
@@ -111,6 +111,6 @@ void main() {
     final state = menuBarStateOf(data, after);
 
     expect(state.elapsed, '1:05:00');
-    expect(state.title, '🍅 专注 1:05:00');
+    expect(state.title, '⏰ 专注 1:05:00');
   });
 }

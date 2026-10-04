@@ -13,7 +13,7 @@ void main() {
   test('空闲：只显示品牌名，配色中性，无可重置会话', () {
     final state = menuBarStateOf(_base(), DateTime(2026, 9, 6, 10));
 
-    expect(state.title, 'pinecore');
+    expect(state.title, '🌲 pinecore');
     expect(state.tint, PineColors.sub.toARGB32());
     expect(state.primary, '开始');
     expect(state.canReset, false);
@@ -32,7 +32,7 @@ void main() {
     final state = menuBarStateOf(data, now.add(const Duration(seconds: 1)));
 
     // 常驻显示的是「已经专注了多久」，不是剩余。
-    expect(state.title, '专注 00:01');
+    expect(state.title, '🍅 专注 00:01');
     expect(state.elapsed, '00:01');
     expect(state.detail, contains('剩余 24:59'));
     expect(state.tint, PineColors.focus.toARGB32());
@@ -55,7 +55,7 @@ void main() {
     final state = menuBarStateOf(data, after);
 
     // 25:00 计划 + 1:30 超时 = 26:30 已专注。
-    expect(state.title, '专注 26:30');
+    expect(state.title, '🍅 专注 26:30');
     expect(state.elapsed, '26:30');
     expect(state.tint, PineColors.gold.toARGB32());
     expect(state.detail, contains('超出计划 +01:30'));
@@ -72,7 +72,7 @@ void main() {
     final state = menuBarStateOf(data, now.add(const Duration(minutes: 40)));
 
     // 暂停期间时间不流逝：过了 27 分钟，显示仍是暂停那一刻的已专注 13:00。
-    expect(state.title, '暂停 13:00');
+    expect(state.title, '⏸ 13:00');
     expect(state.elapsed, '13:00');
     expect(state.tint, PineColors.sub.toARGB32());
     expect(state.primary, '继续');
@@ -87,7 +87,7 @@ void main() {
 
     final state = menuBarStateOf(data, now.add(const Duration(seconds: 2)));
 
-    expect(state.title, '短休 00:02');
+    expect(state.title, '🍅 短休 00:02');
     expect(state.tint, PineColors.mint.toARGB32());
     expect(state.confirm, '结束休息');
   });
@@ -98,7 +98,7 @@ void main() {
 
     final state = menuBarStateOf(data, now);
 
-    expect(state.title, '长休 00:00');
+    expect(state.title, '🍅 长休 00:00');
     expect(state.head, contains('长休息'));
   });
 
@@ -111,6 +111,6 @@ void main() {
     final state = menuBarStateOf(data, after);
 
     expect(state.elapsed, '1:05:00');
-    expect(state.title, '专注 1:05:00');
+    expect(state.title, '🍅 专注 1:05:00');
   });
 }

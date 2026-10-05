@@ -48,13 +48,46 @@ class Storage {
 /// 其余字段（任务/清单/设置）仍以云端为准。
 AppData mergeFromCloud(AppData local, Map<String, dynamic> payload) {
   final restored = AppData.fromMap(payload);
+
+  // 事件列表同样按 id 并集（2026-10-05 事故）：旧版本设备的上传净荷里
+  // 没有 events 字段，若直接采用云端，本机的事件列表会被清空。
+  // 云端独有补入、本机独有保留、同 id 云端优先。
+  final cloudEventIds = {for (final e in restored.events) e.id};
+  final localOnlyEvents =
+      local.events.where((e) => !cloudEventIds.contains(e.id)).toList();
+  final mergedEvents = [...restored.events, ...localOnlyEvents];
+
   final cloudIds = {for (final r in restored.records) r.id};
   final localOnly =
       local.records.where((r) => !cloudIds.contains(r.id)).toList();
-  final merged = [...restored.records, ...localOnly]
-    ..sort((a, b) => b.at.compareTo(a.at));
+
+  // 同 id 记录云端优先，**但 eventId 归属例外**：旧版本上传的记录没有
+  // eventId 字段，云端版本里它是空的——本机已有归属时必须保留，
+  // 否则「事件进展」与记录的关联会被旧版设备的上传悄悄斩断。
+  final localEventById = {
+    for (final r in local.records) r.id: r.eventId,
+  };
+  final merged = [
+    for (final r in restored.records)
+      if (r.eventId == null && localEventById[r.id] != null)
+        FocusRecord(
+          id: r.id,
+          taskName: r.taskName,
+          minutes: r.minutes,
+          dayKey: r.dayKey,
+          status: r.status,
+          at: r.at,
+          completedFlag: r.completedFlag,
+          eventId: localEventById[r.id],
+        )
+      else
+        r,
+    ...localOnly,
+  ]..sort((a, b) => b.at.compareTo(a.at));
+
   return restored.copyWith(
     records: merged,
+    events: mergedEvents,
     activeSession: local.activeSession,
     sync: local.sync,
     // 倒计时属本地偏好（不进云端净荷），恢复云端数据时必须保留本机设置，

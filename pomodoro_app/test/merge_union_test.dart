@@ -15,6 +15,22 @@ FocusRecord _rec(String id, String date, String name, double minutes,
       at: DateTime.parse('$date 12:00'),
     );
 
+AppData localWithEvent() {
+  final base = _withRecords([
+    _rec('A', '2026-10-05', '高数', 50),
+  ]);
+  return base.copyWith(
+    events: [
+      FocusEvent(
+        name: '无穷级数',
+        taskName: '高数',
+        startedAt: DateTime(2026, 9, 28),
+        finishedAt: DateTime(2026, 10, 2),
+      ),
+    ],
+  );
+}
+
 AppData _withRecords(List<FocusRecord> records) =>
     AppData(settings: TimerSettings(), records: records);
 
@@ -44,6 +60,54 @@ void main() {
     expect(merged.records.firstWhere((r) => r.id == 'A').minutes, 45.0);
     // 本机独有的 C 保留（事故根因：曾被整体替换清空）
     expect(merged.records.firstWhere((r) => r.id == 'C').minutes, 23.0);
+  });
+
+  test('events 也按 id 并集：本机独有的事件不被云端清空（10-05 事故）', () {
+    // 本机有一个事件；云端净荷来自旧版设备，events 字段缺失
+    final local = localWithEvent();
+    final payload = {
+      'tasks': [],
+      'records': [
+        {'id': 'A', 'name': '高数', 'minutes': 50.0, 'date': '2026-10-05', 'status': 'completed'},
+      ],
+    };
+
+    final merged = mergeFromCloud(local, payload);
+    expect(merged.events.length, 1);
+    expect(merged.events.first.name, '无穷级数');
+  });
+
+  test('同 id 记录云端优先时，本机的 eventId 归属保留（防关联被斩断）', () {
+    // 本机记录带 eventId，云端同 id 记录来自旧版（无 eventId 字段）
+    final local = _withRecords([
+      _rec('A', '2026-10-05', '高数', 50),
+    ]);
+    final localLinked = local.copyWith(
+      records: [
+        FocusRecord(
+          id: 'A',
+          taskName: '高数',
+          minutes: 50,
+          dayKey: '2026-10-05',
+          status: RecordStatus.completed,
+          at: DateTime.parse('2026-10-05 12:00'),
+          eventId: 'event-1',
+        ),
+      ],
+    );
+    final payload = {
+      'tasks': [],
+      'records': [
+        {'id': 'A', 'name': '高数', 'minutes': 45.0, 'date': '2026-10-05', 'status': 'completed'},
+      ],
+    };
+
+    final merged = mergeFromCloud(localLinked, payload);
+    expect(merged.records.length, 1);
+    // 分钟数取云端（同 id 云端优先）
+    expect(merged.records.first.minutes, 45.0);
+    // 但归属保留本机的
+    expect(merged.records.first.eventId, 'event-1');
   });
 
   test('合并后按完成时刻倒序排列（列表展示依赖）', () {

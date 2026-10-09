@@ -358,11 +358,10 @@ class TimerEngine {
           ],
         );
       }
-      // 休息轮换按「完成次数」口径（当量口径只用于统计展示，见 StatsView）。
-      final completedToday = next.records
-          .where((r) => r.counted && r.dayKey == dateKey(now))
-          .length;
-      final nextMode = completedToday % 4 == 0 && completedToday > 0
+      // 休息类型按本次实际专注时长决定（2026-10-09 起）：
+      // ≤70 分钟 → 短休息；>70 分钟 → 长休息。
+      // 替代旧的「每完成 4 次一长休」轮换；不触碰任何记录，只是会话状态。
+      final nextMode = view.elapsedMinutes > 70
           ? SessionMode.longBreak
           : SessionMode.shortBreak;
       next = next.copyWith(clearActiveSession: true);

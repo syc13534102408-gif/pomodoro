@@ -93,7 +93,7 @@ void main() {
     expect(view.elapsedMinutes, closeTo(2.5, 0.05));
   });
 
-  test('确认完成后记录完整时长并自动进入短休息', () {
+  test('确认完成后记录完整时长并自动进入长休息（72 分钟 > 70）', () {
     final start = DateTime(2026, 8, 29, 9, 0);
     var data = TimerEngine.start(_base(focus: 50), SessionMode.focus, start);
     final later = start.add(const Duration(minutes: 72));
@@ -111,13 +111,13 @@ void main() {
     expect(record.status, RecordStatus.completed);
     expect(record.minutes, closeTo(72.0, 0.05));
 
-    // 自动开始休息，且第 1 次是短休息。
+    // 自动开始休息：本次 72 分钟（>70）→ 长休息。
     expect(data.activeSession, isNotNull);
-    expect(data.activeSession!.mode, SessionMode.shortBreak);
+    expect(data.activeSession!.mode, SessionMode.longBreak);
     expect(data.activeSession!.running, isTrue);
   });
 
-  test('第 4 次专注完成后进入长休息', () {
+  test('休息类型按本次时长：短轮次完成后进短休（不再按次数轮换）', () {
     final now = DateTime(2026, 8, 29, 12, 0);
     var data = _base(focus: 25);
     // 先补 3 条已完成记录，使本次成为第 4 次。
@@ -134,7 +134,8 @@ void main() {
     data = TimerEngine.start(data, SessionMode.focus, now);
     data = TimerEngine.complete(data, now.add(const Duration(minutes: 25)));
     expect(StatsView.of(data, now).todayCount, 2); // 100 分钟 → 2 个
-    expect(data.activeSession!.mode, SessionMode.longBreak);
+    // 休息类型按本次时长：这轮只有 25 分钟 → 短休息。
+    expect(data.activeSession!.mode, SessionMode.shortBreak);
   });
 
   test('重置会丢弃未完成会话，不写入统计', () {

@@ -91,6 +91,25 @@ class AutoCloudSync {
   /// 这样周期同步里连续「先上传、再拉取」时，后者不会被前者的节流吃掉。
   DateTime _lastPush = DateTime.fromMillisecondsSinceEpoch(0);
 
+  /// 「完成专注」尚未成功上传的积压条数。完成一次专注是**必达事件**：
+  /// 上传被占用/失败时只排队、不丢弃，等下一次同步机会（回前台/巡检/启动）
+  /// 由 [flushPending] 补传，避免用户"点了完成但一直没上去"。
+  ///
+  /// 用计数而非布尔：本次上传只消化「它开始时已积压」的那些，
+  /// 上传期间新产生的完成事件会留在计数里等下一轮。
+  int _pendingPushes = 0;
+
+  /// 本次上传开始时就积压的条数——成功/冲突时恰好消化这么多。
+  void _consumePendingPushes(int count) {
+    if (count <= 0) return;
+    _pendingPushes = _pendingPushes > count ? _pendingPushes - count : 0;
+  }
+
+  /// 上传失败：保证至少留 1 条待补传（本次没传上去）。
+  void _markPendingPush() {
+    if (_pendingPushes < 1) _pendingPushes = 1;
+  }
+
   bool _canRun(AppData data) =>
       !_busy &&
       data.sync.deviceCode.isNotEmpty &&
@@ -122,21 +141,49 @@ class AutoCloudSync {
 
   /// 完成一次专注后调用：把本机新数据推上云端。
   ///
-  /// 网络失败静默跳过——数据仍在本地，下次同步会补上。
-  /// 云端已被网页端更新（409）时改为拉取，本机有改动则弹窗询问。
+  /// **必达语义**（2026-10-12 修）：完成专注不该被节流或竞争吞掉——
+  /// - 不参与 [minInterval]/[pushInterval] 节流（该事件本身低频，节流只会漏传）；
+  /// - 若此刻正有拉取/上传在跑（[AutoCloudSync] 单通道），只把 [_pendingPushes]
+  ///   加一排队，等下一次同步机会由 [flushPending] 用**最新数据**补传，不再直接丢弃；
+  /// - 网络失败同样留待补传（数据始终在本机，不会丢）。
+  ///
+  /// 云端已被另一端更新（409）时改为拉取，本机有改动则弹窗询问。
   /// [context] 仅在有冲突需要弹窗时使用，可为 null。
   Future<void> afterFocus(BuildContext? context, AppData data) async {
-    if (!_canRun(data)) return;
-    final fingerprint = cloudFingerprint(data);
+    if (data.sync.deviceCode.isEmpty) return;
     if (!hasLocalChanges(data)) return; // 没有新记录，无需上传
+    if (_busy) {
+      _pendingPushes++; // 有同步在跑：排队，等下一次机会补传
+      return;
+    }
+    await _pushNow(context, data);
+  }
+
+  /// 下一次同步机会的补传（回前台/巡检/启动时调用）：把被占用或失败的那次
+  /// 「完成专注」补上去。用 [current]（调用方的最新数据）而不是当时的快照，
+  /// 避免用旧快照覆盖云端在本机之后产生的新改动。
+  Future<void> flushPending(BuildContext? context, AppData current) async {
+    if (_pendingPushes <= 0 || _busy) return;
+    if (current.sync.deviceCode.isEmpty || !hasLocalChanges(current)) {
+      _pendingPushes = 0; // 未绑码 / 已由其它路径同步上去了
+      return;
+    }
+    await _pushNow(context, current);
+  }
+
+  /// 真正的单次上传。[_busy] 由此方法统一持有与释放。
+  Future<void> _pushNow(BuildContext? context, AppData data) async {
+    final fingerprint = cloudFingerprint(data);
+    final pendingAtStart = _pendingPushes; // 本次上传能消化掉的积压
+    var askOnConflict = false;
     _busy = true;
-    _lastRun = _clock();
     try {
       final updatedAt = await _sync.upload(
         deviceCode: data.sync.deviceCode,
         payload: data.toCloudMap(),
         baseUpdatedAt: data.sync.lastSyncedAt,
       );
+      _consumePendingPushes(pendingAtStart);
       await _apply(data.copyWith(
         sync: data.sync.copyWith(
           lastUploadedAt: updatedAt,
@@ -145,15 +192,24 @@ class AutoCloudSync {
         ),
       ));
     } on CloudSyncException catch (error) {
-      // 409：网页端刚更新过云端。本机数据不丢，转去拉取并让用户决定。
       if (error.conflict) {
-        if (context == null || !context.mounted) return;
-        await _pull(context, data, askOnConflict: true);
+        // 409：云端刚被另一端更新。本机数据不丢，交给拉取链路询问；
+        // 开始时积压的那些不再计入待补传（否则会立即再撞一次同一冲突）。
+        _consumePendingPushes(pendingAtStart);
+        askOnConflict = true;
+      } else {
+        _markPendingPush();
       }
     } catch (_) {
-      // 网络不可用等：静默跳过。
+      // 网络不可用等：留待下一次同步机会补传。
+      _markPendingPush();
     } finally {
       _busy = false;
+    }
+    // 必须在 [_busy] 释放之后再拉取：[_pull] 自身带 `!_busy` 前置检查，
+    // 原先在 _busy 未释放时调用会静默 return——409 的询问从未真正执行过。
+    if (askOnConflict && context != null && context.mounted) {
+      await _pull(context, data, askOnConflict: true);
     }
   }
 
@@ -176,6 +232,7 @@ class AutoCloudSync {
     if (_busy) return;
     if (_clock().difference(_lastPush) < _pushInterval) return; // 节流
     final fingerprint = cloudFingerprint(data);
+    final pendingAtStart = _pendingPushes;
     _busy = true;
     _lastPush = _clock();
     try {
@@ -184,6 +241,8 @@ class AutoCloudSync {
         payload: data.toCloudMap(),
         baseUpdatedAt: data.sync.lastSyncedAt,
       );
+      // 这次传的是最新数据，开始时积压的完成事件已包含在内。
+      _consumePendingPushes(pendingAtStart);
       await _apply(data.copyWith(
         sync: data.sync.copyWith(
           lastUploadedAt: updatedAt,
@@ -191,8 +250,13 @@ class AutoCloudSync {
           lastSyncedHash: fingerprint,
         ),
       ));
+    } on CloudSyncException catch (error) {
+      // 409 冲突：交给拉取链路询问，不计入待补传；
+      // 其它错误留待下一次同步机会补传。
+      if (!error.conflict) _markPendingPush();
     } catch (_) {
-      // 409 冲突 / 网络不可用：静默跳过。本机数据不动，下轮同步补上。
+      // 网络不可用等：静默跳过，但要记住这次没传上去。
+      _markPendingPush();
     } finally {
       _busy = false;
     }

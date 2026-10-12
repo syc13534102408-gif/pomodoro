@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -18,12 +20,24 @@ class FakeCloudSync extends CloudSync {
   String? lastUploadedCode;
   Map<String, dynamic>? lastUploadedPayload;
 
+  /// 上传次数：验证「占用期间不并发上传 / 补传恰好一次」。
+  int uploadCount = 0;
+
+  /// true 时上传直接抛网络错误（模拟离线）。
+  bool offline = false;
+
+  /// 非空时上传挂起直到 completer 完成（模拟"同步进行中"的竞争窗口）。
+  Completer<void>? gate;
+
   @override
   Future<DateTime> upload({
     required String deviceCode,
     required Map<String, dynamic> payload,
     DateTime? baseUpdatedAt,
   }) async {
+    uploadCount++;
+    if (gate != null) await gate!.future;
+    if (offline) throw CloudSyncException('网络不可用');
     lastUploadedCode = deviceCode;
     lastUploadedPayload = payload;
     if (baseUpdatedAt != null &&
@@ -417,5 +431,131 @@ void main() {
     await auto.afterLocalChange(local);
     expect(applied, isNull, reason: '冲突时不应 apply 任何数据');
     expect(local.records.map((r) => r.taskName), contains('本机新记录'));
+  });
+
+  // ── 「完成专注必达」（2026-10-12：修"点了完成却没上传"）──
+
+  test('节流窗口内完成专注照常上传（不再被 minInterval 吞掉）', () async {
+    var now = DateTime(2026, 8, 31, 12);
+    final sync = FakeCloudSync();
+    final auto = AutoCloudSync(
+      sync: sync,
+      apply: (_) async {},
+      minInterval: const Duration(hours: 1), // 极端节流：完成专注也应穿过去
+      pushInterval: const Duration(hours: 1),
+      clock: () => now,
+    );
+    // 回前台拉取先跑一次（云端无备份 → 404 静默），刷新了节流时钟。
+    await auto.onResume(null, _linked());
+    now = now.add(const Duration(seconds: 2)); // 仍在节流窗口内
+
+    final changed = _linked().copyWith(records: [_record('刚完成的专注')]);
+    await auto.afterFocus(null, changed);
+
+    expect(sync.lastUploadedCode, _code, reason: '完成专注不受节流约束');
+    expect(sync.lastUploadedPayload!['records'], isNotEmpty);
+  });
+
+  test('同步进行中完成专注：排队而非丢弃，下一次机会补传', () async {
+    final sync = FakeCloudSync();
+    final auto = AutoCloudSync(
+      sync: sync,
+      apply: (_) async {},
+      minInterval: Duration.zero,
+      pushInterval: Duration.zero,
+    );
+    // 占住通道：模拟回前台拉取/另一次上传正在进行。
+    sync.gate = Completer<void>();
+    final first = auto.afterFocus(
+      null,
+      _linked().copyWith(records: [_record('第一条')]),
+    );
+    await Future<void>.delayed(Duration.zero);
+    expect(sync.uploadCount, 1);
+
+    // 此时用户点了「完成」：应排队，不能并发上传也不能丢。
+    final second = _linked().copyWith(records: [_record('第二条')]);
+    await auto.afterFocus(null, second);
+    expect(sync.uploadCount, 1, reason: '占用期间不应并发上传');
+
+    sync.gate!.complete();
+    await first;
+
+    // 下一次同步机会（回前台/巡检/启动）用最新数据补传。
+    await auto.flushPending(null, second);
+    expect(sync.uploadCount, 2, reason: '应恰好补传一次');
+    expect(sync.lastUploadedPayload!['records'], isNotEmpty);
+  });
+
+  test('上传失败留待补传：下一次同步机会补上', () async {
+    final sync = FakeCloudSync()..offline = true;
+    AppData? applied;
+    final auto = AutoCloudSync(
+      sync: sync,
+      apply: (data) async => applied = data,
+      minInterval: Duration.zero,
+      pushInterval: Duration.zero,
+    );
+    final done = _linked().copyWith(records: [_record('离线完成的专注')]);
+    await auto.afterFocus(null, done);
+    expect(applied, isNull, reason: '离线时不上传也不 apply');
+
+    sync.offline = false;
+    await auto.flushPending(null, done);
+    expect(applied, isNotNull);
+    expect(sync.lastUploadedPayload!['records'], isNotEmpty);
+  });
+
+  test('已同步成功后不再重复补传', () async {
+    final sync = FakeCloudSync();
+    final auto = AutoCloudSync(
+      sync: sync,
+      apply: (_) async {},
+      minInterval: Duration.zero,
+      pushInterval: Duration.zero,
+    );
+    final done = _linked().copyWith(records: [_record('完成的专注')]);
+    await auto.afterFocus(null, done); // 一次成功上传，pending 清空
+    await auto.flushPending(null, done);
+    expect(sync.uploadCount, 1, reason: '不应重复上传');
+  });
+
+  testWidgets('完成专注遇 409：释放通道后拉取并弹窗询问（修 _busy 顺序）',
+      (tester) async {
+    final sync = FakeCloudSync()
+      ..updatedAt = DateTime.utc(2026, 8, 31, 10, 5)
+      ..payload = _webPayload();
+    final base = _linked();
+    final auto = AutoCloudSync(
+      sync: sync,
+      apply: (_) async {},
+      minInterval: Duration.zero,
+      pushInterval: Duration.zero,
+    );
+    // 本机自 10:00 后新增记录，云端 10:05 被另一端更新 → 上传必 409。
+    final local = base.copyWith(records: [_record('本机新记录')]).copyWith(
+          sync: base.sync.copyWith(
+            lastSyncedAt: DateTime.utc(2026, 8, 31, 10, 0),
+            lastSyncedHash: cloudFingerprint(base),
+          ),
+        );
+
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(body: Builder(
+        builder: (context) {
+          return Center(
+            child: TextButton(
+              onPressed: () => auto.afterFocus(context, local),
+              child: const Text('trigger'),
+            ),
+          );
+        },
+      )),
+    ));
+    await tester.tap(find.text('trigger'));
+    await tester.pumpAndSettle();
+
+    // 修复前 _pull 在 _busy 未释放时被静默 return，这个弹窗根本不会出现。
+    expect(find.text('云端有更新'), findsOneWidget);
   });
 }

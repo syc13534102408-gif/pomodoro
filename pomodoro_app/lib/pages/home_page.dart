@@ -146,6 +146,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     await _autoSync.afterLocalChange(_data);
     if (!mounted) return;
     await _autoSync.onResume(context, _data);
+    if (!mounted) return;
+    // 最后补传被占用/网络吞掉的那次「完成专注」（必达语义的兜底）。
+    await _autoSync.flushPending(context, _data);
   }
 
   @override
@@ -162,8 +165,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       _tick(forcePersist: true);
-      // 回到前台：拉取网页端可能刚上传的更新。
-      unawaited(_autoSync.onResume(context, _data));
+      // 回到前台：先补传本机未上传的改动，再拉云端更新，最后补传被吞掉的完成记录。
+      // 用 _syncNow 而不是只拉取——解锁后立刻点「完成」的那次上传曾被拉取挤掉。
+      unawaited(_syncNow());
       // 镜像轮询只在前台跑（后台冻结时轮询无意义），回前台立即收敛一次。
       if (_mirrorEnabled) {
         _startMirrorTimer();
@@ -227,15 +231,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     // Android restore 补偿：进程刚醒且会话已过 targetReached（如被强制停止后
     // 重新打开）时补弹 910——这是 910 在 Android 上仅剩的使用场景。
     if (mounted) unawaited(_compensateRestoredAlarm(restored));
-    // 启动同步：先拉取云端更新（与既有冲突询问语义一致），
-    // 再补传本机上次退出前可能没来得及上传的改动。
-    if (mounted) {
-      unawaited(() async {
-        await _autoSync.onResume(context, _data);
-        if (!mounted) return;
-        await _autoSync.afterLocalChange(_data);
-      }());
-    }
+    // 启动同步：先补传本机上次退出前没来得及上传的改动，再拉取云端更新，
+    // 最后兜底补传被吞掉的完成记录（与回前台、每 3 分钟巡检同一套逻辑）。
+    if (mounted) unawaited(_syncNow());
   }
 
   void _startTicker() {

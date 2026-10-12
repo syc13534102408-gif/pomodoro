@@ -70,19 +70,26 @@ class AutoCloudSync {
     required CloudSync sync,
     required Future<void> Function(AppData data) apply,
     Duration minInterval = const Duration(seconds: 15),
+    Duration pushInterval = const Duration(seconds: 20),
     DateTime Function()? clock,
   })  : _sync = sync,
         _apply = apply,
         _minInterval = minInterval,
+        _pushInterval = pushInterval,
         _clock = clock ?? DateTime.now;
 
   final CloudSync _sync;
   final Future<void> Function(AppData data) _apply;
   final Duration _minInterval;
+  final Duration _pushInterval;
   final DateTime Function() _clock;
 
   bool _busy = false;
   DateTime _lastRun = DateTime.fromMillisecondsSinceEpoch(0);
+
+  /// 「本地改动即上传」的独立节流时钟：与 [minInterval] 分开，
+  /// 这样周期同步里连续「先上传、再拉取」时，后者不会被前者的节流吃掉。
+  DateTime _lastPush = DateTime.fromMillisecondsSinceEpoch(0);
 
   bool _canRun(AppData data) =>
       !_busy &&
@@ -153,6 +160,43 @@ class AutoCloudSync {
   /// App 启动 / 回到前台时调用：拉取云端更新。
   Future<void> onResume(BuildContext? context, AppData data) =>
       _pull(context, data, askOnConflict: true);
+
+  /// 本地数据改动后调用（补记、删除记录、改目标/清单/设置/编辑记录等）：
+  /// 节流上传，让云端尽快跟上本机，而不是只等「完成一次专注」。
+  ///
+  /// 与 [afterFocus] 的两点差异：
+  /// - 不需要 context：遇 409（云端已被另一端更新）时**静默跳过**，本机改动
+  ///   原样保留，交给 [onResume]/周期同步的拉取链路去询问，避免高频弹窗打断操作；
+  /// - 会话进行中不上传：`activeSession` 会把 in-progress 记录写进净荷，
+  ///   这种半截记录不该落到云端，统一等 [afterFocus] 在完成时上传。
+  Future<void> afterLocalChange(AppData data) async {
+    if (data.sync.deviceCode.isEmpty) return; // 未绑定同步码：不创建孤立备份
+    if (data.activeSession != null) return; // 会话进行中：等完成后统一上传
+    if (!hasLocalChanges(data)) return; // 没有新改动
+    if (_busy) return;
+    if (_clock().difference(_lastPush) < _pushInterval) return; // 节流
+    final fingerprint = cloudFingerprint(data);
+    _busy = true;
+    _lastPush = _clock();
+    try {
+      final updatedAt = await _sync.upload(
+        deviceCode: data.sync.deviceCode,
+        payload: data.toCloudMap(),
+        baseUpdatedAt: data.sync.lastSyncedAt,
+      );
+      await _apply(data.copyWith(
+        sync: data.sync.copyWith(
+          lastUploadedAt: updatedAt,
+          lastSyncedAt: updatedAt,
+          lastSyncedHash: fingerprint,
+        ),
+      ));
+    } catch (_) {
+      // 409 冲突 / 网络不可用：静默跳过。本机数据不动，下轮同步补上。
+    } finally {
+      _busy = false;
+    }
+  }
 
   Future<void> _pull(
     BuildContext? context,

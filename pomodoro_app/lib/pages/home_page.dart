@@ -129,14 +129,23 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     }
   }
 
-  /// 备份同步低频拉取：每 3 分钟一次，onResume 自带 updatedAt 与 15 秒
-  /// minInterval 保护，重复调用安全；失败静默（网络异常不影响计时）。
+  /// 备份同步低频巡检：每 3 分钟一次，先补传本机未上传的改动，再拉云端更新。
+  /// onResume 自带 updatedAt 与 15 秒 minInterval 保护，重复调用安全；
+  /// 失败静默（网络异常不影响计时）。
   void _startBackupSyncTimer() {
     _backupSyncTimer?.cancel();
     _backupSyncTimer = Timer.periodic(const Duration(minutes: 3), (_) {
       if (!mounted || !_ready) return;
-      unawaited(_autoSync.onResume(context, _data));
+      unawaited(_syncNow());
     });
+  }
+
+  /// 先上传（有本地改动时）再拉取，顺序串行：
+  /// 上传成功会刷新 lastSyncedAt，随后的拉取看到云端没有更新会自然跳过。
+  Future<void> _syncNow() async {
+    await _autoSync.afterLocalChange(_data);
+    if (!mounted) return;
+    await _autoSync.onResume(context, _data);
   }
 
   @override
@@ -166,6 +175,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       _mirrorTimer?.cancel();
       _backupSyncTimer?.cancel();
       _persist(force: true);
+      // 退后台前尽力把本机改动推上去（失败无妨：回前台的周期巡检会补）。
+      unawaited(_autoSync.afterLocalChange(_data));
     }
   }
 
@@ -216,8 +227,15 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     // Android restore 补偿：进程刚醒且会话已过 targetReached（如被强制停止后
     // 重新打开）时补弹 910——这是 910 在 Android 上仅剩的使用场景。
     if (mounted) unawaited(_compensateRestoredAlarm(restored));
-    // 启动时拉取一次云端更新（已绑定同步码的情况下）。
-    if (mounted) unawaited(_autoSync.onResume(context, _data));
+    // 启动同步：先拉取云端更新（与既有冲突询问语义一致），
+    // 再补传本机上次退出前可能没来得及上传的改动。
+    if (mounted) {
+      unawaited(() async {
+        await _autoSync.onResume(context, _data);
+        if (!mounted) return;
+        await _autoSync.afterLocalChange(_data);
+      }());
+    }
   }
 
   void _startTicker() {
@@ -661,7 +679,11 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     _apply(TimerEngine.switchMode(_data, mode, DateTime.now()), force: true);
   }
 
-  void _replace(AppData next) => _apply(next, force: true);
+  void _replace(AppData next) {
+    _apply(next, force: true);
+    // 本地改动即刻排队上传云端（节流 20s、冲突静默），不必等下一次完成专注。
+    unawaited(_autoSync.afterLocalChange(next));
+  }
 
   /// 会话是否处于「挂起」：会话存在，但用户切到了其他模式——
   /// 会话被暂停冻结保留，切回其所属模式即继续。
@@ -1260,7 +1282,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                       ),
                       const SizedBox(width: 10),
                       Text(
-                        formatClock(record.minutes),
+                        formatHoursMinutes(record.minutes),
                         style: brickNumberStyle(fontSize: 12),
                       ),
                     ],
@@ -1598,7 +1620,7 @@ class _RecentRow extends StatelessWidget {
             ),
             const SizedBox(width: 8),
             Text(
-              formatClock(record.minutes),
+              formatHoursMinutes(record.minutes),
               style: brickNumberStyle(fontSize: 13),
             ),
             const SizedBox(width: 4),

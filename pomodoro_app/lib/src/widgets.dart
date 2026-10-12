@@ -890,17 +890,20 @@ String formatMinutes(double minutes) {
       : '${tenths ~/ 10}.${tenths % 10} 番茄';
 }
 
-/// 时长显示为 时:分:秒（最近完成列表用——记录时长常有零头，
-/// 秒级精度才看得出 46.4 与 46.9 的差别）。满一小时为 h:mm:ss，
-/// 不足一小时为 mm:ss。仅用于记录行展示，聚合统计仍走 [formatMinutes]。
-String formatClock(double minutes) {
-  final totalSeconds = (minutes * 60).round();
-  final h = totalSeconds ~/ 3600;
-  final m = (totalSeconds % 3600) ~/ 60;
-  final s = totalSeconds % 60;
-  final mm = m.toString().padLeft(2, '0');
-  final ss = s.toString().padLeft(2, '0');
-  return h > 0 ? '$h:$mm:$ss' : '$mm:$ss';
+/// 「X 小时 Y 分钟」人话时长（最近完成列表用）：
+/// `3 小时 5 分钟` / `3 小时` / `45 分钟`；不足 1 分钟为 `<1 分钟`。
+///
+/// 2026-10-12 起不再显示 `mm:ss`（原来靠秒级精度区分 46.4 与 46.9 分钟，
+/// 但对「看记录」这个场景不直观），四舍五入到分钟。
+/// 聚合统计仍走 [formatMinutes]。
+String formatHoursMinutes(double minutes) {
+  final total = minutes.round();
+  if (total <= 0) return '<1 分钟';
+  final h = total ~/ 60;
+  final m = total % 60;
+  if (h == 0) return '$m 分钟';
+  if (m == 0) return '$h 小时';
+  return '$h 小时 $m 分钟';
 }
 
 /// 「大数字 + 小单位」的富文本：单位按 [unitScale] 缩小（默认 0.62）。

@@ -294,4 +294,128 @@ void main() {
     expect(applied, isNull);
     expect(local.records.map((r) => r.taskName), contains('本机新记录'));
   });
+
+  // ── 「本地改动即上传」（2026-10-12 新增，替代"只在完成专注时上传"）──
+
+  test('本地改动即上传：补记/改设置等不再等到下次完成专注', () async {
+    final sync = FakeCloudSync();
+    AppData? applied;
+    final auto = AutoCloudSync(
+      sync: sync,
+      apply: (data) async => applied = data,
+      minInterval: Duration.zero,
+      pushInterval: Duration.zero,
+    );
+    final changed = _linked().copyWith(records: [_record('补记的记录')]);
+    await auto.afterLocalChange(changed);
+
+    expect(sync.lastUploadedCode, _code);
+    expect(sync.lastUploadedPayload!['records'], isNotEmpty);
+    expect(applied!.sync.lastSyncedHash, cloudFingerprint(changed));
+  });
+
+  test('未绑定同步码时，本地改动不上传（不创建孤立备份）', () async {
+    final sync = FakeCloudSync();
+    final auto = AutoCloudSync(
+      sync: sync,
+      apply: (_) async {},
+      minInterval: Duration.zero,
+      pushInterval: Duration.zero,
+    );
+    await auto.afterLocalChange(
+      _linked(code: '').copyWith(records: [_record('数学真题')]),
+    );
+    expect(sync.lastUploadedCode, isNull);
+  });
+
+  test('本机无改动时不上传', () async {
+    final sync = FakeCloudSync();
+    final base = _linked();
+    final auto = AutoCloudSync(
+      sync: sync,
+      apply: (_) async {},
+      minInterval: Duration.zero,
+      pushInterval: Duration.zero,
+    );
+    await auto.afterLocalChange(
+      base.copyWith(
+        sync: base.sync.copyWith(lastSyncedHash: cloudFingerprint(base)),
+      ),
+    );
+    expect(sync.lastUploadedCode, isNull);
+  });
+
+  test('会话进行中不上传（避免把 in-progress 记录写进云端）', () async {
+    final sync = FakeCloudSync();
+    final auto = AutoCloudSync(
+      sync: sync,
+      apply: (_) async {},
+      minInterval: Duration.zero,
+      pushInterval: Duration.zero,
+    );
+    // 有进行中会话，即便数据与上次同步不同也不上传。
+    final running = _linked().copyWith(
+      records: [_record('数学真题')],
+      activeSession: const ActiveSession(
+        recordId: 'r1',
+        mode: SessionMode.focus,
+        running: true,
+      ),
+    );
+    await auto.afterLocalChange(running);
+    expect(sync.lastUploadedCode, isNull);
+  });
+
+  test('节流：pushInterval 内第二次本地改动不上传', () async {
+    var now = DateTime(2026, 8, 31, 12);
+    final sync = FakeCloudSync();
+    AppData? lastApplied;
+    final auto = AutoCloudSync(
+      sync: sync,
+      apply: (data) async => lastApplied = data,
+      minInterval: Duration.zero,
+      pushInterval: const Duration(seconds: 20),
+      clock: () => now,
+    );
+    final first = _linked().copyWith(records: [_record('第一条')]);
+    await auto.afterLocalChange(first);
+    expect(sync.lastUploadedCode, _code, reason: '首轮应上传');
+
+    sync.lastUploadedPayload = null;
+    now = now.add(const Duration(seconds: 5)); // 仍在节流窗口内
+    final second = lastApplied!.copyWith(records: [
+      ...lastApplied!.records,
+      _record('第二条'),
+    ]);
+    await auto.afterLocalChange(second);
+    expect(sync.lastUploadedPayload, isNull, reason: '节流窗口内不应上传');
+
+    now = now.add(const Duration(seconds: 20)); // 超出窗口
+    await auto.afterLocalChange(second);
+    expect(sync.lastUploadedPayload, isNotNull, reason: '超出窗口后应补传');
+  });
+
+  test('本地改动上传遇 409：静默跳过，不弹窗不覆盖本机', () async {
+    final sync = FakeCloudSync()
+      ..updatedAt = DateTime.utc(2026, 8, 31, 10, 5)
+      ..payload = _webPayload();
+    AppData? applied;
+    final auto = AutoCloudSync(
+      sync: sync,
+      apply: (data) async => applied = data,
+      minInterval: Duration.zero,
+      pushInterval: Duration.zero,
+    );
+    final local = _linked()
+        .copyWith(records: [_record('本机新记录')])
+        .copyWith(
+      sync: _linked().sync.copyWith(
+        lastSyncedAt: DateTime.utc(2026, 8, 31, 10, 0),
+        lastSyncedHash: cloudFingerprint(_linked()),
+      ),
+    );
+    await auto.afterLocalChange(local);
+    expect(applied, isNull, reason: '冲突时不应 apply 任何数据');
+    expect(local.records.map((r) => r.taskName), contains('本机新记录'));
+  });
 }

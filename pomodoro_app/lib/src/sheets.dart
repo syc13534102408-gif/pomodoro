@@ -1688,11 +1688,16 @@ Future<void> showEventActionSheet(
   );
 }
 
-/// 全部已完成事件清单（统计页「已完成 N 个 · 查看全部」的入口）。
+/// 事件档案：全部事件的独立展示窗口（统计页「事件进展」卡的完整版）。
 ///
-/// 与统计页只列最近 5 条不同，这里列出全部；每条可重命名或删除，点条目看记录明细。
-/// 用 StatefulBuilder 就地刷新，避免增删后关掉面板再打开。
-Future<void> showFinishedEventsSheet(
+/// 2026-10-13：原「已完成事件」清单只列已完成、且统计页只露最近 5 条，
+/// 事件一多既不直观也看不全。升级为完整档案：
+/// - 汇总头：事件数 / 累计时长（小时分钟人话）/ 番茄当量 / 覆盖天数；
+/// - 按任务构成：色点 + 任务名 + 事件数与累计时长；
+/// - 分区：进行中（含已暂停）→ 已完成；
+/// - 已完成支持「按最近 / 按时长」排序切换（标题栏右侧）；
+/// - 行内信息：名称 + 状态/完成日期 + 覆盖天数 + 累计时长（小时分钟人话）。
+Future<void> showEventArchiveSheet(
   BuildContext context, {
   required AppData data,
   required Color Function(String taskName) colorFor,
@@ -1704,43 +1709,146 @@ Future<void> showFinishedEventsSheet(
     backgroundColor: PineColors.paper,
     builder: (sheetContext) {
       var current = data;
+      var byDuration = false;
       return StatefulBuilder(
         builder: (sheetContext, setSheetState) {
+          final statsById = {
+            for (final event in current.events)
+              event.id: eventStatsOf(current, event.id),
+          };
+          final live = current.events.where((e) => !e.isFinished).toList();
           final finished = current.events.where((e) => e.isFinished).toList()
-            ..sort((a, b) => (b.finishedAt ?? b.startedAt)
-                .compareTo(a.finishedAt ?? a.startedAt));
+            ..sort((a, b) => byDuration
+                ? statsById[b.id]!.minutes
+                    .compareTo(statsById[a.id]!.minutes)
+                : (b.finishedAt ?? b.startedAt)
+                    .compareTo(a.finishedAt ?? a.startedAt));
+
+          final totalMinutes = statsById.values
+              .fold<double>(0, (sum, stats) => sum + stats.minutes);
+          final totalTomato = pomodoroEquiv(totalMinutes);
+          final dayKeys = <String>{
+            for (final stats in statsById.values)
+              for (final record in stats.records) record.dayKey,
+          };
+          // 按任务构成：色点 + 任务名 + 事件数与累计时长，按时长降序。
+          final byTask = <String, Map<String, double>>{};
+          for (final event in current.events) {
+            final entry = byTask.putIfAbsent(
+                event.taskName, () => {'minutes': 0, 'count': 0});
+            entry['minutes'] = entry['minutes']! + statsById[event.id]!.minutes;
+            entry['count'] = entry['count']! + 1;
+          }
+          final taskRows = byTask.entries.toList()
+            ..sort((a, b) =>
+                b.value['minutes']!.compareTo(a.value['minutes']!));
+
           void apply(AppData next) {
             onChanged(next);
             setSheetState(() => current = next);
           }
 
           return _SheetScaffold(
-            title: '已完成事件',
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text(
-                  '共 ${finished.length} 个 · 点条目看记录明细',
-                  style: const TextStyle(color: PineColors.sub, fontSize: 11),
-                ),
-                const SizedBox(height: 6),
-                if (finished.isEmpty)
-                  const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 18),
-                    child: Text('还没有已完成的事件',
-                        style: TextStyle(color: PineColors.sub, fontSize: 12)),
-                  )
-                else
-                  for (final event in finished)
-                    _finishedEventTile(
-                      sheetContext,
-                      current,
-                      event,
-                      colorFor,
-                      apply,
+            title: '事件档案',
+            trailing: BrickButton(
+              label: byDuration ? '按时长' : '按最近',
+              icon: Icons.swap_vert,
+              height: 34,
+              color: PineColors.card,
+              foregroundColor: PineColors.pine,
+              onPressed: () => setSheetState(() => byDuration = !byDuration),
+            ),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.of(sheetContext).size.height * 0.72,
+              ),
+              child: ListView(
+                shrinkWrap: true,
+                children: [
+                  // 汇总头。
+                  Text(
+                    '共 ${current.events.length} 个事件 · 累计 '
+                    '${formatHoursMinutes(totalMinutes)} · $totalTomato 番茄 · '
+                    '覆盖 ${dayKeys.length} 天',
+                    style: const TextStyle(color: PineColors.sub, fontSize: 11),
+                  ),
+                  const SizedBox(height: 12),
+                  // 按任务构成。
+                  for (final row in taskRows)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 7),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 8,
+                            height: 8,
+                            decoration: BoxDecoration(
+                              color: colorFor(row.key),
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              row.key,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                  color: PineColors.ink, fontSize: 12),
+                            ),
+                          ),
+                          Text(
+                            '${row.value['count']!.toInt()} 个 · '
+                            '${formatHoursMinutes(row.value['minutes']!)}',
+                            style: brickNumberStyle(
+                                fontSize: 11, color: PineColors.sub),
+                          ),
+                        ],
+                      ),
                     ),
-              ],
+                  // 分区：进行中（含已暂停）。
+                  if (live.isNotEmpty) ...[
+                    const Divider(height: 18, color: PineColors.line),
+                    Text(
+                      '进行中 ${live.length} 个',
+                      style:
+                          const TextStyle(color: PineColors.sub, fontSize: 11),
+                    ),
+                    const SizedBox(height: 4),
+                    for (final event in live)
+                      _eventArchiveTile(
+                        sheetContext,
+                        current,
+                        event,
+                        colorFor,
+                        apply,
+                      ),
+                  ],
+                  // 分区：已完成。
+                  const Divider(height: 18, color: PineColors.line),
+                  Text(
+                    '已完成 ${finished.length} 个',
+                    style: const TextStyle(color: PineColors.sub, fontSize: 11),
+                  ),
+                  const SizedBox(height: 4),
+                  if (finished.isEmpty)
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 18),
+                      child: Text('还没有已完成的事件',
+                          style:
+                              TextStyle(color: PineColors.sub, fontSize: 12)),
+                    )
+                  else
+                    for (final event in finished)
+                      _eventArchiveTile(
+                        sheetContext,
+                        current,
+                        event,
+                        colorFor,
+                        apply,
+                      ),
+                ],
+              ),
             ),
           );
         },
@@ -1749,8 +1857,10 @@ Future<void> showFinishedEventsSheet(
   );
 }
 
-/// 清单里的一行：点左侧进详情，右侧「⋯」重命名/删除。
-Widget _finishedEventTile(
+/// 档案行：点左侧进详情，右侧「⋯」重命名/删除。
+/// 第二信息按状态给：已完成显示完成日期，进行中/已暂停显示状态；
+/// 一律带覆盖天数与累计时长（小时分钟人话）。
+Widget _eventArchiveTile(
   BuildContext context,
   AppData data,
   FocusEvent event,
@@ -1758,7 +1868,10 @@ Widget _finishedEventTile(
   void Function(AppData next) apply,
 ) {
   final stats = eventStatsOf(data, event.id);
-  final done = event.finishedAt ?? event.startedAt;
+  final stamp = event.finishedAt ?? event.startedAt;
+  final statusText = event.isFinished
+      ? '${stamp.month}/${stamp.day} 完成'
+      : event.statusLabel;
   return Row(
     children: [
       Expanded(
@@ -1791,13 +1904,15 @@ Widget _finishedEventTile(
                     style: const TextStyle(color: PineColors.ink, fontSize: 13),
                   ),
                 ),
-                Text('${done.month}/${done.day} 完成',
-                    style:
-                        const TextStyle(color: PineColors.sub, fontSize: 10.5)),
+                Text(
+                  '$statusText · ${stats.days} 天',
+                  style: const TextStyle(color: PineColors.sub, fontSize: 10.5),
+                ),
                 const SizedBox(width: 8),
-                MinutesText(stats.minutes,
-                    style:
-                        brickNumberStyle(fontSize: 12, color: PineColors.sub)),
+                Text(
+                  formatHoursMinutes(stats.minutes),
+                  style: brickNumberStyle(fontSize: 12, color: PineColors.sub),
+                ),
               ],
             ),
           ),

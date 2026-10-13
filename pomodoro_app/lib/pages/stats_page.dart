@@ -344,10 +344,11 @@ class _EventsSection extends StatelessWidget {
             const SizedBox(height: 14),
             const Divider(height: 1, color: PineColors.line),
             const SizedBox(height: 10),
-            // 这里只列最近 5 个；完整清单（含重命名/删除）在统计页的这个入口里。
+            // 统计页只留最近 3 个做概览；完整档案（汇总头 / 按任务构成 /
+            // 排序切换 / 全部条目）走「事件档案」窗口。
             InkWell(
               borderRadius: BorderRadius.circular(6),
-              onTap: () => showFinishedEventsSheet(
+              onTap: () => showEventArchiveSheet(
                 context,
                 data: data,
                 colorFor: colorFor,
@@ -364,7 +365,7 @@ class _EventsSection extends StatelessWidget {
                           const TextStyle(color: PineColors.sub, fontSize: 11),
                     ),
                     const SizedBox(width: 3),
-                    const Text('查看全部',
+                    const Text('事件档案',
                         style: TextStyle(color: PineColors.pine, fontSize: 11)),
                     const Icon(Icons.chevron_right,
                         size: 13, color: PineColors.pine),
@@ -372,7 +373,7 @@ class _EventsSection extends StatelessWidget {
                 ),
               ),
             ),
-            for (final event in finished.take(5)) _finishedRow(context, event),
+            for (final event in finished.take(3)) _finishedRow(context, event),
           ],
         ],
       ),

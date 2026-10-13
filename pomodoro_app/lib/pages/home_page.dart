@@ -876,27 +876,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         child: Stack(
           children: [
             Positioned.fill(child: _desktopCabin(session, view)),
-            // 右上角：统计 / 设置抽屉开关（打开时高亮，再点同键或 Esc 关闭）。
-            Positioned(
-              top: 10,
-              right: 14,
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _desktopOverlayButton(
-                    which: _overlayStats,
-                    icon: Icons.bar_chart_rounded,
-                    tooltip: '统计',
-                  ),
-                  const SizedBox(width: 8),
-                  _desktopOverlayButton(
-                    which: _overlaySettings,
-                    icon: Icons.tune_rounded,
-                    tooltip: '设置',
-                  ),
-                ],
-              ),
-            ),
             if (_desktopOverlay != _overlayNone) ...[
               // 遮罩：ink 18%，点任意处关闭（160ms 淡入）。
               Positioned.fill(
@@ -931,6 +910,30 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 ),
               ),
             ],
+            // 右上角：统计 / 设置抽屉开关（打开时高亮，再点同键或 Esc 关闭）。
+            // 必须放在 Stack 最后（最上层）：否则抽屉打开时会盖住这两只按钮——
+            // 用户点按钮想关抽屉、实际点在抽屉内容上，观感就是「统计按钮一直
+            // 卡在灰色按下态，关不掉」（2026-10-13 修）。
+            Positioned(
+              top: 10,
+              right: 14,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _desktopOverlayButton(
+                    which: _overlayStats,
+                    icon: Icons.bar_chart_rounded,
+                    tooltip: '统计',
+                  ),
+                  const SizedBox(width: 8),
+                  _desktopOverlayButton(
+                    which: _overlaySettings,
+                    icon: Icons.tune_rounded,
+                    tooltip: '设置',
+                  ),
+                ],
+              ),
+            ),
           ],
         ),
       ),

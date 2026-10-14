@@ -211,20 +211,17 @@ class MainFlutterWindow: NSWindow, NSMenuDelegate {
 
   private func render(title: String, tintArgb: Int) {
     guard let button = statusItem?.button else { return }
-    let tint = pineColor(tintArgb)
     // 等宽数字：倒计时逐秒变化时宽度不跳动。
     let font = NSFont.monospacedDigitSystemFont(ofSize: 13, weight: .medium)
-    // 颜色跟随系统外观：深色菜单栏 → 白字（投屏/暗色下醒目），
-    // 浅色菜单栏 → 保留 Dart 推送的状态色（松绿/薄荷/金）。
-    // 用 dynamicProvider 而非固定色，外观切换时自动重评估。
-    let adaptive = NSColor(name: nil, dynamicProvider: { appearance in
-      let dark = appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
-      return dark ? NSColor.white : tint
-    })
+    // 固定白字（2026-10-14）：此前用 dynamicProvider 按 appearance 判断深浅色，
+    // 但 NSStatusBar 按钮解析动态色时拿到的 appearance 常常是 aqua，于是在深色
+    // 菜单栏上也判成浅色、回落成状态色（番茄红/灰褐），看着发黑看不清。
+    // 状态色已改为通过标题里的阶段短标签区分，文字统一用白色。
+    let color = NSColor.white
     button.attributedTitle = NSAttributedString(
       string: title,
-      attributes: [.font: font, .foregroundColor: adaptive])
-    button.contentTintColor = adaptive
+      attributes: [.font: font, .foregroundColor: color])
+    button.contentTintColor = color
     lastTitle = title
     lastTint = tintArgb
   }
@@ -232,15 +229,6 @@ class MainFlutterWindow: NSWindow, NSMenuDelegate {
   private func string(_ state: [String: Any], _ key: String) -> String? {
     guard let value = state[key] as? String, !value.isEmpty else { return nil }
     return value
-  }
-
-  private func pineColor(_ argb: Int) -> NSColor {
-    let value = UInt32(truncatingIfNeeded: argb)
-    return NSColor(
-      red: CGFloat((value >> 16) & 0xFF) / 255,
-      green: CGFloat((value >> 8) & 0xFF) / 255,
-      blue: CGFloat(value & 0xFF) / 255,
-      alpha: 1)
   }
 
   @objc private func handleMenuAction(_ sender: NSMenuItem) {

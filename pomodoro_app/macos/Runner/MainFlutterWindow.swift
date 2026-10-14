@@ -211,17 +211,32 @@ class MainFlutterWindow: NSWindow, NSMenuDelegate {
 
   private func render(title: String, tintArgb: Int) {
     guard let button = statusItem?.button else { return }
-    // 等宽数字：倒计时逐秒变化时宽度不跳动。
+    // 文字画成非模板位图（2026-10-14 三次修，最终方案）：这台系统的浅色外观下，
+    // NSStatusBarButton 的文字颜色被系统材质接管——attributedTitle 的白色前景、
+    // contentTintColor、甚至把按钮 appearance 锁成 darkAqua 都被忽略，
+    // 深色菜单栏上黑字隐形。离屏把文本画成白色位图（isTemplate=false），
+    // 颜色完全自控；每秒重画一次小文本，开销可忽略。
     let font = NSFont.monospacedDigitSystemFont(ofSize: 13, weight: .medium)
-    // 固定白字（2026-10-14）：此前用 dynamicProvider 按 appearance 判断深浅色，
-    // 但 NSStatusBar 按钮解析动态色时拿到的 appearance 常常是 aqua，于是在深色
-    // 菜单栏上也判成浅色、回落成状态色（番茄红/灰褐），看着发黑看不清。
-    // 状态色已改为通过标题里的阶段短标签区分，文字统一用白色。
-    let color = NSColor.white
-    button.attributedTitle = NSAttributedString(
-      string: title,
-      attributes: [.font: font, .foregroundColor: color])
-    button.contentTintColor = color
+    // 位图文字（最终方案，2026-10-15 红色判别实验确认颜色可控）：
+    // 系统浅色外观下 attributedTitle 前景/contentTintColor/appearance 全被忽略，
+    // 深色菜单栏上黑字隐形；离屏画白色位图（isTemplate=false）颜色自控。
+    // 用 deviceWhite 0.999 而非 .white——calibrated white 在部分绘制路径
+    // 会被色彩管理转换，纯自定义 RGB 最稳。
+    let font_color = NSColor(srgbRed: 1.0, green: 1.0, blue: 1.0, alpha: 1.0)
+    let attrs: [NSAttributedString.Key: Any] = [
+      .font: font, .foregroundColor: font_color]
+    let text = title as NSString
+    let size = text.size(withAttributes: attrs)
+    let image = NSImage(size: size)
+    image.lockFocus()
+    text.draw(at: .zero, withAttributes: attrs)
+    image.unlockFocus()
+    image.isTemplate = false
+    button.image = image
+    button.imagePosition = .imageOnly
+    button.attributedTitle = NSAttributedString(string: "")
+    button.title = ""
+    NSLog("pine render: '%@' -> image %.0fx%.0f", title, size.width, size.height)
     lastTitle = title
     lastTint = tintArgb
   }

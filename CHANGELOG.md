@@ -19,7 +19,7 @@
   （测试 146 例 / 18 文件、方案 E「松林手帐」、休息规则、番茄口径、云净荷 schema）。
 - **`build-macos.sh` 入库**：原先躺在 gitignore 的 `outputs/` 里，换机即失传；移到 `scripts/build-macos.sh`。
 - **安卓包重出**：`outputs/松果-v1.3.7-同步必达-2026-10-23.apk`
-  （19.6MB / 20,283,496 B，versionName 1.3.7、versionCode 8，sha256 前缀 `1fcf6d2030651fbc`）。
+  （19.6MB / 19,577,247 B = 18.67 MiB，versionName 1.3.7、versionCode 8，sha256 前缀 `1fcf6d2030651fbc`）。
   上一个包停在 10-09（v1.3.6），**没有 10-12 的必达上传与 409 修复**，建议尽快替换手机上的版本。
   构建注意：`flutter build apk` 必须能写 `~/.gradle`（见 docs/07 §1 #5）。
 

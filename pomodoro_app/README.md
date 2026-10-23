@@ -40,7 +40,7 @@ F=$PWD/../tools/flutter/bin/flutter
 
 $F pub get
 ../tools/flutter/bin/dart analyze    # flutter analyze 的 LSP 在本机会崩，用这个
-$F --suppress-analytics test         # 157 项用例 / 20 个文件，应全绿
+$F --suppress-analytics test         # 158 项用例 / 20 个文件，应全绿
 $F build apk --release --target-platform android-arm64   # 约 19MB
 ```
 

@@ -30,9 +30,14 @@
 - **已知约束**：待办**单端编辑**。`mergeFromCloud` 对 todos 是"整体采用云端"（只有 records/events 走
   id 并集，因为它们只追加）；待办是可删改列表，并集表达不了删除。多端并发时以最后上传者为准。
 - 回归：`dart analyze` 零告警、`flutter test` **158 全绿**（新增解析器 8 例 + 面板/卡片 3 例）。
-- **产物**：`outputs/松果-v1.3.8-日程打勾-2026-10-23.apk`
+- **产物（安卓）**：`outputs/松果-v1.3.8-日程打勾-2026-10-23.apk`
   （19,708,535 B / 18.79 MiB，versionName 1.3.8、versionCode 9，sha256 前缀 `d46861b63ebd72f7`）。
   升级路径 1.3.7(8) → 1.3.8(9)，`applicationId` 与签名未变，原地升级、本地数据保留。
+- **产物（macOS）**：`outputs/pinecore-macos-2026-10-23.zip`（47.3MB 构建产物，18MB 压缩），
+  已 `rsync` 安装到 `/Applications/pinecore.app` 并启动，`CFBundleShortVersionString = 1.3.8`、
+  `CFBundleVersion = 9`。实机截图见 `outputs/desktop-schedule-2026-10-23.png`
+  （信息卡倒计时下方即「日程 · 今天还没安排 ›」一行，菜单栏仍为白字位图）。
+  两端共用同一份 `lib/`，所以这次只重打包、没有额外改动。
 
 ## 2026-10-23 · 文档回填 + 网页端冻结（v1.3.7）
 

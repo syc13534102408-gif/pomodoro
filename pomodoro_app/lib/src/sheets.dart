@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'engine.dart';
 import 'models.dart';
+import 'plan_import.dart';
 import 'theme.dart';
 import 'widgets.dart';
 
@@ -554,13 +555,15 @@ class _TodoRow extends StatelessWidget {
     required this.item,
     required this.onToggle,
     required this.onRemove,
-    required this.onFocus,
+    this.onFocus,
   });
 
   final TodoItem item;
   final VoidCallback onToggle;
   final VoidCallback onRemove;
-  final VoidCallback onFocus;
+
+  /// 长按「设为专注事件」。日程面板不提供该动作（会给每条待办建一个任务），传 null 即可。
+  final VoidCallback? onFocus;
 
   @override
   Widget build(BuildContext context) {
@@ -601,6 +604,328 @@ class _TodoRow extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// 对 todos 的一次变换。父级拿**最新** `_data` 去套，而不是用面板打开时的快照整份回写
+/// （面板存活期间可能发生云端采纳，整份回写会把刚拉到的数据顶掉）。
+typedef TodosTransform = Map<String, List<TodoItem>> Function(
+    Map<String, List<TodoItem>> todos);
+
+/// 日程：跨天待办的多日视图 + 文本导入。
+///
+/// 与「今日清单」的分工：那份只渲染 `dateKey(now)` 一天（且自 2026-09-09 起无入口），
+/// 日程要一次看多天、按**目标日**落地。
+///
+/// **日期键用自然日 `ymdOf(目标日)`，不套凌晨 3 点的统计日口径**——否则凌晨排
+/// 「明天」的任务会掉进昨天（见 plan_import.dart 的口径说明）。
+Future<void> showPlanSheet(
+  BuildContext context, {
+  required AppData data,
+  required ValueChanged<TodosTransform> onApply,
+  DateTime? now,
+}) {
+  return showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: PineColors.paper,
+    builder: (_) => _PlanSheet(data: data, onApply: onApply, now: now),
+  );
+}
+
+class _PlanSheet extends StatefulWidget {
+  const _PlanSheet({required this.data, required this.onApply, this.now});
+
+  final AppData data;
+  final ValueChanged<TodosTransform> onApply;
+  final DateTime? now;
+
+  @override
+  State<_PlanSheet> createState() => _PlanSheetState();
+}
+
+class _PlanSheetState extends State<_PlanSheet> {
+  late final DateTime _now = widget.now ?? DateTime.now();
+  late Map<String, List<TodoItem>> _todos;
+  final _controller = TextEditingController();
+
+  String get _todayKey => ymdOf(dayStart(_now));
+
+  @override
+  void initState() {
+    super.initState();
+    _todos = {
+      for (final entry in widget.data.todos.entries)
+        entry.key: List<TodoItem>.of(entry.value),
+    };
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _apply(TodosTransform transform) {
+    setState(() => _todos = transform(_todos));
+    widget.onApply(transform);
+  }
+
+  void _toggle(String dayKey, TodoItem item) => _apply((todos) => {
+        ...todos,
+        dayKey: [
+          for (final entry in todos[dayKey] ?? const <TodoItem>[])
+            entry.id == item.id
+                ? entry.copyWith(done: !entry.done)
+                : entry,
+        ],
+      });
+
+  void _remove(String dayKey, TodoItem item) => _apply((todos) => {
+        ...todos,
+        dayKey: [
+          for (final entry in todos[dayKey] ?? const <TodoItem>[])
+            if (entry.id != item.id) entry,
+        ],
+      });
+
+  void _addToToday() {
+    final text = _controller.text.trim();
+    if (text.isEmpty) return;
+    _controller.clear();
+    _apply((todos) => {
+          ...todos,
+          _todayKey: [...todos[_todayKey] ?? const <TodoItem>[], TodoItem(text: text)],
+        });
+  }
+
+  Future<void> _openImport() async {
+    // 对话框自己持有 TextEditingController：如果在这里建、这里 dispose，
+    // 关闭动画还在用它就会抛 "used after being disposed"。
+    final plan = await showDialog<PlanParseResult>(
+      context: context,
+      builder: (_) => _PlanImportDialog(now: _now),
+    );
+    if (plan == null || plan.isEmpty) return;
+
+    late PlanMergeResult merged;
+    _apply((todos) {
+      merged = mergePlanIntoTodos(todos, plan);
+      return merged.todos;
+    });
+    if (!mounted) return;
+    ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+      SnackBar(
+        content: Text('已导入 ${merged.added} 条'
+            '${merged.duplicated == 0 ? '' : '（跳过 ${merged.duplicated} 条重复）'}'),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final keys = _todos.keys
+        .where((key) => (_todos[key] ?? const <TodoItem>[]).isNotEmpty)
+        .toList()
+      ..sort();
+    final listHeight = MediaQuery.of(context).size.height * 0.55;
+
+    return _SheetScaffold(
+      title: '日程',
+      trailing: BrickButton(
+        label: '导入',
+        icon: Icons.file_upload_outlined,
+        expand: false,
+        height: 34,
+        color: PineColors.card,
+        foregroundColor: PineColors.pine,
+        onPressed: _openImport,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (keys.isEmpty)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 18),
+              child: Text(
+                '还没有安排。点右上「导入」粘贴一堆，或在下面加到今天。',
+                style: TextStyle(color: PineColors.sub, fontSize: 12),
+              ),
+            )
+          else
+            SizedBox(
+              height: listHeight,
+              child: ListView(
+                padding: EdgeInsets.zero,
+                children: [
+                  for (final key in keys) ...[
+                    _planDayHeader(key, _todos[key]!),
+                    for (final item in _todos[key]!)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 6),
+                        child: _TodoRow(
+                          item: item,
+                          onToggle: () => _toggle(key, item),
+                          onRemove: () => _remove(key, item),
+                        ),
+                      ),
+                    const SizedBox(height: 6),
+                  ],
+                ],
+              ),
+            ),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _controller,
+                  style: const TextStyle(fontSize: 13),
+                  decoration: InputDecoration(
+                    hintText: '加到今天（$_todayKey）',
+                    isDense: true,
+                  ),
+                  onSubmitted: (_) => _addToToday(),
+                ),
+              ),
+              const SizedBox(width: 8),
+              BrickButton(
+                label: '添加',
+                icon: Icons.add,
+                expand: false,
+                height: 40,
+                color: PineColors.ink,
+                onPressed: _addToToday,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _planDayHeader(String dayKey, List<TodoItem> items) {
+    final day = DateTime.tryParse(dayKey);
+    final done = items.where((item) => item.done).length;
+    final label = day == null ? dayKey : chineseDate(day, withYear: false);
+    final isToday = dayKey == _todayKey;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4, top: 2),
+      child: Row(
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              color: isToday ? PineColors.pine : PineColors.ink,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          if (isToday) ...[
+            const SizedBox(width: 6),
+            const Text('今天',
+                style: TextStyle(color: PineColors.pine, fontSize: 10)),
+          ],
+          const Spacer(),
+          Text('$done/${items.length}',
+              style: const TextStyle(color: PineColors.sub, fontSize: 10)),
+        ],
+      ),
+    );
+  }
+}
+
+/// 导入对话框：粘贴 → 实时预览天数/条数/跳过行 → 确认返回解析结果。
+class _PlanImportDialog extends StatefulWidget {
+  const _PlanImportDialog({required this.now});
+
+  final DateTime now;
+
+  @override
+  State<_PlanImportDialog> createState() => _PlanImportDialogState();
+}
+
+class _PlanImportDialogState extends State<_PlanImportDialog> {
+  final _controller = TextEditingController();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final parsed = parsePlan(_controller.text, now: widget.now);
+    return AlertDialog(
+      backgroundColor: PineColors.card,
+      title: const Text('导入日程',
+          style: TextStyle(
+              color: PineColors.ink, fontSize: 17, fontWeight: FontWeight.w600)),
+      // 固定宽高：AlertDialog 按内在尺寸测量，TextField 在里面会把高度算成天文数字
+      // （实测溢出差 9 万像素），必须给它一个有界盒子（docs/07 §7 #3 同类坑）。
+      content: SizedBox(
+        width: 320,
+        height: 330,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              '一行一条，日期在前：10/24 2018 复盘（也接受 2026-10-24）',
+              style: TextStyle(color: PineColors.sub, fontSize: 11),
+            ),
+            const SizedBox(height: 8),
+            Expanded(
+              child: TextField(
+                controller: _controller,
+                expands: true,
+                maxLines: null,
+                textAlignVertical: TextAlignVertical.top,
+                style: const TextStyle(fontSize: 12),
+                decoration: const InputDecoration(
+                  hintText: '10/24 2018 数一复盘 · 18(2) 重做\n10/25 现控 ch5 下半',
+                ),
+                onChanged: (_) => setState(() {}),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              '将写入 ${parsed.dayCount} 天 / ${parsed.total} 条'
+              '${parsed.skipped.isEmpty ? '' : '，跳过 ${parsed.skipped.length} 行'}',
+              style: const TextStyle(color: PineColors.sub, fontSize: 11),
+            ),
+            for (final line in parsed.skipped.take(2))
+              Padding(
+                padding: const EdgeInsets.only(top: 2),
+                child: Text(line,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                        color: PineColors.focus, fontSize: 10)),
+              ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('取消', style: TextStyle(color: PineColors.sub)),
+        ),
+        TextButton(
+          onPressed: parsed.isEmpty
+              ? null
+              : () => Navigator.of(context).pop(parsed),
+          child: Text(
+            '导入',
+            style: TextStyle(
+              color: parsed.isEmpty ? PineColors.faint : PineColors.pine,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

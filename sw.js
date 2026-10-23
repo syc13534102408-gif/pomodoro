@@ -1,3 +1,5 @@
+// ⚠️ 已冻结（2026-10-23）：仅网页端使用，网页端自 2026-09-02 起停止维护。
+// 安卓/macOS 的提醒走本地通知 + 系统闹钟，不经过这里。详见 CHANGELOG.md 2026-10-23。
 self.addEventListener('push', event => {
   const payload = event.data?.json() || {};
   event.waitUntil(self.registration.showNotification(payload.title || '松果 · 专注完成', {

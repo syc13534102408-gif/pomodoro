@@ -8,6 +8,33 @@
 > 原 10-01 条目只记了当天的中间状态，已在文末"补正"。
 > 同日产品决定：**网页端停止维护**。
 
+## 2026-10-23（夜）· 日程智能解析：服务端 /plan/parse（v1.3.9）
+
+- **需求**：不要每次手打/手粘日程，让"散文式计划"（甚至网页）自动变成逐条日程。
+- **为什么放服务端**：模型密钥放客户端等于公开（APK 可反编译），且提示词一改就得发新包。
+  现在 App 只发文本、收文本；密钥是函数环境变量 `PINE_LLM_API_KEY`，换模型只改 `PINE_LLM_MODEL`。
+- **接口**：`POST /plan/parse`，body `{text}` 或 `{url}`（后者服务端抓页面 → 去标签 → 再解析）。
+  返回 `{plan, lines, model, fromUrl, usage}`，`plan` 是「月/日<TAB>条目」文本，天然是
+  `parsePlan()` 的输入——**落库与去重逻辑一行没改**。
+- **服务端三道防线**：① 解析器只收「日期+正文」形态的行，模型输出解释/markdown 一律丢弃
+  （`sanitizePlan`）；② 抽不出内容返回 422 而不是空 plan；③ 未配密钥返回 501 + 配置提示，
+  同步功能不受影响。`/ping` 新增 `llmBound` 布尔，不泄露密钥。
+- **客户端**：导入对话框加「AI ✨ 解析」按钮，成功后**替换输入框内容**并走本地预览，
+  用户仍能核对再导入；失败把服务端原因显示在面板里（不吞异常）。
+  新增 `lib/src/plan_remote.dart`（`PlanRemote.parse`，UTF-8 解码显式走 `utf8.decode(bodyBytes)`）。
+- **部署**：`deploy.py` 支持 `PINE_LLM_API_KEY` 透传（不给则打印提示、端点返回 501）。
+  ```bash
+  cd tencent-sync
+  PINE_LLM_API_KEY=sk-... COS_BUCKET=pine-sync-1478270344 $PY deploy.py --update
+  ```
+- 测试：后端 `node --test tencent-sync/test/plan_parse_test.js` 7 例全绿；
+  Flutter 新增 `plan_remote_test.dart` 5 例 + 面板 AI 流程 2 例，全量 **165 例**。
+- **产物**：`outputs/松果-v1.3.9-AI解析-2026-10-23.apk`（19,708,623 B，versionName 1.3.9、
+  versionCode 10，sha256 前缀 `834a2b17f5047dc0`）；macOS 同日同名 zip 被覆盖为 1.3.9
+  （`outputs/pinecore-macos-2026-10-23.zip`），`/Applications/pinecore.app` 已装 1.3.9(10)。
+- **待办**：线上函数尚未带 `PINE_LLM_API_KEY`，此时「AI 解析」会返回 501 并在面板里显示提示；
+  配好 key 后 `deploy.py --update` 一次即生效，客户端无需再发版。
+
 ## 2026-10-23（晚）· 日程：多日待办 + 粘贴导入（v1.3.8）
 
 - **需求**：8 天考研日程（10/24–10/31，每天 2–6 条）要能在 App 里**手打勾**，不需要计时与时长记录。

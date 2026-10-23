@@ -241,6 +241,22 @@ def main():
         variable("PINE_SECRET_KEY", secret_key),
     ]
 
+    # 智能解析（/plan/parse）的模型密钥：只在本地 shell 里给，别写进仓库。
+    #   PINE_LLM_API_KEY=sk-... COS_BUCKET=... python deploy.py --update
+    # 不给就跳过——端点会返回 501 并提示怎么配，不影响同步功能。
+    llm_key = os.environ.get("PINE_LLM_API_KEY", "").strip()
+    if llm_key:
+        env_vars += [
+            variable("PINE_LLM_BASE_URL",
+                     os.environ.get("PINE_LLM_BASE_URL", "https://api.deepseek.com").strip()),
+            variable("PINE_LLM_MODEL",
+                     os.environ.get("PINE_LLM_MODEL", "deepseek-chat").strip()),
+            variable("PINE_LLM_API_KEY", llm_key),
+        ]
+        print("  智能解析：已配置模型密钥（/plan/parse 可用）")
+    else:
+        print("  智能解析：未配置 PINE_LLM_API_KEY，/plan/parse 将返回 501")
+
     exists = False
     try:
         req = models.GetFunctionRequest()

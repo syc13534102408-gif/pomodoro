@@ -6,6 +6,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:pomodoro_app/main.dart';
 import 'package:pomodoro_app/src/models.dart';
+import 'package:pomodoro_app/src/plan_remote.dart';
+import 'package:pomodoro_app/src/sheets.dart';
 import 'package:pomodoro_app/src/widgets.dart';
 
 String _todayKey() => ymdOf(dayStart(DateTime.now()));
@@ -105,4 +107,90 @@ void main() {
     expect(find.text('2018 数一复盘'), findsOneWidget);
     expect(find.text('现控 ch5 下半'), findsOneWidget);
   });
+
+  testWidgets('导入面板的 AI 解析：服务端结果替换输入框并进入预览', (tester) async {
+    tester.view.physicalSize = const Size(1000, 2200);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    String? sent;
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: Builder(
+          builder: (context) => TextButton(
+            onPressed: () => showPlanSheet(
+              context,
+              data: AppData(),
+              onApply: (_) {},
+              now: DateTime(2026, 10, 23),
+              remote: (text) async {
+                sent = text;
+                return '10/24\t2018 复盘（AI 抽出）';
+              },
+            ),
+            child: const Text('打开日程'),
+          ),
+        ),
+      ),
+    ));
+    await tester.tap(find.text('打开日程'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.widgetWithText(BrickButton, '导入').first);
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.byType(TextField),
+      ),
+      '下周六做 2018 复盘',
+    );
+    await tester.pump();
+    await tester.tap(find.text('AI 解析'));
+    await tester.pumpAndSettle();
+
+    expect(sent, '下周六做 2018 复盘');
+    expect(find.text('将写入 1 天 / 1 条'), findsOneWidget);
+  });
+
+  testWidgets('AI 解析失败时在面板里显示原因，不吞异常', (tester) async {
+    tester.view.physicalSize = const Size(1000, 2200);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: Builder(
+          builder: (context) => TextButton(
+            onPressed: () => showPlanSheet(
+              context,
+              data: AppData(),
+              onApply: (_) {},
+              remote: (_) async =>
+                  throw PlanRemoteException('服务端未配置智能解析（缺少 PINE_LLM_API_KEY）'),
+            ),
+            child: const Text('打开日程'),
+          ),
+        ),
+      ),
+    ));
+    await tester.tap(find.text('打开日程'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(BrickButton, '导入').first);
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.byType(TextField),
+      ),
+      '随便一段',
+    );
+    await tester.pump();
+    await tester.tap(find.text('AI 解析'));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('PINE_LLM_API_KEY'), findsOneWidget);
+  });
+
 }

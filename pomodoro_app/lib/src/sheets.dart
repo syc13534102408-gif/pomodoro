@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'engine.dart';
 import 'models.dart';
 import 'plan_import.dart';
+import 'plan_remote.dart';
 import 'theme.dart';
 import 'widgets.dart';
 
@@ -625,21 +626,30 @@ Future<void> showPlanSheet(
   required AppData data,
   required ValueChanged<TodosTransform> onApply,
   DateTime? now,
+
+  /// 测试注入用；为 null 时走真实的 [PlanRemote]。
+  Future<String> Function(String text)? remote,
 }) {
   return showModalBottomSheet(
     context: context,
     isScrollControlled: true,
     backgroundColor: PineColors.paper,
-    builder: (_) => _PlanSheet(data: data, onApply: onApply, now: now),
+    builder: (_) => _PlanSheet(data: data, onApply: onApply, now: now, remote: remote),
   );
 }
 
 class _PlanSheet extends StatefulWidget {
-  const _PlanSheet({required this.data, required this.onApply, this.now});
+  const _PlanSheet({
+    required this.data,
+    required this.onApply,
+    this.now,
+    this.remote,
+  });
 
   final AppData data;
   final ValueChanged<TodosTransform> onApply;
   final DateTime? now;
+  final Future<String> Function(String text)? remote;
 
   @override
   State<_PlanSheet> createState() => _PlanSheetState();
@@ -705,7 +715,7 @@ class _PlanSheetState extends State<_PlanSheet> {
     // 关闭动画还在用它就会抛 "used after being disposed"。
     final plan = await showDialog<PlanParseResult>(
       context: context,
-      builder: (_) => _PlanImportDialog(now: _now),
+      builder: (_) => _PlanImportDialog(now: _now, remote: widget.remote),
     );
     if (plan == null || plan.isEmpty) return;
 
@@ -839,9 +849,10 @@ class _PlanSheetState extends State<_PlanSheet> {
 
 /// 导入对话框：粘贴 → 实时预览天数/条数/跳过行 → 确认返回解析结果。
 class _PlanImportDialog extends StatefulWidget {
-  const _PlanImportDialog({required this.now});
+  const _PlanImportDialog({required this.now, this.remote});
 
   final DateTime now;
+  final Future<String> Function(String text)? remote;
 
   @override
   State<_PlanImportDialog> createState() => _PlanImportDialogState();
@@ -849,6 +860,30 @@ class _PlanImportDialog extends StatefulWidget {
 
 class _PlanImportDialogState extends State<_PlanImportDialog> {
   final _controller = TextEditingController();
+  bool _busy = false;
+  String? _error;
+
+  /// 交给服务端（`/plan/parse`）把散文/网页计划抽成标准日程文本；
+  /// 成功后就地替换输入框内容，用户仍能在预览里核对后再导入。
+  Future<void> _autoParse() async {
+    final text = _controller.text.trim();
+    if (text.isEmpty || _busy) return;
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      final parse = widget.remote ?? PlanRemote().parse;
+      final result = await parse(text);
+      if (!mounted) return;
+      setState(() => _controller.text = result);
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _error = error.toString());
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
 
   @override
   void dispose() {
@@ -868,7 +903,7 @@ class _PlanImportDialogState extends State<_PlanImportDialog> {
       // （实测溢出差 9 万像素），必须给它一个有界盒子（docs/07 §7 #3 同类坑）。
       content: SizedBox(
         width: 320,
-        height: 330,
+        height: 372,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -890,7 +925,44 @@ class _PlanImportDialogState extends State<_PlanImportDialog> {
                 onChanged: (_) => setState(() {}),
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                TextButton.icon(
+                  onPressed: (_busy || _controller.text.trim().isEmpty)
+                      ? null
+                      : _autoParse,
+                  icon: _busy
+                      ? const SizedBox(
+                          width: 12,
+                          height: 12,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.auto_awesome, size: 14),
+                  label: Text(_busy ? '解析中…' : 'AI 解析',
+                      style: const TextStyle(fontSize: 12)),
+                  style: TextButton.styleFrom(
+                    foregroundColor: PineColors.pine,
+                    padding: const EdgeInsets.symmetric(horizontal: 6),
+                    minimumSize: const Size(0, 28),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                ),
+                const Spacer(),
+                const Text('散文/网页计划交给服务端抽取',
+                    style: TextStyle(color: PineColors.faint, fontSize: 10)),
+              ],
+            ),
+            if (_error != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 2),
+                child: Text(_error!,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                        color: PineColors.focus, fontSize: 10)),
+              ),
+            const SizedBox(height: 6),
             Text(
               '将写入 ${parsed.dayCount} 天 / ${parsed.total} 条'
               '${parsed.skipped.isEmpty ? '' : '，跳过 ${parsed.skipped.length} 行'}',

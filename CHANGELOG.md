@@ -32,7 +32,13 @@
 - **产物**：`outputs/松果-v1.3.9-AI解析-2026-10-23.apk`（19,708,623 B，versionName 1.3.9、
   versionCode 10，sha256 前缀 `834a2b17f5047dc0`）；macOS 同日同名 zip 被覆盖为 1.3.9
   （`outputs/pinecore-macos-2026-10-23.zip`），`/Applications/pinecore.app` 已装 1.3.9(10)。
-- **上线记录（2026-10-23 20:05）**：函数已带密钥部署，`/ping` 返回 `llmBound:true`，`/plan/parse`
+- **供应商最终定为 DeepSeek 官方**（2026-10-23 20:29）：OpenCode 那把 `oc_sk_` key 的账户里没有
+  API 余额——**OpenCode Go 是 $10/月 的包月订阅（限客户端内调用、有 5h/周/月当量上限），
+  Zen API 才是按 token 计费的另一套账**，订阅额度不会共享给裸 HTTP 调用，所以一直 402；
+  免费模型则被官方限制为只能在客户端内用（403）。换成 DeepSeek 官方 key 后一次通过：
+  `下周三`→10/28、`周四`→10/29，5 条，255 token（约 ¥0.0004）。
+  在线验证：`llmBound:true` + `POST /plan/parse` 返回 200。
+- **旧的 trace（供对照）**：：函数已带密钥部署，`/ping` 返回 `llmBound:true`，`/plan/parse`
   打到上游。当前用的是 **OpenCode Zen**（`PINE_LLM_BASE_URL=https://opencode.ai/zen/v1`、
   `PINE_LLM_MODEL=deepseek-v4.1-flash`），但账户**余额不足** → 上游 402；免费模型（`*-free`）
   被官方限制为「只能在 OpenCode 客户端内调用」→ 403。因此「AI 解析」暂时返回

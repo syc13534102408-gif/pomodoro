@@ -32,8 +32,16 @@
 - **产物**：`outputs/松果-v1.3.9-AI解析-2026-10-23.apk`（19,708,623 B，versionName 1.3.9、
   versionCode 10，sha256 前缀 `834a2b17f5047dc0`）；macOS 同日同名 zip 被覆盖为 1.3.9
   （`outputs/pinecore-macos-2026-10-23.zip`），`/Applications/pinecore.app` 已装 1.3.9(10)。
-- **待办**：线上函数尚未带 `PINE_LLM_API_KEY`，此时「AI 解析」会返回 501 并在面板里显示提示；
-  配好 key 后 `deploy.py --update` 一次即生效，客户端无需再发版。
+- **上线记录（2026-10-23 20:05）**：函数已带密钥部署，`/ping` 返回 `llmBound:true`，`/plan/parse`
+  打到上游。当前用的是 **OpenCode Zen**（`PINE_LLM_BASE_URL=https://opencode.ai/zen/v1`、
+  `PINE_LLM_MODEL=deepseek-v4.1-flash`），但账户**余额不足** → 上游 402；免费模型（`*-free`）
+  被官方限制为「只能在 OpenCode 客户端内调用」→ 403。因此「AI 解析」暂时返回
+  「模型账户余额不足，充值后才能用智能解析」，充值或换 DeepSeek key 后无需发版即生效。
+- **顺手修一个部署时序坑**：`UpdateFunctionCode` 之后函数会短暂处于 `Updating`，
+  此时 `UpdateFunctionConfiguration` 必被拒（`FailedOperation.UpdateFunctionConfiguration`）；
+  旧脚本只打印一句"配置更新跳过"，导致**环境变量静默没更新**（本次就是这样把 key 丢掉了一次）。
+  现已改成 5s×4 次重试，失败才报 warning。
+- **上游错误翻译**：402/403/429/5xx 统一映射成可行动的中文提示，原始 body 留在 `detail`。
 
 ## 2026-10-23（晚）· 日程：多日待办 + 粘贴导入（v1.3.8）
 

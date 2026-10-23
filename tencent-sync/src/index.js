@@ -246,7 +246,8 @@ async function handlePlanParse(body, origin) {
   if (!LLM_KEY) {
     return reply(501, {
       error: '服务端未配置 PINE_LLM_API_KEY',
-      hint: '在 tencent-sync 下用 PINE_LLM_API_KEY=sk-... 重新 deploy.py --update',
+      hint: '在 tencent-sync 下用 PINE_LLM_API_KEY=... 重新 deploy.py --update',
+      providers: 'OpenCode Zen 用 PINE_LLM_BASE_URL=https://opencode.ai/zen/v1；DeepSeek 用默认值',
     }, origin);
   }
   const text = typeof body?.text === 'string' ? body.text.trim() : '';
@@ -294,10 +295,18 @@ async function handlePlanParse(body, origin) {
     });
     const raw = await res.text();
     if (!res.ok) {
-      return reply(502, {
-        error: `模型接口返回 ${res.status}`,
-        detail: raw.slice(0, 300),
-      }, origin);
+      // 把上游的英文错误翻成用户能行动的一句话，原始 body 仍放在 detail 里供排查。
+      let error = `模型接口返回 ${res.status}`;
+      if (res.status === 402 || /insufficient|funds|balance|quota/i.test(raw)) {
+        error = '模型账户余额不足，充值后才能用智能解析';
+      } else if (res.status === 401 || res.status === 403) {
+        error = '模型密钥无效或无权限（OpenCode 的免费模型只能在官方客户端内使用）';
+      } else if (res.status === 429) {
+        error = '模型接口限流，稍后重试';
+      } else if (res.status >= 500) {
+        error = '模型服务暂时不可用，稍后重试';
+      }
+      return reply(502, { error, detail: raw.slice(0, 300), upstreamStatus: res.status }, origin);
     }
     payload = JSON.parse(raw);
   } catch (error) {

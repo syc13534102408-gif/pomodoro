@@ -294,11 +294,22 @@ def main():
         cfg.Environment = env_object(env_vars)
         cfg.Timeout = 20
         cfg.MemorySize = 128
-        try:
-            client.UpdateFunctionConfiguration(cfg)
-            print("  ✅ 配置已更新")
-        except Exception as exc:  # noqa: BLE001
-            print(f"  （配置更新跳过: {exc}）")
+        # 刚 UpdateFunctionCode 之后函数会短暂处于 Updating，此时改配置会被拒
+        # （FailedOperation.UpdateFunctionConfiguration）。这是既有的时序坑，
+        # 之前只打印一句"跳过"，导致环境变量静默没更新（2026-10-23 踩到）。
+        for attempt in range(1, 5):
+            try:
+                client.UpdateFunctionConfiguration(cfg)
+                print("  ✅ 配置已更新")
+                break
+            except Exception as exc:  # noqa: BLE001
+                msg = str(exc)
+                if "Updating" in msg and attempt < 4:
+                    print(f"  … 函数仍在 Updating，{attempt * 5}s 后重试配置")
+                    time.sleep(5)
+                    continue
+                print(f"  ⚠️ 配置更新失败（第 {attempt} 次）: {exc}")
+                break
     else:
         req = models.CreateFunctionRequest()
         req.FunctionName = FUNCTION_NAME

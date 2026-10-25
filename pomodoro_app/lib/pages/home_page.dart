@@ -1129,7 +1129,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                     // gold 只留给「按钮底 + ink 字」。
                     color: view.targetReached
                         ? PineColors.goldInk
-                        : view.mode.color,
+                        : view.mode.lineColor,
                     timeText: view.clockText,
                     caption: _caption(session, view),
                     overtime: view.targetReached,
@@ -1376,20 +1376,24 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     );
   }
 
+  /// 环内 caption（2026-10-25 决策 A3）：只留**状态 + 序号**，不再带任务名。
+  ///
+  /// 任务行就在环上方 12pt、带色点，环内再写一遍是纯重复；而环在圆心下方 40pt
+  /// 处的可用弦长只有 205pt，长任务名会被截断甚至压到 12pt 轨道上。
+  /// 手机端同步（`BrickTimer` 与本方法同源），两端文案不再分叉。
   String _caption(ActiveSession? session, SessionView view) {
-    final taskName = _data.selectedTask.name;
     if (session == null) return '准备开始';
-    if (view.targetReached) return '已超时 · $taskName';
+    if (view.targetReached) return '已超时 · 仍在累积';
     if (!session.running) {
       if (view.mode.isFocus) {
         final count = StatsView.of(_data, DateTime.now()).todayCount + 1;
-        return '已暂停 · 第 $count 个番茄 · $taskName';
+        return '已暂停 · 第 $count 个番茄';
       }
       return '已暂停 · ${view.mode.label}';
     }
     if (view.mode == SessionMode.focus) {
       final count = StatsView.of(_data, DateTime.now()).todayCount + 1;
-      return '第 $count 个番茄 · $taskName';
+      return '第 $count 个番茄';
     }
     return view.mode == SessionMode.shortBreak ? '起身活动一下' : '长休息，恢复状态';
   }

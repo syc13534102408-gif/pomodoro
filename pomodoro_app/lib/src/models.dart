@@ -22,6 +22,16 @@ extension SessionModeX on SessionMode {
         SessionMode.longBreak => PineColors.gold,
       };
 
+  /// 阶段色的**线条/文字**变体（环弧、大数字用），2026-10-25 定（评审 P0-2 / 决策 B1）。
+  ///
+  /// 规则：`gold` 只作实底（其上放 ink 字，5.85:1），凡是「弧 / 文字」一律走本 getter。
+  /// 长休的 `gold` 对纸面只有 2.00:1，大字号下限是 3.0；`goldInk` 是 3.40:1。
+  Color get lineColor => switch (this) {
+        SessionMode.focus => PineColors.focus,
+        SessionMode.shortBreak => PineColors.mint,
+        SessionMode.longBreak => PineColors.goldInk,
+      };
+
   static SessionMode from(dynamic value) => SessionMode.values.firstWhere(
         (mode) => mode.key == value || mode.label == value,
         orElse: () => SessionMode.focus,

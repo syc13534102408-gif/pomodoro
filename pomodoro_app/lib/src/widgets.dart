@@ -372,7 +372,8 @@ class BrickTimer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final overtime = view.targetReached;
-    final phase = overtime ? PineColors.gold : view.mode.color;
+    // 弧线与大数字用 lineColor：gold 只作实底（评审 P0-2 / 决策 B1）。
+    final phase = overtime ? PineColors.goldInk : view.mode.lineColor;
     final clockColor = overtime ? PineColors.gold : PineColors.ink;
     return Semantics(
       label: '$caption，${view.clockText}',

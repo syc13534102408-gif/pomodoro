@@ -30,11 +30,30 @@
 - **顺手**：`plan_sheet_test` 里写死的 10/24、10/25 改成相对今天生成（在真正的 10/25 当天会与
   「今日日程」卡重复命中，实测踩到）；`scripts/build-macos.sh` 改为先离线 `pub get` 再 `--no-pub`，
   避免 pub.dev 抖动（2026-10-25 白跑一轮）。
-- 回归：`dart analyze` 零告警、`flutter test` **170 例全绿**（新增布局 5 例）。
+- 回归：`dart analyze` 零告警、`flutter test` **176 例全绿**（新增布局 5 例）。
 - **未做（评审里已列，待逐条勾选）**：P1-1 字号收敛到 6 档、P1-3 四条左缘、P1-5 徽标文字色、
   P1-6 点击热区、P2 全部。
 - 产物：`outputs/松果-v1.3.10-视觉修正-2026-10-25.apk`（19,708,627 B、versionName 1.3.10、
-  versionCode 11）、`outputs/pinecore-macos-2026-10-25.zip`（已装到 /Applications）。
+  versionCode 12）、`outputs/pinecore-macos-2026-10-25.zip`（已装到 /Applications）。
+
+## 2026-10-25（晚）· 决策 A3 + B1：环内文案分级、金色分两档（v1.3.11）
+
+评审稿待拍板项已定：**A3（两端同改，环内不写任务名）**、**B1（gold 只做实底，线条用 goldInk）**。
+
+- **A3 环内 caption 去掉任务名**（`home_page._caption`）：`第 7 个番茄 · 自控` → **`第 7 个番茄`**；
+  暂停态 `已暂停 · 第 7 个番茄`；超时态由 `已超时 · 任务名` 改为 **`已超时 · 仍在累积`**。
+  理由：任务行就在环上方 12pt 且带色点，环内再写一遍是纯重复；而环在圆心下方 40pt 处的
+  可用弦长只有 205pt，长任务名会被截断甚至压到 12pt 轨道上。**手机端同步改动**（同一个 `_caption`），
+  两端文案不再分叉——这偏离了方案 E §7.1「capture 带任务名」的原文，规范已同步更新。
+- **B1 金色分两档**：新增 `SessionMode.lineColor`（longBreak → `goldInk`，focus/shortBreak 不变）。
+  规则收敛成一句：**`gold` 只作实底（其上放 ink 字 5.85:1），凡是「弧 / 大数字」一律用 `lineColor`**。
+  桌面环弧（`home_page.dart`）与手机计时卡弧/时钟（`widgets.dart`）都已改引用。
+  这条同时修掉了前一天 P0-2 的残留：长休阶段色此前仍走 `gold`（对纸面 2.00:1，大字号下限 3.0）。
+- **新增令牌级回归** `test/stage_color_test.dart`（6 例）：两档映射 + 对比度下限
+  （弧线 ≥3.0、`sub` ≥4.5、ink-on-gold ≥4.5、`track` 必须比 `line` 显眼但不抢弧）。
+- 回归：`dart analyze` 零告警、`flutter test` **176 例全绿**。
+- 产物：`outputs/松果-v1.3.11-文案分级-2026-10-25.apk`（19,708,627 B、versionName 1.3.11、
+  versionCode 12）、`outputs/pinecore-macos-2026-10-25.zip`（已装到 /Applications）。
 
 ## 2026-10-23（夜）· 日程智能解析：服务端 /plan/parse（v1.3.9）
 

@@ -36,6 +36,10 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   bool _syncingForeground = false;
   bool _goalPulse = false;
   bool _stampVisible = false;
+
+  /// 今日日程的「内联加一条」状态（不弹面板，直接在卡里输入）。
+  bool _planAdding = false;
+  final TextEditingController _planController = TextEditingController();
   Timer? _stampTimer;
   String _foregroundKey = '';
   DateTime _lastPersist = DateTime.fromMillisecondsSinceEpoch(0);
@@ -153,6 +157,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
   @override
   void dispose() {
+    _planController.dispose();
     _ticker?.cancel();
     _stampTimer?.cancel();
     _mirrorTimer?.cancel();
@@ -855,9 +860,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               SizedBox(height: compact ? 8 : 12),
               _controls(session, view, suspended: _data.activeSession),
               SizedBox(height: compact ? 8 : 12),
-              _metrics(stats),
-              SizedBox(height: compact ? 8 : 12),
               _planCard(),
+              SizedBox(height: compact ? 8 : 12),
+              _metrics(stats),
               SizedBox(height: compact ? 8 : 12),
               _recent(),
               const SizedBox(height: 4),
@@ -1160,34 +1165,19 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
   /// 底部信息小卡：今日进度 + 最近完成（含手动补记入口）。
   /// 最近记录行整行可点进详情（删除在详情内，与安卓共用逻辑）。
-  /// 桌面信息卡里的日程一行：只显示今日进度，点开同一个日程面板。
-  Widget _desktopPlanRow() {
-    final todayKey = ymdOf(dayStart(DateTime.now()));
-    final items = _data.todos[todayKey] ?? const <TodoItem>[];
-    final done = items.where((item) => item.done).length;
-    final label =
-        items.isEmpty ? '日程 · 今天还没安排' : '日程 · 今日 $done/${items.length}';
-    return InkWell(
-      borderRadius: BorderRadius.circular(8),
-      onTap: _openPlanSheet,
-      child: Row(
-        children: [
-          const Icon(Icons.checklist_rtl, size: 13, color: PineColors.sub),
-          const SizedBox(width: 6),
-          Text(label,
-              style: const TextStyle(color: PineColors.sub, fontSize: 10)),
-          const Spacer(),
-          const Icon(Icons.chevron_right, size: 14, color: PineColors.sub),
-        ],
-      ),
-    );
-  }
-
+  /// 底部信息小卡（2026-10-25 改版）：
+  /// 考试倒计时 → **今日日程（就地打勾）** → 今日进度。
+  ///
+  /// 「最近完成」整块移到统计抽屉：主窗只回答两件事——接下来做什么、今天做了多少。
+  /// 这样日程从 1 行入口变成 3 行可勾清单，而总高度反而略降（最近完成块曾占 2 行 + 表头）。
   Widget _desktopInfoCard(StatsView stats) {
     final goal = _data.goalMinutes <= 0 ? 1 : _data.goalMinutes;
     final todayRatio = (stats.todayMinutes / goal).clamp(0.0, 1.0);
-    final items = _data.records.where((record) => record.counted).toList()
-      ..sort((a, b) => b.at.compareTo(a.at));
+    final todayKey = ymdOf(dayStart(DateTime.now()));
+    final planItems = _data.todos[todayKey] ?? const <TodoItem>[];
+    final planDone = planItems.where((item) => item.done).length;
+    // 440×600 放 2 条、500×640 与更高放 3 条（其余折叠成「还有 N 条」）。
+    final planRows = MediaQuery.sizeOf(context).height < 640 ? 2 : 3;
     return Container(
       padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
       decoration: BoxDecoration(
@@ -1211,7 +1201,64 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             const Divider(height: 1, color: PineColors.line),
             const SizedBox(height: 9),
           ],
-          _desktopPlanRow(),
+          Row(
+            children: [
+              const Text(
+                '今日日程',
+                style: TextStyle(
+                    color: PineColors.ink,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600),
+              ),
+              const Spacer(),
+              if (planItems.isNotEmpty)
+                Text(
+                  '$planDone/${planItems.length}',
+                  style: const TextStyle(color: PineColors.sub, fontSize: 11),
+                ),
+              const SizedBox(width: 2),
+              InkWell(
+                borderRadius: BorderRadius.circular(99),
+                onTap: _openPlanSheet,
+                child: const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                  child: Text(
+                    '全部 ›',
+                    style: TextStyle(color: PineColors.sub, fontSize: 11),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          if (planItems.isEmpty)
+            InkWell(
+              borderRadius: BorderRadius.circular(8),
+              onTap: _openPlanSheet,
+              child: const Padding(
+                padding: EdgeInsets.symmetric(vertical: 8),
+                child: Text(
+                  '今天还没安排 · 点这里排（支持粘贴导入）',
+                  style: TextStyle(color: PineColors.sub, fontSize: 11),
+                ),
+              ),
+            )
+          else
+            for (final item in planItems.take(planRows))
+              _planRow(todayKey, item, fontSize: 12),
+          if (planItems.length > planRows)
+            InkWell(
+              borderRadius: BorderRadius.circular(8),
+              onTap: _openPlanSheet,
+              child: Padding(
+                padding: const EdgeInsets.only(top: 2),
+                child: Text(
+                  '还有 ${planItems.length - planRows} 条 ›',
+                  style:
+                      const TextStyle(color: PineColors.pine, fontSize: 11),
+                ),
+              ),
+            ),
           const SizedBox(height: 8),
           Row(
             children: [
@@ -1222,9 +1269,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               const SizedBox(width: 10),
               Expanded(
                 child: Container(
-                  height: 5,
+                  height: 6,
                   decoration: BoxDecoration(
-                    color: PineColors.line,
+                    color: PineColors.track,
                     borderRadius: BorderRadius.circular(99),
                   ),
                   child: FractionallySizedBox(
@@ -1241,106 +1288,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               ),
             ],
           ),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              const Text(
-                '最近完成',
-                style: TextStyle(
-                    color: PineColors.ink,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600),
-              ),
-              const Spacer(),
-              // 「全部」入口：首页只列最近 3 条，完整清单（可修改/删除）在这里。
-              InkWell(
-                borderRadius: BorderRadius.circular(99),
-                onTap: () => showAllRecordsSheet(
-                  context,
-                  data: _data,
-                  colorFor: _colorFor,
-                  onChanged: _replace,
-                ),
-                child: const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                  child: Text(
-                    '全部 ›',
-                    style: TextStyle(color: PineColors.sub, fontSize: 11),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 2),
-              InkWell(
-                borderRadius: BorderRadius.circular(99),
-                onTap: () =>
-                    showManualSheet(context, data: _data, onChanged: _replace),
-                child: const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  child: Text(
-                    '＋ 补记',
-                    style: TextStyle(
-                        color: PineColors.pine,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 2),
-          if (items.isEmpty)
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 6),
-              child: Text(
-                '完成一轮专注后会出现在这里',
-                style: TextStyle(color: PineColors.faint, fontSize: 11),
-              ),
-            )
-          else
-            // 桌面默认窗口 640 高时只放 2 条：第 3 条会顶到窗口底被硬切
-            // （2026-10-25 评审 P0-1 改法③）。更多记录走「全部 ›」。
-            for (final record in items.take(
-                MediaQuery.sizeOf(context).height < 720 ? 2 : 3))
-              InkWell(
-                borderRadius: BorderRadius.circular(8),
-                onTap: () => showRecordDetailSheet(
-                  context,
-                  data: _data,
-                  record: record,
-                  color: _colorFor(record.taskName),
-                  onChanged: _replace,
-                ),
-                child: Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 2, vertical: 6),
-                  child: Row(
-                    children: [
-                      _TaskSwatch(color: _colorFor(record.taskName), size: 9),
-                      const SizedBox(width: 9),
-                      Expanded(
-                        child: Text(
-                          record.taskName,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                              color: PineColors.ink, fontSize: 12),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        '${record.status.label} · ${record.at.hour.toString().padLeft(2, '0')}:${record.at.minute.toString().padLeft(2, '0')}',
-                        style: const TextStyle(
-                            color: PineColors.sub, fontSize: 10.5),
-                      ),
-                      const SizedBox(width: 10),
-                      Text(
-                        formatHoursMinutes(record.minutes),
-                        style: brickNumberStyle(fontSize: 12),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
         ],
       ),
     );
@@ -1568,52 +1515,114 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   }
 
   /// 今日日程（**自然日**，不是凌晨 3 点的统计日）：只勾选，不计时。
+  /// 今日日程（手机，2026-10-25 改版）：直接在主页面打勾，不再必须进面板。
+  ///
+  /// 只看今天、只做一件事——勾。跨天排程/导入仍在 `showPlanSheet`（点「全部 ›」）。
+  /// 排序不重排：勾完留在原位，避免手指正点的那一行跳走。
   Widget _planCard() {
     final todayKey = ymdOf(dayStart(DateTime.now()));
     final items = _data.todos[todayKey] ?? const <TodoItem>[];
     final done = items.where((item) => item.done).length;
+    const maxRows = 4;
     return BrickCard(
       padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          SectionHeader(
-            title: '今日日程',
-            trailing: InkWell(
-              borderRadius: BorderRadius.circular(6),
-              onTap: _openPlanSheet,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 2),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      items.isEmpty ? '去安排' : '$done/${items.length}',
-                      style: const TextStyle(
-                          color: PineColors.sub, fontSize: 11),
-                    ),
-                    const SizedBox(width: 2),
-                    const Icon(Icons.chevron_right,
-                        size: 14, color: PineColors.sub),
-                  ],
+          Row(
+            children: [
+              const Text(
+                '今日日程',
+                style: TextStyle(
+                    color: PineColors.ink,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600),
+              ),
+              const Spacer(),
+              if (items.isNotEmpty)
+                Text('$done/${items.length}',
+                    style: const TextStyle(
+                        color: PineColors.sub, fontSize: 12)),
+              const SizedBox(width: 4),
+              // 内联加一条：不弹面板，点开就在卡里输入。
+              InkWell(
+                borderRadius: BorderRadius.circular(99),
+                onTap: () => setState(() => _planAdding = !_planAdding),
+                child: Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                  child: Icon(
+                    _planAdding ? Icons.close : Icons.add,
+                    size: 16,
+                    color: PineColors.pine,
+                  ),
                 ),
               ),
-            ),
+              InkWell(
+                borderRadius: BorderRadius.circular(99),
+                onTap: _openPlanSheet,
+                child: const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                  child: Text('全部 ›',
+                      style:
+                          TextStyle(color: PineColors.sub, fontSize: 12)),
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 8),
-          if (items.isEmpty)
-            const Text('今天还没安排 · 点右上打开日程',
-                style: TextStyle(color: PineColors.sub, fontSize: 11))
+          const SizedBox(height: 4),
+          if (items.isEmpty && !_planAdding)
+            InkWell(
+              borderRadius: BorderRadius.circular(8),
+              onTap: () => setState(() => _planAdding = true),
+              child: const Padding(
+                padding: EdgeInsets.symmetric(vertical: 6),
+                child: Text('今天还没安排 · 点这里加一条',
+                    style: TextStyle(color: PineColors.sub, fontSize: 12)),
+              ),
+            )
           else
-            for (final item in items.take(3)) _planRow(todayKey, item),
-          if (items.length > 3)
+            for (final item in items.take(maxRows))
+              _planRow(todayKey, item, fontSize: 13),
+          if (_planAdding)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Row(
+                children: [
+                  const Icon(Icons.radio_button_unchecked,
+                      size: 16, color: PineColors.faint),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: TextField(
+                      controller: _planController,
+                      autofocus: true,
+                      style: const TextStyle(fontSize: 13),
+                      decoration: const InputDecoration(
+                        isDense: true,
+                        hintText: '今天要做的一件事',
+                        hintStyle:
+                            TextStyle(color: PineColors.sub, fontSize: 12),
+                      ),
+                      onSubmitted: (_) => _addPlanItem(todayKey),
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: () => _addPlanItem(todayKey),
+                    child: const Text('加',
+                        style:
+                            TextStyle(color: PineColors.pine, fontSize: 12)),
+                  ),
+                ],
+              ),
+            ),
+          if (items.length > maxRows)
             Padding(
               padding: const EdgeInsets.only(top: 4),
               child: InkWell(
                 onTap: _openPlanSheet,
-                child: Text('还有 ${items.length - 3} 条 · 全部 ›',
+                child: Text('还有 ${items.length - maxRows} 条 · 全部 ›',
                     style:
-                        const TextStyle(color: PineColors.pine, fontSize: 11)),
+                        const TextStyle(color: PineColors.pine, fontSize: 12)),
               ),
             ),
         ],
@@ -1621,7 +1630,22 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     );
   }
 
-  Widget _planRow(String dayKey, TodoItem item) => InkWell(
+  void _addPlanItem(String todayKey) {
+    final text = _planController.text.trim();
+    if (text.isEmpty) return;
+    _planController.clear();
+    _applyTodos((todos) => {
+          ...todos,
+          todayKey: [
+            ...todos[todayKey] ?? const <TodoItem>[],
+            TodoItem(text: text),
+          ],
+        });
+    setState(() => _planAdding = false);
+  }
+
+  Widget _planRow(String dayKey, TodoItem item, {double fontSize = 12}) =>
+      InkWell(
         borderRadius: BorderRadius.circular(8),
         onTap: () => _applyTodos((todos) => {
               ...todos,
@@ -1633,13 +1657,12 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               ],
             }),
         child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 3),
+          // 行高 ~26：内容 18 + 上下 4，可点区域靠这个内边距撑开。
+          padding: const EdgeInsets.symmetric(vertical: 4),
           child: Row(
             children: [
               Icon(
-                item.done
-                    ? Icons.check_circle
-                    : Icons.radio_button_unchecked,
+                item.done ? Icons.check_circle : Icons.radio_button_unchecked,
                 size: 16,
                 color: item.done ? PineColors.pine : PineColors.faint,
               ),
@@ -1650,10 +1673,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    fontSize: 12,
+                    fontSize: fontSize,
                     color: item.done ? PineColors.sub : PineColors.ink,
-                    decoration:
-                        item.done ? TextDecoration.lineThrough : null,
+                    decoration: item.done ? TextDecoration.lineThrough : null,
                   ),
                 ),
               ),

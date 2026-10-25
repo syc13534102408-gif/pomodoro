@@ -104,7 +104,7 @@ class Paper {
   /// 写死在 `_DesktopRing` 里，任何一屏多加一行内容都会重新触发裁切）。
   static const double cabinColumn = 452;
   static const double ringMax = 244;
-  static const double ringMid = 212;
+  static const double ringMid = 200;
   static const double ringMin = 184;
 
   /// 最细线宽（分隔线等）

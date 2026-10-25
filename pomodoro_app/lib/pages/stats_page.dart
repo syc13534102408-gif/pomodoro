@@ -58,6 +58,9 @@ class _StatsPageState extends State<StatsPage> {
     // 只看上周时不再标「今」。
     final todayIndex = _weekOffset == 0 ? today.weekday - 1 : -1;
     final maxY = _niceMax(stats.maxDay());
+    // 最近完成从主窗搬到这里（2026-10-25）：桌面主窗只留「接下来做什么 + 今天做了多少」。
+    final recent = data.records.where((record) => record.counted).toList()
+      ..sort((a, b) => b.at.compareTo(a.at));
     final legend = stats.tasksInWeek();
     final weekTotal = stats.weekMinutes;
 
@@ -153,6 +156,80 @@ class _StatsPageState extends State<StatsPage> {
                           ? 0
                           : _totalForTask(stats, name) / weekTotal,
                       color: _colorFor(name),
+                    ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          BrickCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SectionHeader(
+                  title: '最近完成',
+                  trailing: InkWell(
+                    borderRadius: BorderRadius.circular(99),
+                    onTap: () => showAllRecordsSheet(
+                      context,
+                      data: data,
+                      colorFor: _colorFor,
+                      onChanged: widget.onChanged,
+                    ),
+                    child: const Padding(
+                      padding:
+                          EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                      child: Text('全部 ›',
+                          style:
+                              TextStyle(color: PineColors.sub, fontSize: 12)),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                if (recent.isEmpty)
+                  const Text('还没有完成的记录',
+                      style:
+                          TextStyle(color: PineColors.sub, fontSize: 12))
+                else
+                  for (final record in recent.take(5))
+                    InkWell(
+                      borderRadius: BorderRadius.circular(8),
+                      onTap: () => showRecordDetailSheet(
+                        context,
+                        data: data,
+                        record: record,
+                        color: _colorFor(record.taskName),
+                        onChanged: widget.onChanged,
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 6),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 8,
+                              height: 8,
+                              decoration: BoxDecoration(
+                                color: _colorFor(record.taskName),
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                            const SizedBox(width: 9),
+                            Expanded(
+                              child: Text(
+                                record.taskName,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                    color: PineColors.ink, fontSize: 13),
+                              ),
+                            ),
+                            Text(
+                              formatHoursMinutes(record.minutes),
+                              style: const TextStyle(
+                                  color: PineColors.sub, fontSize: 12),
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
               ],
             ),

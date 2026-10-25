@@ -62,10 +62,11 @@ void main() {
       }),
     );
 
-    expect(find.text('今天还没安排 · 点右上打开日程'), findsOneWidget);
+    expect(find.textContaining('今天还没安排'), findsOneWidget);
     expect(find.text('816 真题① 限时'), findsNothing);
 
-    await tester.tap(find.text('去安排'));
+    // 卡片本身只显示今天；跨天视图走「全部 ›」。
+    await tester.tap(find.text('全部 ›').first);
     await tester.pumpAndSettle();
 
     expect(find.text('日程'), findsOneWidget);
@@ -79,7 +80,7 @@ void main() {
 
   testWidgets('日程面板里粘贴导入：预览条数 → 确认后落到对应日期', (tester) async {
     await _pumpHome(tester, AppData());
-    await tester.tap(find.text('去安排'));
+    await tester.tap(find.text('全部 ›').first);
     await tester.pumpAndSettle();
 
     await tester.tap(find.widgetWithText(BrickButton, '导入').first);

@@ -16,8 +16,11 @@ class PineColors {
   /// 墨色主文字 / 主行动按钮底
   static const ink = Color(0xFF33302A);
 
-  /// 次级文字、未选中、说明
-  static const sub = Color(0xFF85796A);
+  /// 次级文字、未选中、说明。
+  /// 2026-10-25 压暗：原 #85796A 对纸面只有 3.78:1、对卡片 4.18:1，
+  /// 而它承载全屏 10–12px 文字（方案 E §7.1 要求正文级 ≥4.5:1）。
+  /// 现值对纸面 4.62:1、对卡片 5.11:1。
+  static const sub = Color(0xFF776B5C);
 
   /// 禁用、空态占位
   static const faint = Color(0xFFC9BFAE);
@@ -31,16 +34,51 @@ class PineColors {
   /// 专注阶段色 + 危险语义（删除/清空）
   static const focus = Color(0xFFD96B52);
 
-  /// 短休阶段色
-  static const mint = Color(0xFF5FAE8B);
+  /// 短休阶段色（2026-10-25 压暗到 3.37:1，原 #5FAE8B 作环弧只有 2.36:1，
+  /// 不达 WCAG 1.4.11 对「进度图形」的 3.0:1）。
+  static const mint = Color(0xFF47916E);
 
   /// 长休阶段色 / 超时 / 「完成」按钮底
   static const gold = Color(0xFFD9A441);
+
+  /// 进度轨道（环轨、细进度条底）。**不要用 `line`**：`line` 是 hairline 分隔线，
+  /// 必须极浅（对纸面 1.19:1），而轨道要让「剩余比例」读得出来；两个用途的
+  /// 对比度要求相反，所以单独成令牌（2026-10-25 评审）。
+  static const track = Color(0xFFD8CDBB);
+
+  /// `gold` 的文字/线条变体。`gold` 只作按钮底（其上放 ink 字 5.85:1）；
+  /// 直接当时钟/弧色对纸面只有 2.00:1，大字号也不达 3.0:1。
+  static const goldInk = Color(0xFFA87A2B);
 
   /// 阶段/语义色派生浅底：`α=.14 叠在纸面`，供段选、选中行、徽章底等使用。
   /// 一律由代码派生，禁止各页手写近似色值。
   static Color tint(Color semantic) =>
       Color.alphaBlend(semantic.withAlpha(36), paper);
+}
+
+/// 字号阶梯：一屏最多用到的六档（2026-10-25 评审收敛）。
+/// 没有可引用的档位时，`fontSize: 12.5` 这类半像素值不会有人拦得住——
+/// 令牌化之后 code review 可以机械拒绝非档值。
+class PineType {
+  const PineType._();
+
+  /// 环内时钟（唯一 display）
+  static const double clock = 50;
+
+  /// 大数字（倒计时天数、统计格子数值）
+  static const double num = 18;
+
+  /// 正文/任务名
+  static const double body = 15;
+
+  /// 区块标题、列表主文本
+  static const double label = 13;
+
+  /// 元信息（记录时间、日程行、今日进度）
+  static const double meta = 12;
+
+  /// 说明、徽标
+  static const double caption = 11;
 }
 
 /// 纸面几何常量。半径/投影/描边统一由这里取值。
@@ -61,6 +99,13 @@ class Paper {
 
   /// 小元件（色条、勾选框、进度、徽章）圆角
   static const tinyRadius = 6.0;
+
+  /// 桌面「专注舱」的版心与环径（2026-10-25 评审：环径是垂直预算的自变量，
+  /// 写死在 `_DesktopRing` 里，任何一屏多加一行内容都会重新触发裁切）。
+  static const double cabinColumn = 452;
+  static const double ringMax = 244;
+  static const double ringMid = 212;
+  static const double ringMin = 184;
 
   /// 最细线宽（分隔线等）
   static const hairline = 1.0;

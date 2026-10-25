@@ -1005,6 +1005,16 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   /// 收进底部一张信息小卡。窗口矮时可滚动，拖宽只留白。
   Widget _desktopCabin(ActiveSession? session, SessionView view) {
     final stats = StatsView.of(_data, DateTime.now());
+    // 500×640 是默认窗口，原布局内容 624.5pt > 视口 574pt，信息卡底缘被视口硬切
+    // （2026-10-25 评审 P0-1）。按可用高度分档收紧，环径是最大的一块预算。
+    final height = MediaQuery.sizeOf(context).height;
+    final compact = height < 640;
+    final ring = height >= 700
+        ? Paper.ringMax
+        : (compact ? Paper.ringMin : Paper.ringMid);
+    final gapBase = compact ? 8.0 : 12.0;
+    // 最小窗 440×600 实测还差 2pt（布局回归测试抓到），尾间隙按 4 网格收到 4。
+    final gapTail = compact ? 4.0 : 12.0;
     return Padding(
       padding: const EdgeInsets.fromLTRB(24, 52, 24, 12),
       child: Center(
@@ -1028,7 +1038,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                   const SizedBox(height: 10),
                   _suspendBanner(),
                 ],
-                const SizedBox(height: 12),
+                SizedBox(height: gapBase),
                 // 任务行（轻量，非卡片）：整行可点换任务。
                 Center(
                   child: InkWell(
@@ -1114,8 +1124,12 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 Center(
                   child: _DesktopRing(
                     progress: view.progress,
-                    color:
-                        view.targetReached ? PineColors.gold : view.mode.color,
+                    diameter: ring,
+                    // 金色不能直接用 gold（对纸面 2.00:1），字与弧改 goldInk（3.40:1）；
+                    // gold 只留给「按钮底 + ink 字」。
+                    color: view.targetReached
+                        ? PineColors.goldInk
+                        : view.mode.color,
                     timeText: view.clockText,
                     caption: _caption(session, view),
                     overtime: view.targetReached,
@@ -1125,20 +1139,17 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 const SizedBox(height: 4),
                 Center(
                   child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 400),
+                    // 与信息卡同宽（452），左缘落在同一条 24 基准线上。
+                    constraints:
+                        const BoxConstraints(maxWidth: Paper.cabinColumn),
                     child: _controls(session, view,
                         suspended: _data.activeSession),
                   ),
                 ),
-                const SizedBox(height: 16),
+                SizedBox(height: gapTail),
                 _desktopInfoCard(stats),
-                const SizedBox(height: 8),
-                const Center(
-                  child: Text(
-                    '空格 开始/暂停 · R 重置 · Esc 关抽屉',
-                    style: TextStyle(color: PineColors.faint, fontSize: 10.5),
-                  ),
-                ),
+                // 快捷键提示行已移除：500×640 下它整行落在视口外（评审 P0-1 改法⑤），
+                // 快捷键在菜单栏与设置页都有。
               ],
             ),
           ),
@@ -1178,10 +1189,10 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     final items = _data.records.where((record) => record.counted).toList()
       ..sort((a, b) => b.at.compareTo(a.at));
     return Container(
-      padding: const EdgeInsets.fromLTRB(14, 12, 14, 8),
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
       decoration: BoxDecoration(
         color: PineColors.card,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(Paper.cardRadius),
         boxShadow: Paper.shadow,
       ),
       child: Column(
@@ -1286,7 +1297,10 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               ),
             )
           else
-            for (final record in items.take(3))
+            // 桌面默认窗口 640 高时只放 2 条：第 3 条会顶到窗口底被硬切
+            // （2026-10-25 评审 P0-1 改法③）。更多记录走「全部 ›」。
+            for (final record in items.take(
+                MediaQuery.sizeOf(context).height < 720 ? 2 : 3))
               InkWell(
                 borderRadius: BorderRadius.circular(8),
                 onTap: () => showRecordDetailSheet(
@@ -1789,6 +1803,7 @@ class _DesktopRing extends StatelessWidget {
     required this.timeText,
     required this.caption,
     required this.overtime,
+    required this.diameter,
     this.stamp = false,
   });
 
@@ -1801,13 +1816,14 @@ class _DesktopRing extends StatelessWidget {
   /// 完成章（桌面）：一次专注完成时在环右上角盖下。
   final bool stamp;
 
-  static const double _diameter = 244;
+  /// 环径由父级按可用高度决定（244 / 212 / 184），见 _desktopCabin。
+  final double diameter;
 
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: _diameter,
-      height: _diameter,
+      width: diameter,
+      height: diameter,
       child: Stack(
         clipBehavior: Clip.none,
         fit: StackFit.expand,
@@ -1822,8 +1838,11 @@ class _DesktopRing extends StatelessWidget {
                 Text(
                   timeText,
                   style: brickNumberStyle(
-                    fontSize: 50,
-                    color: overtime ? PineColors.gold : PineColors.ink,
+                    // 小环降一档，避免数字顶到 12pt 轨道。
+                    fontSize: diameter >= Paper.ringMax
+                        ? 50
+                        : (diameter < 200 ? 44 : 46),
+                    color: overtime ? PineColors.goldInk : PineColors.ink,
                   ),
                 ),
                 const SizedBox(height: 2),
@@ -1862,7 +1881,7 @@ class _RingPainter extends CustomPainter {
     final track = Paint()
       ..style = PaintingStyle.stroke
       ..strokeWidth = stroke
-      ..color = PineColors.line;
+      ..color = PineColors.track;
     canvas.drawCircle(rect.center, (size.width - stroke) / 2, track);
     final p = progress.clamp(0.0, 1.0);
     if (p <= 0) return;

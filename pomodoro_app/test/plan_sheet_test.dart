@@ -85,7 +85,12 @@ void main() {
     await tester.tap(find.widgetWithText(BrickButton, '导入').first);
     await tester.pumpAndSettle();
 
-    const text = '10/24 2018 数一复盘\n10/25 现控 ch5 下半';
+    // 日期必须相对"今天"生成：写死 10/24、10/25 会在真正的 10/25 那天
+    // 与本页「今日日程」卡重复命中（2026-10-25 实测踩到）。
+    final d1 = DateTime.now().add(const Duration(days: 3));
+    final d2 = DateTime.now().add(const Duration(days: 4));
+    String md(DateTime d) => '${d.month}/${d.day}';
+    final text = '${md(d1)} 2018 数一复盘\n${md(d2)} 现控 ch5 下半';
     await tester.enterText(
       find.descendant(
         of: find.byType(AlertDialog),

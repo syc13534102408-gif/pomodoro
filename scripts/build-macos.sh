@@ -30,7 +30,11 @@ rm -rf /tmp/pine-macos/build
 cd /tmp/pine-macos/macos
 /opt/homebrew/bin/pod install >/dev/null 2>&1
 cd /tmp/pine-macos
-"$F" build macos --release
+
+# 依赖已在本机 pub-cache 里时，不联网解析——2026-10-25 有一次 pub.dev 域名解析失败，
+# 整轮打包白跑。先离线 pub get，再让 build 跳过隐式 pub get。
+"$F" pub get --offline >/dev/null 2>&1 || "$F" pub get >/dev/null
+"$F" build macos --release --no-pub
 
 cd /tmp/pine-macos
 ditto -c -k --sequesterRsrc --keepParent "build/macos/Build/Products/Release/pinecore.app" \

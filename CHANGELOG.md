@@ -30,11 +30,29 @@
 - **顺手**：`plan_sheet_test` 里写死的 10/24、10/25 改成相对今天生成（在真正的 10/25 当天会与
   「今日日程」卡重复命中，实测踩到）；`scripts/build-macos.sh` 改为先离线 `pub get` 再 `--no-pub`，
   避免 pub.dev 抖动（2026-10-25 白跑一轮）。
-- 回归：`dart analyze` 零告警、`flutter test` **179 例全绿**（新增布局 5 例）。
+- 回归：`dart analyze` 零告警、`flutter test` **185 例全绿**（新增布局 5 例）。
 - **未做（评审里已列，待逐条勾选）**：P1-1 字号收敛到 6 档、P1-3 四条左缘、P1-5 徽标文字色、
   P1-6 点击热区、P2 全部。
 - 产物：`outputs/松果-v1.3.10-视觉修正-2026-10-25.apk`（19,708,627 B、versionName 1.3.10、
-  versionCode 14）、`outputs/pinecore-macos-2026-10-25.zip`（已装到 /Applications）。
+  versionCode 15）、`outputs/pinecore-macos-2026-10-25.zip`（已装到 /Applications）。
+
+## 2026-10-25（凌晨）· 修「勾一条 = 勾一片」：待办 id 撞号（v1.3.14）
+
+- **现象**（实机）：在桌面/手机日程里点任意一条，同一天其它条目一起变勾。
+- **根因**：`TodoItem` 的 id 是 `DateTime.now().microsecondsSinceEpoch`。粘贴导入是一次循环
+  批量创建几十条，同一微秒内多次调用会拿到**同一个时间戳**，于是多条共享 id；而勾选逻辑是
+  `entry.id == item.id` —— 撞号就等于一次命中多条。用户真实数据里 10/29 那天 4 条有 3 条同 id，
+  10/30 与 10/31 也有。
+- **修复**：① id 改为「时间戳-进程内自增序号」，撞号概率归零；② `AppData.fromMap` 读盘时
+  做一次**去重迁移**（同 id 的后来者换新 id，内容与完成状态不动），历史数据下次启动自动修好。
+- **验证**：新增 `test/todo_id_test.dart` 6 例（批量 200 条 id 全唯一、导入 30 条唯一、
+  显式 id 保持、读盘修复同日/跨日重复、勾选只影响一条且同 id 时会勾中两条的反证）。
+  实机复查 prefs：18 个日期、0 处重复，撞号条目已换新 id。
+- 回归：`dart analyze` 零告警、`flutter test` **185 例全绿**。
+- 产物：`outputs/松果-v1.3.14-勾选修复-2026-10-25.apk`（versionName 1.3.14、versionCode 15）、
+  `outputs/pinecore-macos-2026-10-25.zip`（已装）。
+- **教训**："同一次循环里创建的对象"不能只靠时间戳做 id——这类 id 要在**创建处**保证唯一，
+  在**读取处**保证修复，两道都要有。
 
 ## 2026-10-25（深夜）· 窗口尺寸 560×760 + 四档行数（v1.3.13）
 
@@ -49,9 +67,9 @@
 - **踩坑记录**：第一次截图只看到 3 条，一度以为分档没生效——实际是**被 pkill 前后的旧实例残帧**。
   用 `flutter run -d macos` 打印 `MediaQuery` 高度（760.0）才定位，之后重启释放的新实例即正确。
   教训：桌面端改尺寸后，截图前先确认进程启动时间晚于产物 mtime。
-- 回归：`test/desktop_layout_test.dart` 扩到 8 例（新增 560×760、600×820 两档），全量 **179 例全绿**。
+- 回归：`test/desktop_layout_test.dart` 扩到 8 例（新增 560×760、600×820 两档），全量 **185 例全绿**。
 - 产物：`outputs/松果-v1.3.13-默认窗-2026-10-25.apk`（19,708,559 B、versionName 1.3.13、
-  versionCode 14）、`outputs/pinecore-macos-2026-10-25.zip`（已装）。
+  versionCode 15）、`outputs/pinecore-macos-2026-10-25.zip`（已装）。
 
 ## 2026-10-25（夜）· 今日日程直接打勾；最近完成搬进统计抽屉（v1.3.12）
 
@@ -68,9 +86,9 @@
   点行仍进详情可改可删）。桌面主窗不再渲染记录列表，`_desktopInfoRow` 那行入口随之删除。
 - **回归**：`test/desktop_layout_test.dart` 重写为 6 例——三种窗尺寸 `maxScrollExtent == 0`、
   主窗**断言不再出现「最近完成」**、日程条数分档、统计页能看到最近完成。
-  `test/plan_sheet_test.dart` 的入口从「去安排」改为「全部 ›」。全量 **179 例全绿**。
+  `test/plan_sheet_test.dart` 的入口从「去安排」改为「全部 ›」。全量 **185 例全绿**。
 - 产物：`outputs/松果-v1.3.12-今日日程-2026-10-25.apk`（19,708,559 B、versionName 1.3.12、
-  versionCode 14，sha256 前缀 `237920814b612673`）、`outputs/pinecore-macos-2026-10-25.zip`（已装）。
+  versionCode 15，sha256 前缀 `237920814b612673`）、`outputs/pinecore-macos-2026-10-25.zip`（已装）。
 
 ## 2026-10-25（晚）· 决策 A3 + B1：环内文案分级、金色分两档（v1.3.11）
 
@@ -87,9 +105,9 @@
   这条同时修掉了前一天 P0-2 的残留：长休阶段色此前仍走 `gold`（对纸面 2.00:1，大字号下限 3.0）。
 - **新增令牌级回归** `test/stage_color_test.dart`（6 例）：两档映射 + 对比度下限
   （弧线 ≥3.0、`sub` ≥4.5、ink-on-gold ≥4.5、`track` 必须比 `line` 显眼但不抢弧）。
-- 回归：`dart analyze` 零告警、`flutter test` **179 例全绿**。
+- 回归：`dart analyze` 零告警、`flutter test` **185 例全绿**。
 - 产物：`outputs/松果-v1.3.11-文案分级-2026-10-25.apk`（19,708,627 B、versionName 1.3.11、
-  versionCode 14）、`outputs/pinecore-macos-2026-10-25.zip`（已装到 /Applications）。
+  versionCode 15）、`outputs/pinecore-macos-2026-10-25.zip`（已装到 /Applications）。
 
 ## 2026-10-23（夜）· 日程智能解析：服务端 /plan/parse（v1.3.9）
 

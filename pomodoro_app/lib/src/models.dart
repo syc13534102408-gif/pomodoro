@@ -330,11 +330,23 @@ class FocusEvent {
 }
 
 class TodoItem {
+  /// 进程内自增序号，与时间戳拼成 id。
+  ///
+  /// 只用 `microsecondsSinceEpoch` 会在**批量创建**时撞号：粘贴导入一次几十条，
+  /// 循环里同一微秒内多次调用会拿到同一个值，而勾选是按 id 匹配的——
+  /// 撞号就会「勾一条 = 勾一片」（2026-10-25 实机踩到，10/29 那天 4 条里 3 条同 id）。
+  static int _seq = 0;
+
+  static String _newId() {
+    _seq = (_seq + 1) % 1000000;
+    return '${DateTime.now().microsecondsSinceEpoch}-$_seq';
+  }
+
   TodoItem({
     String? id,
     required this.text,
     this.done = false,
-  }) : id = id ?? DateTime.now().microsecondsSinceEpoch.toString();
+  }) : id = id ?? _newId();
 
   final String id;
   final String text;
@@ -745,6 +757,16 @@ class AppData {
             .map((item) => TodoItem.fromMap(Map<dynamic, dynamic>.from(item)))
             .toList();
       });
+    }
+    // 修复历史数据里的重复 id（旧版批量创建会撞号）：同 id 的后来者换新 id，
+    // 否则勾选会一次勾中多条。跨日期也去重——id 是全局匹配用的。
+    final seenTodoIds = <String>{};
+    for (final items in todos.values) {
+      for (var i = 0; i < items.length; i++) {
+        if (seenTodoIds.add(items[i].id)) continue;
+        items[i] = TodoItem(text: items[i].text, done: items[i].done);
+        seenTodoIds.add(items[i].id);
+      }
     }
 
     final rawEvents = map['events'];

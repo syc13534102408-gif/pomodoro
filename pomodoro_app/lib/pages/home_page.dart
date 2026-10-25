@@ -1014,7 +1014,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     // （2026-10-25 评审 P0-1）。按可用高度分档收紧，环径是最大的一块预算。
     final height = MediaQuery.sizeOf(context).height;
     final compact = height < 640;
-    final ring = height >= 700
+    // 环径四档（2026-10-25 定）：默认窗 560×760 落在最高档，一屏 4 条日程。
+    final ring = height >= 720
         ? Paper.ringMax
         : (compact ? Paper.ringMin : Paper.ringMid);
     final gapBase = compact ? 8.0 : 12.0;
@@ -1176,8 +1177,12 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     final todayKey = ymdOf(dayStart(DateTime.now()));
     final planItems = _data.todos[todayKey] ?? const <TodoItem>[];
     final planDone = planItems.where((item) => item.done).length;
-    // 440×600 放 2 条、500×640 与更高放 3 条（其余折叠成「还有 N 条」）。
-    final planRows = MediaQuery.sizeOf(context).height < 640 ? 2 : 3;
+    // 日程行数按窗高分档：440×600 → 2、500×640 → 3、560×720 → 4、≥800 → 5
+    // （超出折叠成「还有 N 条 ›」）。默认窗 560×760 落在 4 条档。
+    final windowHeight = MediaQuery.sizeOf(context).height;
+    final planRows = windowHeight < 640
+        ? 2
+        : (windowHeight < 720 ? 3 : (windowHeight < 800 ? 4 : 5));
     return Container(
       padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
       decoration: BoxDecoration(

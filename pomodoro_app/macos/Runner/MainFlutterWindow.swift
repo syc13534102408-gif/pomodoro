@@ -40,17 +40,22 @@ class MainFlutterWindow: NSWindow, NSMenuDelegate {
   override func awakeFromNib() {
     let flutterViewController = FlutterViewController()
     self.contentViewController = flutterViewController
-    // 方向 B「专注舱」：默认小窗 500×640，最小 440×600。
+    // 方向 B「专注舱」：默认 560×760，最小 440×600（2026-10-25 定）。
+    // 560 宽 = 版心 452 + 双侧 30 呼吸（再宽只是多一圈空白纸面）；
+    // 760 高 = 4 条今日日程 + 满尺寸 244 环 + 约 15pt 余量，恰好"一屏看完今天"。
     // 桌面布局为单舱 + 右滑抽屉（统计/设置）；窗口拖宽只留白、内容不拉伸。
-    // 关闭窗口状态恢复，避免系统用上次的旧尺寸覆盖初始大小。
     self.isRestorable = false
     // 关窗后窗口对象必须存活：菜单栏计时依赖窗口持有的 FlutterEngine 与通道，
     // 若随窗口一起释放，倒计时和菜单动作都会失效。
     self.isReleasedWhenClosed = false
-    self.setContentSize(NSSize(width: 500, height: 640))
+    self.setContentSize(NSSize(width: 560, height: 760))
     self.minSize = NSSize(width: 440, height: 600)
     self.center()
-    self.setFrame(self.frame, display: true)
+    // 记住用户拖过的尺寸：有历史 frame 就用历史的，首次启动才用默认值并居中。
+    if !self.setFrameUsingName("PineMainWindowFrame") {
+      self.setFrame(self.frame, display: true)
+    }
+    _ = self.setFrameAutosaveName("PineMainWindowFrame")
 
     RegisterGeneratedPlugins(registry: flutterViewController)
 

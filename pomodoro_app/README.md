@@ -1,6 +1,6 @@
 # 专注时光（松果）· 安卓 + macOS 端
 
-Flutter 应用（**v1.3.12+13**），安卓与 macOS 桌面共用一套代码。
+Flutter 应用（**v1.3.13+14**），安卓与 macOS 桌面共用一套代码。
 数据经**腾讯云同步后端**在两端互通（同码互通、本地优先）；网页端已于 2026-09-02 冻结。
 
 > 项目级文档见 [`../docs/`](../docs/)；本文只讲本模块特有的内容。
@@ -41,7 +41,7 @@ F=$PWD/../tools/flutter/bin/flutter
 
 $F pub get
 ../tools/flutter/bin/dart analyze    # flutter analyze 的 LSP 在本机会崩，用这个
-$F --suppress-analytics test         # 177 项用例 / 23 个文件，应全绿
+$F --suppress-analytics test         # 179 项用例 / 23 个文件，应全绿
 $F build apk --release --target-platform android-arm64   # 约 19MB
 ```
 

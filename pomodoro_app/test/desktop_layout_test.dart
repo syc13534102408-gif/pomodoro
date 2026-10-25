@@ -68,8 +68,9 @@ void main() {
 
   for (final size in const <Size>[
     Size(440, 600), // 最小窗
-    Size(500, 640), // 默认窗
-    Size(560, 720), // 拉大
+    Size(500, 640), // 旧默认窗（3 条档）
+    Size(560, 760), // 默认窗（4 条档）
+    Size(600, 820), // 拉大（5 条档）
   ]) {
     testWidgets('桌面舱 ${size.width.toInt()}×${size.height.toInt()} 不需要滚动',
         (tester) async {
@@ -95,12 +96,23 @@ void main() {
     });
   }
 
-  testWidgets('默认窗日程显示 3 条，其余折叠成「还有 N 条」', (tester) async {
+  testWidgets('旧默认窗 500×640 日程显示 3 条，其余折叠成「还有 N 条」', (tester) async {
     try {
       await _pumpDesktop(tester, width: 500, height: 640);
       expect(find.text('日程条目 1'), findsOneWidget);
       expect(find.text('日程条目 3'), findsOneWidget);
       expect(find.text('日程条目 4'), findsNothing);
+      expect(find.text('还有 2 条 ›'), findsOneWidget);
+    } finally {
+      _restore(tester);
+    }
+  });
+
+  testWidgets('默认窗 560×760 日程显示 4 条，第 5 条折叠', (tester) async {
+    try {
+      await _pumpDesktop(tester, width: 560, height: 760, data: _data(todos: 6));
+      expect(find.text('日程条目 4'), findsOneWidget);
+      expect(find.text('日程条目 5'), findsNothing);
       expect(find.text('还有 2 条 ›'), findsOneWidget);
     } finally {
       _restore(tester);

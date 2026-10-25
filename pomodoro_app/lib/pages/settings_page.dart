@@ -539,7 +539,7 @@ class _SettingsPageState extends State<SettingsPage> {
                           style:
                               TextStyle(color: PineColors.sub, fontSize: 13)),
                       Spacer(),
-                      Text('v1.3.12 · 松林手帐',
+                      Text('v1.3.13 · 松林手帐',
                           style: TextStyle(
                               color: PineColors.ink,
                               fontSize: 13,

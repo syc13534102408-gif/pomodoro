@@ -1649,9 +1649,23 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     setState(() => _planAdding = false);
   }
 
+  /// 长按编辑日程文本：只改文字，id / 勾选状态 / 所属日期都不动。
+  Future<void> _editPlanItem(String dayKey, TodoItem item) async {
+    final text = await showTodoEditDialog(context, initialText: item.text);
+    if (text == null || text.isEmpty) return;
+    _applyTodos((todos) => {
+          ...todos,
+          dayKey: [
+            for (final entry in todos[dayKey] ?? const <TodoItem>[])
+              entry.id == item.id ? entry.copyWith(text: text) : entry,
+          ],
+        });
+  }
+
   Widget _planRow(String dayKey, TodoItem item, {double fontSize = 12}) =>
       InkWell(
         borderRadius: BorderRadius.circular(8),
+        onLongPress: () => _editPlanItem(dayKey, item),
         onTap: () => _applyTodos((todos) => {
               ...todos,
               dayKey: [

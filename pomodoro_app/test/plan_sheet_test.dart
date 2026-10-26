@@ -199,4 +199,74 @@ void main() {
     expect(find.textContaining('PINE_LLM_API_KEY'), findsOneWidget);
   });
 
+
+  testWidgets('长按日程条目可以改文字，id 与勾选状态不变', (tester) async {
+    tester.view.physicalSize = const Size(1000, 2200);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    final today = ymdOf(dayStart(DateTime.now()));
+    final item = TodoItem(id: 'keep-me', text: '原任务名', done: true);
+    TodosTransform? captured;
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: Builder(
+          builder: (context) => TextButton(
+            onPressed: () => showPlanSheet(
+              context,
+              data: AppData(todos: {
+                today: [item],
+              }),
+              onApply: (transform) => captured = transform,
+            ),
+            child: const Text('打开日程'),
+          ),
+        ),
+      ),
+    ));
+    await tester.tap(find.text('打开日程'));
+    await tester.pumpAndSettle();
+
+    await tester.longPress(find.text('原任务名'));
+    await tester.pumpAndSettle();
+    expect(find.text('编辑内容'), findsOneWidget);
+
+    await tester.enterText(find.byType(TextField).last, '改过的任务名');
+    await tester.tap(find.text('保存'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('改过的任务名'), findsOneWidget);
+    expect(find.text('原任务名'), findsNothing);
+
+    // 只改文字：id 与勾选状态必须原样保留（id 变了会丢云端归属，done 变了等于误勾）。
+    final after = captured!(AppData(todos: {
+      today: [item],
+    }).todos);
+    expect(after[today]!.single.id, 'keep-me');
+    expect(after[today]!.single.done, isTrue);
+    expect(after[today]!.single.text, '改过的任务名');
+  });
+
+
+  testWidgets('首页日程卡长按也能改文字（主路径）', (tester) async {
+    final today = _todayKey();
+    await _pumpHome(
+      tester,
+      AppData(todos: {
+        today: [TodoItem(text: '改我这条')],
+      }),
+    );
+
+    await tester.longPress(find.text('改我这条'));
+    await tester.pumpAndSettle();
+    expect(find.text('编辑内容'), findsOneWidget);
+
+    await tester.enterText(find.byType(TextField).last, '已经改好了');
+    await tester.tap(find.text('保存'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('已经改好了'), findsOneWidget);
+    expect(find.text('改我这条'), findsNothing);
+  });
+
 }

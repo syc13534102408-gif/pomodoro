@@ -557,6 +557,7 @@ class _TodoRow extends StatelessWidget {
     required this.onToggle,
     required this.onRemove,
     this.onFocus,
+    this.onEdit,
   });
 
   final TodoItem item;
@@ -566,12 +567,17 @@ class _TodoRow extends StatelessWidget {
   /// 长按「设为专注事件」。日程面板不提供该动作（会给每条待办建一个任务），传 null 即可。
   final VoidCallback? onFocus;
 
+  /// 长按「编辑内容」。日程面板传这个；两者都给时长按优先编辑。
+  final VoidCallback? onEdit;
+
   @override
   Widget build(BuildContext context) {
     return BrickPressable(
       onTap: null,
-      onLongPress: onFocus,
-      semanticLabel: '设为专注事件 ${item.text}',
+      onLongPress: onEdit ?? onFocus,
+      semanticLabel: onEdit == null
+          ? '设为专注事件 ${item.text}'
+          : '编辑或长按修改：${item.text}',
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
         decoration: BoxDecoration(
@@ -605,6 +611,77 @@ class _TodoRow extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// 编辑日程/待办文本。返回 null 表示取消，返回空串表示用户清空了内容（调用方应忽略）。
+///
+/// 独立成 StatefulWidget 是刻意的：controller 必须跟着对话框一起 dispose，
+/// 在 `await showDialog` 之后立刻 dispose 会在关闭动画里抛 used-after-disposed（2026-10-23 踩过）。
+Future<String?> showTodoEditDialog(
+  BuildContext context, {
+  required String initialText,
+}) {
+  return showDialog<String>(
+    context: context,
+    builder: (_) => _TodoEditDialog(initialText: initialText),
+  );
+}
+
+class _TodoEditDialog extends StatefulWidget {
+  const _TodoEditDialog({required this.initialText});
+
+  final String initialText;
+
+  @override
+  State<_TodoEditDialog> createState() => _TodoEditDialogState();
+}
+
+class _TodoEditDialogState extends State<_TodoEditDialog> {
+  late final TextEditingController _controller =
+      TextEditingController(text: widget.initialText);
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _submit() => Navigator.of(context).pop(_controller.text.trim());
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      backgroundColor: PineColors.card,
+      title: const Text('编辑内容',
+          style: TextStyle(
+              color: PineColors.ink, fontSize: 17, fontWeight: FontWeight.w600)),
+      // 对话框按内在宽度测量：给固定宽度，别让 TextField 参与无界测量（docs/07 §7）。
+      content: SizedBox(
+        width: 320,
+        child: TextField(
+          controller: _controller,
+          autofocus: true,
+          maxLines: 3,
+          minLines: 1,
+          style: const TextStyle(fontSize: 13),
+          decoration: const InputDecoration(isDense: true),
+          onSubmitted: (_) => _submit(),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('取消', style: TextStyle(color: PineColors.sub)),
+        ),
+        TextButton(
+          onPressed: _submit,
+          child: const Text('保存',
+              style:
+                  TextStyle(color: PineColors.pine, fontWeight: FontWeight.w600)),
+        ),
+      ],
     );
   }
 }
@@ -700,6 +777,19 @@ class _PlanSheetState extends State<_PlanSheet> {
         ],
       });
 
+  /// 长按编辑：只改文本，id/勾选状态/所属日期都不动。
+  Future<void> _editItem(String dayKey, TodoItem item) async {
+    final text = await showTodoEditDialog(context, initialText: item.text);
+    if (text == null || text.isEmpty) return;
+    _apply((todos) => {
+          ...todos,
+          dayKey: [
+            for (final entry in todos[dayKey] ?? const <TodoItem>[])
+              entry.id == item.id ? entry.copyWith(text: text) : entry,
+          ],
+        });
+  }
+
   void _addToToday() {
     final text = _controller.text.trim();
     if (text.isEmpty) return;
@@ -780,6 +870,7 @@ class _PlanSheetState extends State<_PlanSheet> {
                           item: item,
                           onToggle: () => _toggle(key, item),
                           onRemove: () => _remove(key, item),
+                          onEdit: () => _editItem(key, item),
                         ),
                       ),
                     const SizedBox(height: 6),
@@ -787,6 +878,14 @@ class _PlanSheetState extends State<_PlanSheet> {
                 ],
               ),
             ),
+          const Align(
+            alignment: Alignment.centerLeft,
+            child: Padding(
+              padding: EdgeInsets.only(bottom: 4),
+              child: Text('长按条目可改文字 · 点勾选框打勾',
+                  style: TextStyle(color: PineColors.sub, fontSize: 11)),
+            ),
+          ),
           Row(
             children: [
               Expanded(

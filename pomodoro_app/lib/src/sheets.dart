@@ -901,8 +901,11 @@ class _PlanSheetState extends State<_PlanSheet> {
                 children: [
                   for (final key in keys) ...[
                     _planDayHeader(key, _todos[key]!),
-                    for (final item in _todos[key]!)
-                      Padding(
+                    // 每天一组独立动画：跨天不重排，组内勾选才滑动。
+                    AnimatedTodoRows(
+                      items: _todos[key]!,
+                      rowHeight: 54,
+                      itemBuilder: (item) => Padding(
                         padding: const EdgeInsets.only(bottom: 6),
                         child: _TodoRow(
                           item: item,
@@ -917,6 +920,7 @@ class _PlanSheetState extends State<_PlanSheet> {
                           ),
                         ),
                       ),
+                    ),
                     const SizedBox(height: 6),
                   ],
                 ],

@@ -676,6 +676,51 @@ class BrickBarSegment {
 }
 
 /// 周直方图（纸面版）：圆角堆叠柱、无描边，今日列松绿高亮，空日浅色占位。
+/// 可动画的待办行容器：勾选重排时行会**滑动**到新位置，而不是瞬间闪现。
+///
+/// 为什么不用 `AnimatedList`：它支持插入/删除，但**不支持 move**；而我们唯一要动画的
+/// 恰恰是「同一批行换顺序」。这里用固定行高的 `Stack` + `AnimatedPositioned`，
+/// 每行以 `TodoItem.id` 作 key，位置变化就有中间态可插值（2026-10-26）。
+///
+/// 前置条件：行高固定且内容单行（调用方的行都是 maxLines: 1）。
+class AnimatedTodoRows extends StatelessWidget {
+  const AnimatedTodoRows({
+    super.key,
+    required this.items,
+    required this.rowHeight,
+    required this.itemBuilder,
+    this.duration = const Duration(milliseconds: 240),
+  });
+
+  final List<TodoItem> items;
+  final double rowHeight;
+  final Widget Function(TodoItem item) itemBuilder;
+  final Duration duration;
+
+  @override
+  Widget build(BuildContext context) {
+    final reduceMotion = MediaQuery.maybeOf(context)?.disableAnimations ?? false;
+    return SizedBox(
+      height: rowHeight * items.length,
+      child: Stack(
+        children: [
+          for (var i = 0; i < items.length; i++)
+            AnimatedPositioned(
+              key: ValueKey<String>(items[i].id),
+              duration: reduceMotion ? Duration.zero : duration,
+              curve: Curves.easeOutCubic,
+              top: i * rowHeight,
+              left: 0,
+              right: 0,
+              height: rowHeight,
+              child: itemBuilder(items[i]),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
 class BrickBars extends StatelessWidget {
   const BrickBars({
     super.key,

@@ -1249,8 +1249,12 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               ),
             )
           else
-            for (final item in planItems.take(planRows))
-              _planRow(todayKey, item, fontSize: 12),
+            AnimatedTodoRows(
+              items: planItems.take(planRows).toList(),
+              rowHeight: 26,
+              itemBuilder: (item) =>
+                  _planRow(todayKey, item, fontSize: 12),
+            ),
           if (planItems.length > planRows)
             InkWell(
               borderRadius: BorderRadius.circular(8),
@@ -1587,8 +1591,13 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               ),
             )
           else
-            for (final item in items.take(maxRows))
-              _planRow(todayKey, item, fontSize: 13),
+            // 勾选后重排要有中间态：固定行高 + AnimatedPositioned 才滑得动。
+            AnimatedTodoRows(
+              items: items.take(maxRows).toList(),
+              rowHeight: 26,
+              itemBuilder: (item) =>
+                  _planRow(todayKey, item, fontSize: 13),
+            ),
           if (_planAdding)
             Padding(
               padding: const EdgeInsets.only(top: 4),

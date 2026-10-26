@@ -352,9 +352,10 @@ void main() {
     );
 
     await tester.tap(find.text('第二条'));
-    await tester.pump();
+    // 重排是 240ms 的位置动画，必须等它落定再量坐标（否则量到的是中间态）。
+    await tester.pumpAndSettle();
     await tester.tap(find.text('第三条'));
-    await tester.pump();
+    await tester.pumpAndSettle();
 
     final y2 = tester.getTopLeft(find.text('第二条')).dy;
     final y3 = tester.getTopLeft(find.text('第三条')).dy;
@@ -362,6 +363,34 @@ void main() {
     // 先勾的「第二条」在最上，后勾的「第三条」紧跟其后，「第一条」未勾留在下面。
     expect(y2, lessThan(y3));
     expect(y3, lessThan(y1));
+  });
+
+
+  testWidgets('重排是滑动的：动画进行中行不在终位（防"直接闪现"回归）', (tester) async {
+    await _pumpHome(
+      tester,
+      AppData(todos: {
+        _todayKey(): [
+          TodoItem(text: '甲'),
+          TodoItem(text: '乙'),
+          TodoItem(text: '丙'),
+        ],
+      }),
+    );
+
+    final beforeY = tester.getTopLeft(find.text('乙')).dy;
+    await tester.tap(find.text('乙'));
+    // 起动画后只推进 100ms（总时长 240ms），此时应处在中间态。
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+    final midY = tester.getTopLeft(find.text('乙')).dy;
+
+    await tester.pumpAndSettle();
+    final endY = tester.getTopLeft(find.text('乙')).dy;
+
+    expect(endY, lessThan(beforeY), reason: '勾选后应移动到更靠上的位置');
+    expect(midY, greaterThan(endY), reason: '动画中途不应已经在终位（说明是瞬间跳变）');
+    expect(midY, lessThan(beforeY), reason: '动画中途应已离开原位');
   });
 
 }

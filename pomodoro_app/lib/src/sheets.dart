@@ -609,6 +609,10 @@ class _TodoRow extends StatelessWidget {
                 ),
               ),
             ),
+            // 常显的编辑按钮（2026-10-26 反馈：批量改内容时右键/长按太繁复）。
+            if (onEdit != null)
+              _GhostIcon(
+                  icon: Icons.edit_outlined, label: '编辑内容', onTap: onEdit!),
             _GhostIcon(
                 icon: Icons.delete_outline, label: '删除待办', onTap: onRemove),
             const SizedBox(width: 6),

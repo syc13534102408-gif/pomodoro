@@ -1757,8 +1757,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 }
 
 /// 最近记录行（手机）：整行可点 → 记录详情 sheet；删除在详情内进行。
-/// 日程条目（首页卡用）：点=勾选；桌面端悬停出铅笔、右键出菜单；手机端长按编辑。
-class _PlanLine extends StatefulWidget {
+/// 日程条目（首页卡用）：点=勾选；铅笔常显=编辑；桌面端右键还有菜单；手机端长按也能编辑。
+class _PlanLine extends StatelessWidget {
   const _PlanLine({
     required this.item,
     required this.fontSize,
@@ -1776,26 +1776,18 @@ class _PlanLine extends StatefulWidget {
   final VoidCallback onRemove;
 
   @override
-  State<_PlanLine> createState() => _PlanLineState();
-}
-
-class _PlanLineState extends State<_PlanLine> {
-  bool _hover = false;
-
-  @override
   Widget build(BuildContext context) {
-    final item = widget.item;
     final row = InkWell(
       borderRadius: BorderRadius.circular(8),
-      onTap: widget.onToggle,
+      onTap: onToggle,
       // 手机：长按编辑（触摸屏上没有右键）。桌面：长按不做任何事，避免和拖选冲突。
-      onLongPress: widget.desktop ? null : widget.onEdit,
-      onSecondaryTapDown: widget.desktop
+      onLongPress: desktop ? null : onEdit,
+      onSecondaryTapDown: desktop
           ? (details) => showPlanItemMenu(
                 context,
                 details.globalPosition,
-                onEdit: widget.onEdit,
-                onRemove: widget.onRemove,
+                onEdit: onEdit,
+                onRemove: onRemove,
               )
           : null,
       child: Padding(
@@ -1814,30 +1806,28 @@ class _PlanLineState extends State<_PlanLine> {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                  fontSize: widget.fontSize,
+                  fontSize: fontSize,
                   color: item.done ? PineColors.sub : PineColors.ink,
                   decoration: item.done ? TextDecoration.lineThrough : null,
                 ),
               ),
             ),
-            if (widget.desktop && _hover)
-              GestureDetector(
-                onTap: widget.onEdit,
-                child: const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 4),
-                  child: Icon(Icons.edit_outlined,
-                      size: 14, color: PineColors.sub),
-                ),
+            // 常显编辑按钮：批量改内容时不用先悬停/右键（2026-10-26 反馈）。
+            GestureDetector(
+              onTap: onEdit,
+              child: const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                child: Icon(Icons.edit_outlined,
+                    size: 14, color: PineColors.sub),
               ),
+            ),
           ],
         ),
       ),
     );
-    if (!widget.desktop) return row;
+    if (!desktop) return row;
     return MouseRegion(
       cursor: SystemMouseCursors.click,
-      onEnter: (_) => setState(() => _hover = true),
-      onExit: (_) => setState(() => _hover = false),
       child: row,
     );
   }

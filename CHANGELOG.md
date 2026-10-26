@@ -30,11 +30,24 @@
 - **顺手**：`plan_sheet_test` 里写死的 10/24、10/25 改成相对今天生成（在真正的 10/25 当天会与
   「今日日程」卡重复命中，实测踩到）；`scripts/build-macos.sh` 改为先离线 `pub get` 再 `--no-pub`，
   避免 pub.dev 抖动（2026-10-25 白跑一轮）。
-- 回归：`dart analyze` 零告警、`flutter test` **188 例全绿**（新增布局 5 例）。
+- 回归：`dart analyze` 零告警、`flutter test` **189 例全绿**（新增布局 5 例）。
 - **未做（评审里已列，待逐条勾选）**：P1-1 字号收敛到 6 档、P1-3 四条左缘、P1-5 徽标文字色、
   P1-6 点击热区、P2 全部。
 - 产物：`outputs/松果-v1.3.10-视觉修正-2026-10-25.apk`（19,708,627 B、versionName 1.3.10、
-  versionCode 17）、`outputs/pinecore-macos-2026-10-25.zip`（已装到 /Applications）。
+  versionCode 18）、`outputs/pinecore-macos-2026-10-25.zip`（已装到 /Applications）。
+
+## 2026-10-26（再补）· 编辑按钮常显（v1.3.17）
+
+- **反馈**：批量改内容时「悬停出铅笔 / 右键再点一下」太繁复。
+- **改法**：铅笔改为**每行常显**——首页日程卡、桌面信息卡日程行、跨天日程面板三处一致；
+  右键菜单与手机长按都保留（多入口，不互斥）。hover 只剩手型光标，不再控制可见性。
+- **副作用处理**：`_PlanLine` 不再需要 `_hover` 状态，从 StatefulWidget 降回 StatelessWidget，
+  顺带删掉一个假 hover 字段（评审 P2-4 的另一半）。
+- **行内空间**：面板行现在是「勾选框 + 文本 + 铅笔 + 删除」，13px 文本下仍单行不换行；
+  首页卡行同理。两个图标各 14pt，靠 `_GhostIcon`/`Padding` 控制命中区。
+- 回归：新增 1 例（不悬停、不右键，直接点铅笔进编辑），全量 **189 例全绿**。
+- 产物：`outputs/松果-v1.3.17-常显编辑-2026-10-26.apk`（versionName 1.3.17、versionCode 18）、
+  `outputs/pinecore-macos-2026-10-26.zip`（已装）。
 
 ## 2026-10-26（补）· 桌面端改用右键菜单 + 悬停铅笔（v1.3.16）
 
@@ -48,8 +61,8 @@
   右击同样出菜单，长按仍可用（面板两端共用）。
 - 顺带补上评审 P2-4 的一半：`_PlanLine` 有真实 hover 反馈，不再只是算而不用。
 - 回归：新增 1 例（桌面右键 → 菜单 → 编辑 → 保存，需切 `debugDefaultTargetPlatformOverride`），
-  全量 **188 例全绿**。
-- 产物：`outputs/松果-v1.3.16-桌面编辑-2026-10-26.apk`（versionName 1.3.16、versionCode 17，
+  全量 **189 例全绿**。
+- 产物：`outputs/松果-v1.3.16-桌面编辑-2026-10-26.apk`（versionName 1.3.16、versionCode 18，
   sha256 前缀 `a9b272134455acd6`）、`outputs/pinecore-macos-2026-10-26.zip`（已装）。
 ## 2026-10-26 · 导入的日程支持改文字（v1.3.15）
 
@@ -61,8 +74,8 @@
   done 变了等于误勾。单测里直接断言这三件事。
 - 弹窗用独立 `StatefulWidget` 持有 controller：在 `await showDialog` 之后立刻 dispose 会在关闭动画里
   抛 used-after-disposed（2026-10-23 踩过）；内容给固定宽度 320，避免 TextField 参与无界内在测量。
-- 回归：新增 2 例（面板长按改字 + 首页卡长按改字，前者同时断言 id/done 不变），全量 **188 例全绿**。
-- 产物：`outputs/松果-v1.3.15-日程可编辑-2026-10-26.apk`（versionName 1.3.15、versionCode 17，
+- 回归：新增 2 例（面板长按改字 + 首页卡长按改字，前者同时断言 id/done 不变），全量 **189 例全绿**。
+- 产物：`outputs/松果-v1.3.15-日程可编辑-2026-10-26.apk`（versionName 1.3.15、versionCode 18，
   sha256 前缀 `1c406fa79e2ee47f`）、`outputs/pinecore-macos-2026-10-26.zip`（已装）。
 
 ## 2026-10-25（凌晨）· 修「勾一条 = 勾一片」：待办 id 撞号（v1.3.14）
@@ -77,8 +90,8 @@
 - **验证**：新增 `test/todo_id_test.dart` 6 例（批量 200 条 id 全唯一、导入 30 条唯一、
   显式 id 保持、读盘修复同日/跨日重复、勾选只影响一条且同 id 时会勾中两条的反证）。
   实机复查 prefs：18 个日期、0 处重复，撞号条目已换新 id。
-- 回归：`dart analyze` 零告警、`flutter test` **188 例全绿**。
-- 产物：`outputs/松果-v1.3.14-勾选修复-2026-10-25.apk`（versionName 1.3.14、versionCode 17）、
+- 回归：`dart analyze` 零告警、`flutter test` **189 例全绿**。
+- 产物：`outputs/松果-v1.3.14-勾选修复-2026-10-25.apk`（versionName 1.3.14、versionCode 18）、
   `outputs/pinecore-macos-2026-10-25.zip`（已装）。
 - **教训**："同一次循环里创建的对象"不能只靠时间戳做 id——这类 id 要在**创建处**保证唯一，
   在**读取处**保证修复，两道都要有。
@@ -96,9 +109,9 @@
 - **踩坑记录**：第一次截图只看到 3 条，一度以为分档没生效——实际是**被 pkill 前后的旧实例残帧**。
   用 `flutter run -d macos` 打印 `MediaQuery` 高度（760.0）才定位，之后重启释放的新实例即正确。
   教训：桌面端改尺寸后，截图前先确认进程启动时间晚于产物 mtime。
-- 回归：`test/desktop_layout_test.dart` 扩到 8 例（新增 560×760、600×820 两档），全量 **188 例全绿**。
+- 回归：`test/desktop_layout_test.dart` 扩到 8 例（新增 560×760、600×820 两档），全量 **189 例全绿**。
 - 产物：`outputs/松果-v1.3.13-默认窗-2026-10-25.apk`（19,708,559 B、versionName 1.3.13、
-  versionCode 17）、`outputs/pinecore-macos-2026-10-25.zip`（已装）。
+  versionCode 18）、`outputs/pinecore-macos-2026-10-25.zip`（已装）。
 
 ## 2026-10-25（夜）· 今日日程直接打勾；最近完成搬进统计抽屉（v1.3.12）
 
@@ -115,9 +128,9 @@
   点行仍进详情可改可删）。桌面主窗不再渲染记录列表，`_desktopInfoRow` 那行入口随之删除。
 - **回归**：`test/desktop_layout_test.dart` 重写为 6 例——三种窗尺寸 `maxScrollExtent == 0`、
   主窗**断言不再出现「最近完成」**、日程条数分档、统计页能看到最近完成。
-  `test/plan_sheet_test.dart` 的入口从「去安排」改为「全部 ›」。全量 **188 例全绿**。
+  `test/plan_sheet_test.dart` 的入口从「去安排」改为「全部 ›」。全量 **189 例全绿**。
 - 产物：`outputs/松果-v1.3.12-今日日程-2026-10-25.apk`（19,708,559 B、versionName 1.3.12、
-  versionCode 17，sha256 前缀 `237920814b612673`）、`outputs/pinecore-macos-2026-10-25.zip`（已装）。
+  versionCode 18，sha256 前缀 `237920814b612673`）、`outputs/pinecore-macos-2026-10-25.zip`（已装）。
 
 ## 2026-10-25（晚）· 决策 A3 + B1：环内文案分级、金色分两档（v1.3.11）
 
@@ -134,9 +147,9 @@
   这条同时修掉了前一天 P0-2 的残留：长休阶段色此前仍走 `gold`（对纸面 2.00:1，大字号下限 3.0）。
 - **新增令牌级回归** `test/stage_color_test.dart`（6 例）：两档映射 + 对比度下限
   （弧线 ≥3.0、`sub` ≥4.5、ink-on-gold ≥4.5、`track` 必须比 `line` 显眼但不抢弧）。
-- 回归：`dart analyze` 零告警、`flutter test` **188 例全绿**。
+- 回归：`dart analyze` 零告警、`flutter test` **189 例全绿**。
 - 产物：`outputs/松果-v1.3.11-文案分级-2026-10-25.apk`（19,708,627 B、versionName 1.3.11、
-  versionCode 17）、`outputs/pinecore-macos-2026-10-25.zip`（已装到 /Applications）。
+  versionCode 18）、`outputs/pinecore-macos-2026-10-25.zip`（已装到 /Applications）。
 
 ## 2026-10-23（夜）· 日程智能解析：服务端 /plan/parse（v1.3.9）
 

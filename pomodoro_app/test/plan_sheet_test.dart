@@ -307,4 +307,34 @@ void main() {
     }
   });
 
+
+  testWidgets('铅笔常显：不悬停、不右键，直接点铅笔就能进编辑', (tester) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
+    tester.view.devicePixelRatio = 2.0;
+    tester.view.physicalSize = const Size(1120, 1520);
+    try {
+      final today = _todayKey();
+      await _pumpHome(
+        tester,
+        AppData(todos: {
+          today: [TodoItem(text: '点铅笔改我')],
+        }),
+      );
+
+      // 没有 hover 也看得见
+      expect(find.byIcon(Icons.edit_outlined), findsWidgets);
+      await tester.tap(find.byIcon(Icons.edit_outlined).first);
+      await tester.pumpAndSettle();
+      expect(find.text('编辑内容'), findsOneWidget);
+
+      await tester.enterText(find.byType(TextField).last, '铅笔改好了');
+      await tester.tap(find.text('保存'));
+      await tester.pumpAndSettle();
+      expect(find.text('铅笔改好了'), findsOneWidget);
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+      tester.view.reset();
+    }
+  });
+
 }

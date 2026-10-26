@@ -1662,11 +1662,22 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         });
   }
 
+  void _removePlanItem(String dayKey, TodoItem item) {
+    _applyTodos((todos) => {
+          ...todos,
+          dayKey: [
+            for (final entry in todos[dayKey] ?? const <TodoItem>[])
+              if (entry.id != item.id) entry,
+          ],
+        });
+  }
+
   Widget _planRow(String dayKey, TodoItem item, {double fontSize = 12}) =>
-      InkWell(
-        borderRadius: BorderRadius.circular(8),
-        onLongPress: () => _editPlanItem(dayKey, item),
-        onTap: () => _applyTodos((todos) => {
+      _PlanLine(
+        item: item,
+        fontSize: fontSize,
+        desktop: _desktop,
+        onToggle: () => _applyTodos((todos) => {
               ...todos,
               dayKey: [
                 for (final entry in todos[dayKey] ?? const <TodoItem>[])
@@ -1675,32 +1686,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                       : entry,
               ],
             }),
-        child: Padding(
-          // 行高 ~26：内容 18 + 上下 4，可点区域靠这个内边距撑开。
-          padding: const EdgeInsets.symmetric(vertical: 4),
-          child: Row(
-            children: [
-              Icon(
-                item.done ? Icons.check_circle : Icons.radio_button_unchecked,
-                size: 16,
-                color: item.done ? PineColors.pine : PineColors.faint,
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  item.text,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: fontSize,
-                    color: item.done ? PineColors.sub : PineColors.ink,
-                    decoration: item.done ? TextDecoration.lineThrough : null,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
+        onEdit: () => _editPlanItem(dayKey, item),
+        onRemove: () => _removePlanItem(dayKey, item),
       );
 
   Widget _recent() {
@@ -1770,6 +1757,92 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 }
 
 /// 最近记录行（手机）：整行可点 → 记录详情 sheet；删除在详情内进行。
+/// 日程条目（首页卡用）：点=勾选；桌面端悬停出铅笔、右键出菜单；手机端长按编辑。
+class _PlanLine extends StatefulWidget {
+  const _PlanLine({
+    required this.item,
+    required this.fontSize,
+    required this.desktop,
+    required this.onToggle,
+    required this.onEdit,
+    required this.onRemove,
+  });
+
+  final TodoItem item;
+  final double fontSize;
+  final bool desktop;
+  final VoidCallback onToggle;
+  final VoidCallback onEdit;
+  final VoidCallback onRemove;
+
+  @override
+  State<_PlanLine> createState() => _PlanLineState();
+}
+
+class _PlanLineState extends State<_PlanLine> {
+  bool _hover = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final item = widget.item;
+    final row = InkWell(
+      borderRadius: BorderRadius.circular(8),
+      onTap: widget.onToggle,
+      // 手机：长按编辑（触摸屏上没有右键）。桌面：长按不做任何事，避免和拖选冲突。
+      onLongPress: widget.desktop ? null : widget.onEdit,
+      onSecondaryTapDown: widget.desktop
+          ? (details) => showPlanItemMenu(
+                context,
+                details.globalPosition,
+                onEdit: widget.onEdit,
+                onRemove: widget.onRemove,
+              )
+          : null,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Row(
+          children: [
+            Icon(
+              item.done ? Icons.check_circle : Icons.radio_button_unchecked,
+              size: 16,
+              color: item.done ? PineColors.pine : PineColors.faint,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                item.text,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: widget.fontSize,
+                  color: item.done ? PineColors.sub : PineColors.ink,
+                  decoration: item.done ? TextDecoration.lineThrough : null,
+                ),
+              ),
+            ),
+            if (widget.desktop && _hover)
+              GestureDetector(
+                onTap: widget.onEdit,
+                child: const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 4),
+                  child: Icon(Icons.edit_outlined,
+                      size: 14, color: PineColors.sub),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+    if (!widget.desktop) return row;
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _hover = true),
+      onExit: (_) => setState(() => _hover = false),
+      child: row,
+    );
+  }
+}
+
 class _RecentRow extends StatelessWidget {
   const _RecentRow({
     required this.record,

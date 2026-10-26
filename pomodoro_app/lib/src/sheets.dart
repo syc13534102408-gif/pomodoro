@@ -558,6 +558,7 @@ class _TodoRow extends StatelessWidget {
     required this.onRemove,
     this.onFocus,
     this.onEdit,
+    this.onMenu,
   });
 
   final TodoItem item;
@@ -570,9 +571,12 @@ class _TodoRow extends StatelessWidget {
   /// 长按「编辑内容」。日程面板传这个；两者都给时长按优先编辑。
   final VoidCallback? onEdit;
 
+  /// 桌面右键菜单（编辑/删除）。传入后鼠标右击该行会弹菜单。
+  final void Function(Offset globalPosition)? onMenu;
+
   @override
   Widget build(BuildContext context) {
-    return BrickPressable(
+    final row = BrickPressable(
       onTap: null,
       onLongPress: onEdit ?? onFocus,
       semanticLabel: onEdit == null
@@ -612,6 +616,14 @@ class _TodoRow extends StatelessWidget {
         ),
       ),
     );
+    final withMenu = onMenu == null
+        ? row
+        : GestureDetector(
+            behavior: HitTestBehavior.translucent,
+            onSecondaryTapDown: (details) => onMenu!(details.globalPosition),
+            child: row,
+          );
+    return withMenu;
   }
 }
 
@@ -684,6 +696,32 @@ class _TodoEditDialogState extends State<_TodoEditDialog> {
       ],
     );
   }
+}
+
+/// 日程条目的桌面右键菜单（编辑/删除）。
+///
+/// macOS 上"长按"是触摸屏姿势，鼠标用户不会那么操作（2026-10-26 反馈）；
+/// 桌面端改用系统习惯的右键菜单，长按仍然留给手机。
+Future<void> showPlanItemMenu(
+  BuildContext context,
+  Offset globalPosition, {
+  required VoidCallback onEdit,
+  required VoidCallback onRemove,
+}) async {
+  final overlay = Overlay.of(context).context.findRenderObject() as RenderBox;
+  final action = await showMenu<String>(
+    context: context,
+    position: RelativeRect.fromRect(
+      Rect.fromPoints(globalPosition, globalPosition),
+      Offset.zero & overlay.size,
+    ),
+    items: const [
+      PopupMenuItem<String>(value: 'edit', child: Text('编辑内容')),
+      PopupMenuItem<String>(value: 'delete', child: Text('删除')),
+    ],
+  );
+  if (action == 'edit') onEdit();
+  if (action == 'delete') onRemove();
 }
 
 /// 对 todos 的一次变换。父级拿**最新** `_data` 去套，而不是用面板打开时的快照整份回写
@@ -871,6 +909,12 @@ class _PlanSheetState extends State<_PlanSheet> {
                           onToggle: () => _toggle(key, item),
                           onRemove: () => _remove(key, item),
                           onEdit: () => _editItem(key, item),
+                          onMenu: (position) => showPlanItemMenu(
+                            context,
+                            position,
+                            onEdit: () => _editItem(key, item),
+                            onRemove: () => _remove(key, item),
+                          ),
                         ),
                       ),
                     const SizedBox(height: 6),

@@ -1,5 +1,7 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -267,6 +269,42 @@ void main() {
 
     expect(find.text('已经改好了'), findsOneWidget);
     expect(find.text('改我这条'), findsNothing);
+  });
+
+
+  testWidgets('桌面端右键日程条目出菜单，可选「编辑内容」', (tester) async {
+    // 右键/悬停是桌面专属分支，必须把平台切成 macOS 才会启用（见 _PlanLine.desktop）。
+    debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
+    tester.view.devicePixelRatio = 2.0;
+    tester.view.physicalSize = const Size(1120, 1520);
+    try {
+      final today = _todayKey();
+      await _pumpHome(
+        tester,
+        AppData(todos: {
+          today: [TodoItem(text: '右键改我')],
+        }),
+      );
+
+      await tester.tap(
+        find.text('右键改我'),
+        kind: PointerDeviceKind.mouse,
+        buttons: kSecondaryMouseButton,
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('编辑内容'), findsOneWidget);
+      await tester.tap(find.text('编辑内容'));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(find.byType(TextField).last, '右键改好了');
+      await tester.tap(find.text('保存'));
+      await tester.pumpAndSettle();
+      expect(find.text('右键改好了'), findsOneWidget);
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+      tester.view.reset();
+    }
   });
 
 }

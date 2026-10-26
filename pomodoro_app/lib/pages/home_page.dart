@@ -1677,14 +1677,11 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         item: item,
         fontSize: fontSize,
         desktop: _desktop,
+        // 勾选即重排：完成的按勾选顺序浮到顶部（见 toggleTodoDone）。
         onToggle: () => _applyTodos((todos) => {
               ...todos,
-              dayKey: [
-                for (final entry in todos[dayKey] ?? const <TodoItem>[])
-                  entry.id == item.id
-                      ? entry.copyWith(done: !entry.done)
-                      : entry,
-              ],
+              dayKey:
+                  toggleTodoDone(todos[dayKey] ?? const <TodoItem>[], item.id),
             }),
         onEdit: () => _editPlanItem(dayKey, item),
         onRemove: () => _removePlanItem(dayKey, item),

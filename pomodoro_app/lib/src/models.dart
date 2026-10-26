@@ -367,6 +367,25 @@ class TodoItem {
       );
 }
 
+/// 勾选/取消勾选的**排序语义**（2026-10-26 定）：
+///
+/// - 勾上 → 插到「已完成区」末尾。于是第一条勾的排最上，之后每勾一条跟在上一条后面；
+/// - 取消勾选 → 退回列表末尾（未完成区最后），不打乱其它条目的相对顺序。
+///
+/// 顺序本身就是持久化数据（todos 是 List），不需要额外存时间戳。
+List<TodoItem> toggleTodoDone(List<TodoItem> items, String id) {
+  final index = items.indexWhere((item) => item.id == id);
+  if (index < 0) return items;
+  final item = items[index];
+  final rest = <TodoItem>[...items]..removeAt(index);
+  if (item.done) {
+    return [...rest, item.copyWith(done: false)];
+  }
+  // 已完成区末尾 = 剩余条目里 done 的个数。
+  final doneCount = rest.where((entry) => entry.done).length;
+  return <TodoItem>[...rest]..insert(doneCount, item.copyWith(done: true));
+}
+
 /// 进行中的会话。字段与网页端 `data.activeSession` 一致。
 class ActiveSession {
   const ActiveSession({

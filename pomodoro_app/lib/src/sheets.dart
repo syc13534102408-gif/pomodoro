@@ -801,14 +801,10 @@ class _PlanSheetState extends State<_PlanSheet> {
     widget.onApply(transform);
   }
 
+  /// 勾选即重排：完成的按勾选顺序浮到顶部（见 toggleTodoDone）。
   void _toggle(String dayKey, TodoItem item) => _apply((todos) => {
         ...todos,
-        dayKey: [
-          for (final entry in todos[dayKey] ?? const <TodoItem>[])
-            entry.id == item.id
-                ? entry.copyWith(done: !entry.done)
-                : entry,
-        ],
+        dayKey: toggleTodoDone(todos[dayKey] ?? const <TodoItem>[], item.id),
       });
 
   void _remove(String dayKey, TodoItem item) => _apply((todos) => {

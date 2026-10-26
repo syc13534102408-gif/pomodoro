@@ -337,4 +337,31 @@ void main() {
     }
   });
 
+
+  testWidgets('勾选后条目真的浮到最上面（视觉顺序回归）', (tester) async {
+    // 首页卡只放今天，不涉及桌面分支；直接点行即可。
+    await _pumpHome(
+      tester,
+      AppData(todos: {
+        _todayKey(): [
+          TodoItem(text: '第一条'),
+          TodoItem(text: '第二条'),
+          TodoItem(text: '第三条'),
+        ],
+      }),
+    );
+
+    await tester.tap(find.text('第二条'));
+    await tester.pump();
+    await tester.tap(find.text('第三条'));
+    await tester.pump();
+
+    final y2 = tester.getTopLeft(find.text('第二条')).dy;
+    final y3 = tester.getTopLeft(find.text('第三条')).dy;
+    final y1 = tester.getTopLeft(find.text('第一条')).dy;
+    // 先勾的「第二条」在最上，后勾的「第三条」紧跟其后，「第一条」未勾留在下面。
+    expect(y2, lessThan(y3));
+    expect(y3, lessThan(y1));
+  });
+
 }

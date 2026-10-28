@@ -167,21 +167,45 @@ class _StatsPageState extends State<StatsPage> {
               children: [
                 SectionHeader(
                   title: '最近完成',
-                  trailing: InkWell(
-                    borderRadius: BorderRadius.circular(99),
-                    onTap: () => showAllRecordsSheet(
-                      context,
-                      data: data,
-                      colorFor: _colorFor,
-                      onChanged: widget.onChanged,
-                    ),
-                    child: const Padding(
-                      padding:
-                          EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                      child: Text('全部 ›',
-                          style:
-                              TextStyle(color: PineColors.sub, fontSize: 12)),
-                    ),
+                  // 「补记」跟着记录一起搬到这里：桌面主窗去掉「最近完成」后，
+                  // 这个入口一度只剩手机端有（2026-10-28 反馈）。
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      InkWell(
+                        borderRadius: BorderRadius.circular(99),
+                        onTap: () => showManualSheet(
+                          context,
+                          data: data,
+                          onChanged: widget.onChanged,
+                        ),
+                        child: const Padding(
+                          padding: EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 3),
+                          child: Text('＋ 补记',
+                              style: TextStyle(
+                                  color: PineColors.pine,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600)),
+                        ),
+                      ),
+                      InkWell(
+                        borderRadius: BorderRadius.circular(99),
+                        onTap: () => showAllRecordsSheet(
+                          context,
+                          data: data,
+                          colorFor: _colorFor,
+                          onChanged: widget.onChanged,
+                        ),
+                        child: const Padding(
+                          padding:
+                              EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                          child: Text('全部 ›',
+                              style: TextStyle(
+                                  color: PineColors.sub, fontSize: 12)),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
                 const SizedBox(height: 8),

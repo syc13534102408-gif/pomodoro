@@ -141,5 +141,11 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('最近完成'), findsOneWidget);
     expect(find.text('自控'), findsWidgets);
+
+    // 补记入口跟着「最近完成」一起搬进抽屉（2026-10-28 反馈：桌面端一度没有补记）。
+    expect(find.text('＋ 补记'), findsOneWidget);
+    await tester.tap(find.text('＋ 补记'));
+    await tester.pumpAndSettle();
+    expect(find.text('补记已完成事件'), findsOneWidget);
   });
 }

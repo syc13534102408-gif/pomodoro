@@ -622,17 +622,27 @@ class TimerEngine {
   ///
   /// **`at` 变更时必须同步重算 `dayKey`**：统计与"今日/本周"全按归属日聚合，
   /// 只改时刻不改归属日，这条记录会留在错误的一天（口径见 docs/07 §2 #11）。
+  /// 改一条记录的时长 / 完成时刻 / **所属任务**。
+  ///
+  /// 2026-11-02 增补 `taskName`：之前只能改时长与时刻，把记录从「高数」挪到
+  /// 「自控」这种**任务归属错误**无处可改（改事件只动 eventId，`taskName` 不变，
+  /// 统计里的「任务构成」仍算在旧任务上）。
+  ///
+  /// 改任务时**不清空** eventId——是否保留由调用方显式决定（记录面板会把事件
+  /// 下拉重置为空，避免留下"任务与事件不是同一任务"的错配）。
   static AppData updateRecord(
     AppData data,
     String recordId, {
     double? minutes,
     DateTime? at,
+    String? taskName,
   }) =>
       data.copyWith(
         records: [
           for (final record in data.records)
             if (record.id == recordId)
               record.copyWith(
+                taskName: taskName,
                 minutes: minutes ?? record.minutes,
                 at: at ?? record.at,
                 dayKey: at == null ? record.dayKey : dateKey(at),

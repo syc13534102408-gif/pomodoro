@@ -46,7 +46,7 @@ $F config --jdk-dir    "$PWD/tools/jdk/jdk-17.0.13.jdk"
 cd pomodoro_app && $F pub get
 
 # 日常（在 pomodoro_app/ 内）
-$F --suppress-analytics test         # 197 项用例 / 23 个文件，应全绿
+$F --suppress-analytics test         # 201 项用例 / 23 个文件，应全绿
 ../tools/flutter/bin/dart analyze    # flutter analyze 的 LSP 在本机会崩，用这个
 $F build apk --release --target-platform android-arm64
 ```
@@ -107,7 +107,7 @@ pinecone/
 
 ## 📍 当前状态（2026-10-23）
 
-- 版本 **v1.3.19+20**；`dart analyze` 零告警、`flutter test` **197 例全绿**
+- 版本 **v1.3.19+20**；`dart analyze` 零告警、`flutter test` **201 例全绿**
 - UI 为**方案 E「松林手帐」**（`theme.dart` 令牌 v2）；方案 D「扁平积木」规格降为历史稿
 - 网页端自 2026-09-02 冻结，不再跟功能（见 [CHANGELOG](CHANGELOG.md) 2026-10-23）
 - 工作区与 `origin/main` 已同步（"本地领先 22 个提交"的状态已结束）

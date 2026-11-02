@@ -144,7 +144,8 @@ void main() {
 
     // 一并把这条记录归入事件：点开下拉 → 选事件
     expect(find.text('归入专注事件'), findsOneWidget, reason: '对话框应有归属选择');
-    await tester.tap(find.byType(DropdownButtonFormField<String>));
+    // 对话框现在有两个下拉（所属任务 + 归入专注事件），事件是后加的那个。
+    await tester.tap(find.byType(DropdownButtonFormField<String>).last);
     await tester.pumpAndSettle();
     await tester.tap(find.textContaining('第六章').last);
     await tester.pumpAndSettle();

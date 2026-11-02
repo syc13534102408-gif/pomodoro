@@ -1455,15 +1455,26 @@ class _RecordDetailSheet extends StatelessWidget {
     final controller = TextEditingController(text: rounded);
     var at = record.at;
     // '' = 不属于任何事件（下拉 value 不能为 null，否则显示的是 hint 而不是选中项）
+    // 所属任务（2026-11-02）：记录可以是"记错任务"的，之前只能改时长/时刻，
+    // 「高数」改成「自控」这种需求无处可改。
+    var taskName = record.taskName;
+    final taskNames = <String>{
+      for (final task in data.tasks) task.name,
+      record.taskName,
+    }.toList()
+      ..sort();
+
     var eventId = record.eventId ?? '';
-    final eventOptions = <String, String>{
-      '': '不属于任何事件',
-      for (final event in data.events)
-        event.id: '${event.name}（${event.taskName}）${event.statusLabel}',
-    };
-    // 旧数据可能残留指向已删除事件的 id：补一个可显示的项，避免下拉断言失败
-    if (!eventOptions.containsKey(eventId)) {
-      eventOptions[eventId] = '（原事件已删除）';
+    // 事件按任务过滤：跨任务的错误归属本来就不该出现，下拉里只给同任务的事件。
+    Map<String, String> eventOptionsFor(String forTask) {
+      final options = <String, String>{'': '不属于任何事件'};
+      for (final event in data.events) {
+        if (event.taskName != forTask) continue;
+        options[event.id] = event.statusLabel.isEmpty
+            ? event.name
+            : '${event.name} · ${event.statusLabel}';
+      }
+      return options;
     }
     final saved = await showDialog<bool>(
       context: context,
@@ -1544,27 +1555,60 @@ class _RecordDetailSheet extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 14),
-                  // 归入哪条专注事件：把漏归 / 悬空的记录接回正确事件（数据修复入口）
+                  // 所属任务：改这里会重置下方事件选择（跨任务的事件不允许保留）。
                   DropdownButtonFormField<String>(
-                    initialValue: eventId,
+                    initialValue: taskNames.contains(taskName) ? taskName : null,
                     isDense: true,
                     decoration: const InputDecoration(
-                        labelText: '归入专注事件', isDense: true),
+                        labelText: '所属任务', isDense: true),
                     items: [
-                      for (final entry in eventOptions.entries)
+                      for (final name in taskNames)
                         DropdownMenuItem<String>(
-                          value: entry.key,
-                          child: Text(
-                            entry.value,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(fontSize: 13),
-                          ),
+                          value: name,
+                          child: Text(name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(fontSize: 13)),
                         ),
                     ],
-                    onChanged: (value) =>
-                        setDialogState(() => eventId = value ?? ''),
+                    onChanged: (value) => setDialogState(() {
+                      if (value == null || value == taskName) return;
+                      taskName = value;
+                      eventId = ''; // 换任务 → 事件必须重选，避免任务与事件对不上
+                    }),
                   ),
+                  const SizedBox(height: 14),
+                  // 归入哪条专注事件：把漏归 / 悬空的记录接回正确事件（数据修复入口）
+                  Builder(builder: (context) {
+                    final eventOptions = eventOptionsFor(taskName);
+                    if (!eventOptions.containsKey(eventId)) {
+                      // 旧数据可能残留指向已删除事件、或别的任务事件的 id：
+                      // 补一个可显示的项，避免下拉断言失败，同时提示它不匹配。
+                      eventOptions[eventId] = '（与当前任务不匹配的旧事件）';
+                    }
+                    return DropdownButtonFormField<String>(
+                      // key 随任务/选择变化，强制重建，否则 initialValue 不会跟着刷新
+                      key: ValueKey<String>('event-$taskName-$eventId'),
+                      initialValue: eventId,
+                      isDense: true,
+                      decoration: const InputDecoration(
+                          labelText: '归入专注事件', isDense: true),
+                      items: [
+                        for (final entry in eventOptions.entries)
+                          DropdownMenuItem<String>(
+                            value: entry.key,
+                            child: Text(
+                              entry.value,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(fontSize: 13),
+                            ),
+                          ),
+                      ],
+                      onChanged: (value) =>
+                          setDialogState(() => eventId = value ?? ''),
+                    );
+                  }),
                 ],
               ),
             ),
@@ -1585,8 +1629,13 @@ class _RecordDetailSheet extends StatelessWidget {
     if (saved != true) return;
     final minutes = double.tryParse(controller.text.trim());
     if (minutes == null || minutes < 0) return;
-    var next =
-        TimerEngine.updateRecord(data, record.id, minutes: minutes, at: at);
+    var next = TimerEngine.updateRecord(
+      data,
+      record.id,
+      minutes: minutes,
+      at: at,
+      taskName: taskName,
+    );
     next = TimerEngine.setRecordEvent(
         next, record.id, eventId.isEmpty ? null : eventId);
     onChanged(next);

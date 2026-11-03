@@ -1321,8 +1321,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         (MediaQuery.sizeOf(context).width - 16).clamp(300.0, 356.0).toDouble();
     final page = _desktopOverlay == _overlayPlan
         ? Padding(
-            // 抽屉里没有底部弹层的内边距，这里补上，和统计/设置页对齐。
-            padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
+            // 横向内边距与统计/设置页对齐；顶部留给抽屉外的按钮带（见外层 Padding）。
+            padding: const EdgeInsets.fromLTRB(18, 0, 18, 16),
             child: PlanPanel(data: _data, onApply: _applyTodos),
           )
         : _desktopOverlay == _overlayStats
@@ -1347,7 +1347,12 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
           ),
         ],
       ),
-      child: page,
+      // 三只抽屉开关浮在窗口右上角（必须压在最上层才关得掉），
+      // 这里让出 48pt 给它们：否则抽屉里的「导入」按钮会被正好盖住（2026-11-03 反馈）。
+      child: Padding(
+        padding: const EdgeInsets.only(top: 48),
+        child: page,
+      ),
     );
   }
 

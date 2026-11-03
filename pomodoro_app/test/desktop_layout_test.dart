@@ -9,6 +9,7 @@ import 'package:pomodoro_app/main.dart';
 import 'package:pomodoro_app/pages/stats_page.dart';
 import 'package:pomodoro_app/src/models.dart';
 import 'package:pomodoro_app/src/sheets.dart';
+import 'package:pomodoro_app/src/widgets.dart';
 
 /// 桌面「专注舱」的布局回归。
 ///
@@ -192,6 +193,54 @@ void main() {
       await tester.pumpAndSettle();
       expect(inPanel('明天的活'), findsOneWidget);
       expect(inPanel('今天的活'), findsNothing);
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+      tester.view.reset();
+    }
+  });
+
+
+  testWidgets('抽屉里的「导入」按钮不能被右上角抽屉开关盖住', (tester) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
+    tester.view.devicePixelRatio = 2.0;
+    tester.view.physicalSize = const Size(1120, 1520);
+    try {
+      final now = DateTime.now();
+      await _pumpDesktop(
+        tester,
+        width: 560,
+        height: 760,
+        data: AppData(
+          todos: {
+            ymdOf(dayStart(now)): [TodoItem(text: '今天的活')],
+          },
+          settings: const TimerSettings(focus: 60, short: 10, long: 20),
+        ),
+      );
+
+      await tester.tap(find.text('全部 ›'));
+      await tester.pumpAndSettle();
+
+      final importRect = tester.getRect(
+        find.widgetWithText(BrickButton, '导入'),
+      );
+      // 三只抽屉开关：日程 / 统计 / 设置
+      final toggleRects = <Rect>[
+        for (final icon in <IconData>[
+          Icons.checklist_rtl_rounded,
+          Icons.bar_chart_rounded,
+          Icons.tune_rounded,
+        ])
+          tester.getRect(find.byIcon(icon).first),
+      ];
+
+      for (final rect in toggleRects) {
+        expect(importRect.overlaps(rect), isFalse,
+            reason: '「导入」$importRect 与抽屉开关 $rect 重叠——会被挡住/点不到');
+      }
+      // 抽屉开关本身也必须可点（没被抽屉内容反盖）
+      expect(importRect.top, greaterThan(toggleRects.first.bottom),
+          reason: '导入按钮应整体位于开关带下方');
     } finally {
       debugDefaultTargetPlatformOverride = null;
       tester.view.reset();

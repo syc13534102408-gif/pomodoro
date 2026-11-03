@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:pomodoro_app/main.dart';
 import 'package:pomodoro_app/pages/stats_page.dart';
 import 'package:pomodoro_app/src/models.dart';
+import 'package:pomodoro_app/src/sheets.dart';
 
 /// 桌面「专注舱」的布局回归。
 ///
@@ -148,4 +149,53 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('补记已完成事件'), findsOneWidget);
   });
+
+  testWidgets('桌面点「全部 ›」打开的是右侧抽屉（不是底部弹层）', (tester) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
+    tester.view.devicePixelRatio = 2.0;
+    tester.view.physicalSize = const Size(1120, 1520);
+    try {
+      final now = DateTime.now();
+      final today = ymdOf(dayStart(now));
+      final tomorrow = ymdOf(dayStart(now.add(const Duration(days: 1))));
+      await _pumpDesktop(
+        tester,
+        width: 560,
+        height: 760,
+        data: AppData(
+          todos: {
+            today: [TodoItem(text: '今天的活')],
+            tomorrow: [TodoItem(text: '明天的活')],
+          },
+          settings: const TimerSettings(focus: 60, short: 10, long: 20),
+        ),
+      );
+
+      await tester.tap(find.text('全部 ›'));
+      await tester.pumpAndSettle();
+
+      // 抽屉：面板自带标题 + 日期条「今天」
+      expect(find.text('日程'), findsOneWidget);
+      expect(find.text('今天'), findsOneWidget);
+      // 主窗卡片里也有今天的条目，所以断言要落在抽屉内部。
+      Finder inPanel(String text) => find.descendant(
+            of: find.byType(PlanPanel),
+            matching: find.text(text),
+          );
+      expect(inPanel('今天的活'), findsOneWidget);
+      // 底部弹层会有 Material 的 bottom sheet 路由；抽屉没有 modal barrier 的文字。
+      expect(find.byType(BottomSheet), findsNothing);
+
+      // 切换到明天
+      final chip = '${now.add(const Duration(days: 1)).month}/${now.add(const Duration(days: 1)).day}';
+      await tester.tap(find.text(chip));
+      await tester.pumpAndSettle();
+      expect(inPanel('明天的活'), findsOneWidget);
+      expect(inPanel('今天的活'), findsNothing);
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+      tester.view.reset();
+    }
+  });
+
 }

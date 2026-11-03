@@ -54,7 +54,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   static const _overlayNone = 0;
   static const _overlayStats = 1;
   static const _overlaySettings = 2;
-  int _desktopOverlay = _overlayNone; // 0=无抽屉 1=统计 2=设置（方向 B 专注舱）
+  static const _overlayPlan = 3;
+  // 0=无抽屉 1=统计 2=设置 3=日程（方向 B 专注舱）
+  int _desktopOverlay = _overlayNone;
 
   /// 手机端底部导航当前 Tab（专注 / 报告 / 设置，D1）。
   int _tab = 0;
@@ -694,7 +696,12 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     _replace(_data.copyWith(todos: transform(_data.todos)));
   }
 
+  /// 打开日程：桌面走右侧抽屉（与统计/设置同一套机制），手机走底部弹层。
   void _openPlanSheet() {
+    if (_desktop) {
+      setState(() => _desktopOverlay = _overlayPlan);
+      return;
+    }
     showPlanSheet(context, data: _data, onApply: _applyTodos);
   }
 
@@ -937,6 +944,12 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  _desktopOverlayButton(
+                    which: _overlayPlan,
+                    icon: Icons.checklist_rtl_rounded,
+                    tooltip: '日程',
+                  ),
+                  const SizedBox(width: 8),
                   _desktopOverlayButton(
                     which: _overlayStats,
                     icon: Icons.bar_chart_rounded,
@@ -1306,7 +1319,13 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   Widget _desktopDrawer() {
     final width =
         (MediaQuery.sizeOf(context).width - 16).clamp(300.0, 356.0).toDouble();
-    final page = _desktopOverlay == _overlayStats
+    final page = _desktopOverlay == _overlayPlan
+        ? Padding(
+            // 抽屉里没有底部弹层的内边距，这里补上，和统计/设置页对齐。
+            padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
+            child: PlanPanel(data: _data, onApply: _applyTodos),
+          )
+        : _desktopOverlay == _overlayStats
         ? StatsPage(data: _data, onChanged: _replace)
         : SettingsPage(
             data: _data,

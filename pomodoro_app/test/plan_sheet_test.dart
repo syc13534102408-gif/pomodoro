@@ -72,12 +72,12 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('日程'), findsOneWidget);
+    // 新面板默认停在「今天」，明天在日期条上——点它才看得到当天清单。
+    final chip = '${today.add(const Duration(days: 1)).month}/${today.add(const Duration(days: 1)).day}';
+    expect(find.text(chip), findsOneWidget);
+    await tester.tap(find.text(chip));
+    await tester.pumpAndSettle();
     expect(find.text('816 真题① 限时'), findsOneWidget);
-    expect(
-      find.text(chineseDate(today.add(const Duration(days: 1)),
-          withYear: false)),
-      findsWidgets,
-    );
   });
 
   testWidgets('日程面板里粘贴导入：预览条数 → 确认后落到对应日期', (tester) async {
@@ -112,7 +112,14 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    // 导入后默认仍停在今天；点日期条上第一天才能看到导入的条目。
+    expect(find.text(md(d1)), findsOneWidget);
+    await tester.tap(find.text(md(d1)));
+    await tester.pumpAndSettle();
     expect(find.text('2018 数一复盘'), findsOneWidget);
+
+    await tester.tap(find.text(md(d2)));
+    await tester.pumpAndSettle();
     expect(find.text('现控 ch5 下半'), findsOneWidget);
   });
 

@@ -740,44 +740,39 @@ typedef TodosTransform = Map<String, List<TodoItem>> Function(
 ///
 /// **日期键用自然日 `ymdOf(目标日)`，不套凌晨 3 点的统计日口径**——否则凌晨排
 /// 「明天」的任务会掉进昨天（见 plan_import.dart 的口径说明）。
-Future<void> showPlanSheet(
-  BuildContext context, {
-  required AppData data,
-  required ValueChanged<TodosTransform> onApply,
-  DateTime? now,
-
-  /// 测试注入用；为 null 时走真实的 [PlanRemote]。
-  Future<String> Function(String text)? remote,
-}) {
-  return showModalBottomSheet(
-    context: context,
-    isScrollControlled: true,
-    backgroundColor: PineColors.paper,
-    builder: (_) => _PlanSheet(data: data, onApply: onApply, now: now, remote: remote),
-  );
-}
-
-class _PlanSheet extends StatefulWidget {
-  const _PlanSheet({
+/// 日程面板（2026-11-03 重构）：**日期条 + 单日清单**，不再是"一长条 8 天"。
+///
+/// 两端共用：手机在底部弹层里，桌面在右侧抽屉里（与统计/设置同一套机制）。
+/// 需要**有界高度**（内部用 Expanded 撑列表区），调用方负责给高度。
+class PlanPanel extends StatefulWidget {
+  const PlanPanel({
+    super.key,
     required this.data,
     required this.onApply,
     this.now,
     this.remote,
+    this.showTitle = true,
   });
 
   final AppData data;
   final ValueChanged<TodosTransform> onApply;
   final DateTime? now;
+
+  /// 测试注入用；为 null 时走真实的 [PlanRemote]。
   final Future<String> Function(String text)? remote;
 
+  /// 手机弹层自带标题栏时为 false；桌面抽屉里自带标题。
+  final bool showTitle;
+
   @override
-  State<_PlanSheet> createState() => _PlanSheetState();
+  State<PlanPanel> createState() => _PlanPanelState();
 }
 
-class _PlanSheetState extends State<_PlanSheet> {
+class _PlanPanelState extends State<PlanPanel> {
   late final DateTime _now = widget.now ?? DateTime.now();
   late Map<String, List<TodoItem>> _todos;
   final _controller = TextEditingController();
+  late String _selectedKey = _todayKey;
 
   String get _todayKey => ymdOf(dayStart(_now));
 
@@ -799,6 +794,18 @@ class _PlanSheetState extends State<_PlanSheet> {
   void _apply(TodosTransform transform) {
     setState(() => _todos = transform(_todos));
     widget.onApply(transform);
+  }
+
+  /// 日期条内容：今天常驻 + 所有"有内容且不在今天之前"的日子。
+  /// 空档期（比如只排了周五周六）不会出现一排空格子。
+  List<String> get _dayKeys {
+    final keys = <String>{_todayKey};
+    for (final entry in _todos.entries) {
+      if (entry.value.isEmpty) continue;
+      if (entry.key.compareTo(_todayKey) >= 0) keys.add(entry.key);
+    }
+    final list = keys.toList()..sort();
+    return list;
   }
 
   /// 勾选即重排：完成的按勾选顺序浮到顶部（见 toggleTodoDone）。
@@ -828,13 +835,16 @@ class _PlanSheetState extends State<_PlanSheet> {
         });
   }
 
-  void _addToToday() {
+  void _addToSelected() {
     final text = _controller.text.trim();
     if (text.isEmpty) return;
     _controller.clear();
     _apply((todos) => {
           ...todos,
-          _todayKey: [...todos[_todayKey] ?? const <TodoItem>[], TodoItem(text: text)],
+          _selectedKey: [
+            ...todos[_selectedKey] ?? const <TodoItem>[],
+            TodoItem(text: text),
+          ],
         });
   }
 
@@ -864,134 +874,228 @@ class _PlanSheetState extends State<_PlanSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final keys = _todos.keys
-        .where((key) => (_todos[key] ?? const <TodoItem>[]).isNotEmpty)
-        .toList()
-      ..sort();
-    final listHeight = MediaQuery.of(context).size.height * 0.55;
+    final keys = _dayKeys;
+    if (!keys.contains(_selectedKey)) _selectedKey = _todayKey;
+    final items = _todos[_selectedKey] ?? const <TodoItem>[];
+    final totalItems =
+        _todos.values.fold<int>(0, (sum, list) => sum + list.length);
+    final doneItems = _todos.values.fold<int>(
+        0, (sum, list) => sum + list.where((item) => item.done).length);
+    final scheduledDays =
+        _todos.values.where((list) => list.isNotEmpty).length;
 
-    return _SheetScaffold(
-      title: '日程',
-      trailing: BrickButton(
-        label: '导入',
-        icon: Icons.file_upload_outlined,
-        expand: false,
-        height: 34,
-        color: PineColors.card,
-        foregroundColor: PineColors.pine,
-        onPressed: _openImport,
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          if (keys.isEmpty)
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 18),
-              child: Text(
-                '还没有安排。点右上「导入」粘贴一堆，或在下面加到今天。',
-                style: TextStyle(color: PineColors.sub, fontSize: 12),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (widget.showTitle)
+          Row(
+            children: [
+              const Text('日程',
+                  style: TextStyle(
+                      color: PineColors.ink,
+                      fontSize: 17,
+                      fontWeight: FontWeight.w700)),
+              const Spacer(),
+              BrickButton(
+                label: '导入',
+                icon: Icons.file_upload_outlined,
+                expand: false,
+                height: 34,
+                color: PineColors.card,
+                foregroundColor: PineColors.pine,
+                onPressed: _openImport,
               ),
-            )
-          else
-            SizedBox(
-              height: listHeight,
-              child: ListView(
-                padding: EdgeInsets.zero,
-                children: [
-                  for (final key in keys) ...[
-                    _planDayHeader(key, _todos[key]!),
-                    // 每天一组独立动画：跨天不重排，组内勾选才滑动。
+            ],
+          ),
+        if (widget.showTitle) const SizedBox(height: 10),
+        _dateStrip(keys),
+        const SizedBox(height: 8),
+        Expanded(
+          child: items.isEmpty
+              ? _emptyDay()
+              : ListView(
+                  padding: EdgeInsets.zero,
+                  children: [
                     AnimatedTodoRows(
-                      items: _todos[key]!,
+                      items: items,
                       rowHeight: 54,
                       itemBuilder: (item) => Padding(
                         padding: const EdgeInsets.only(bottom: 6),
                         child: _TodoRow(
                           item: item,
-                          onToggle: () => _toggle(key, item),
-                          onRemove: () => _remove(key, item),
-                          onEdit: () => _editItem(key, item),
+                          onToggle: () => _toggle(_selectedKey, item),
+                          onRemove: () => _remove(_selectedKey, item),
+                          onEdit: () => _editItem(_selectedKey, item),
                           onMenu: (position) => showPlanItemMenu(
                             context,
                             position,
-                            onEdit: () => _editItem(key, item),
-                            onRemove: () => _remove(key, item),
+                            onEdit: () => _editItem(_selectedKey, item),
+                            onRemove: () => _remove(_selectedKey, item),
                           ),
                         ),
                       ),
                     ),
-                    const SizedBox(height: 6),
                   ],
+                ),
+        ),
+        const SizedBox(height: 6),
+        Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: _controller,
+                style: const TextStyle(fontSize: 13),
+                decoration: InputDecoration(
+                  hintText: '加到 ${_shortLabel(_selectedKey)}',
+                  isDense: true,
+                ),
+                onSubmitted: (_) => _addToSelected(),
+              ),
+            ),
+            const SizedBox(width: 8),
+            BrickButton(
+              label: '添加',
+              icon: Icons.add,
+              expand: false,
+              height: 40,
+              color: PineColors.ink,
+              onPressed: _addToSelected,
+            ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        Text(
+          '已排 $scheduledDays 天 · 共 $totalItems 条 · 完成 $doneItems 条',
+          style: const TextStyle(color: PineColors.sub, fontSize: 11),
+        ),
+      ],
+    );
+  }
+
+  /// 日期条：每格 = 日期 + 星期 + 当天进度（done/total）。
+  Widget _dateStrip(List<String> keys) {
+    return SizedBox(
+      // 66 = 三行（日期/星期/进度，12+10+10 号字）+ 上下 6 内边距，留 2pt 余量。
+      height: 66,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: EdgeInsets.zero,
+        itemCount: keys.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        itemBuilder: (context, index) {
+          final key = keys[index];
+          final day = DateTime.tryParse(key) ?? _now;
+          final list = _todos[key] ?? const <TodoItem>[];
+          final done = list.where((item) => item.done).length;
+          final selected = key == _selectedKey;
+          final isToday = key == _todayKey;
+          return GestureDetector(
+            onTap: () => setState(() => _selectedKey = key),
+            child: Container(
+              width: 64,
+              padding: const EdgeInsets.symmetric(vertical: 6),
+              decoration: BoxDecoration(
+                color: selected ? PineColors.tint(PineColors.pine) : PineColors.card,
+                borderRadius: BorderRadius.circular(Paper.chipRadius),
+                border: Border.all(
+                    color: selected ? PineColors.pine : PineColors.line),
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    isToday ? '今天' : '${day.month}/${day.day}',
+                    style: TextStyle(
+                      color: selected ? PineColors.pine : PineColors.ink,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    '周${'一二三四五六日'[day.weekday - 1]}',
+                    style:
+                        const TextStyle(color: PineColors.sub, fontSize: 10),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    list.isEmpty ? '—' : '$done/${list.length}',
+                    style: TextStyle(
+                      color: list.isEmpty
+                          ? PineColors.faint
+                          : (selected ? PineColors.pine : PineColors.sub),
+                      fontSize: 10,
+                    ),
+                  ),
                 ],
               ),
             ),
-          const Align(
-            alignment: Alignment.centerLeft,
-            child: Padding(
-              padding: EdgeInsets.only(bottom: 4),
-              child: Text('长按条目可改文字 · 点勾选框打勾',
-                  style: TextStyle(color: PineColors.sub, fontSize: 11)),
-            ),
-          ),
-          Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: _controller,
-                  style: const TextStyle(fontSize: 13),
-                  decoration: InputDecoration(
-                    hintText: '加到今天（$_todayKey）',
-                    isDense: true,
-                  ),
-                  onSubmitted: (_) => _addToToday(),
-                ),
-              ),
-              const SizedBox(width: 8),
-              BrickButton(
-                label: '添加',
-                icon: Icons.add,
-                expand: false,
-                height: 40,
-                color: PineColors.ink,
-                onPressed: _addToToday,
-              ),
-            ],
-          ),
-        ],
+          );
+        },
       ),
     );
   }
 
-  Widget _planDayHeader(String dayKey, List<TodoItem> items) {
-    final day = DateTime.tryParse(dayKey);
-    final done = items.where((item) => item.done).length;
-    final label = day == null ? dayKey : chineseDate(day, withYear: false);
-    final isToday = dayKey == _todayKey;
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 4, top: 2),
-      child: Row(
-        children: [
-          Text(
-            label,
-            style: TextStyle(
-              color: isToday ? PineColors.pine : PineColors.ink,
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          if (isToday) ...[
-            const SizedBox(width: 6),
-            const Text('今天',
-                style: TextStyle(color: PineColors.pine, fontSize: 10)),
-          ],
-          const Spacer(),
-          Text('$done/${items.length}',
-              style: const TextStyle(color: PineColors.sub, fontSize: 10)),
-        ],
+  Widget _emptyDay() {
+    return Align(
+      alignment: Alignment.topLeft,
+      child: Padding(
+        padding: const EdgeInsets.only(top: 8),
+        child: Text(
+          '${_shortLabel(_selectedKey)} 还没有安排 · 在下面加一条，或点「导入」粘贴一堆。',
+          style: const TextStyle(color: PineColors.sub, fontSize: 12),
+        ),
       ),
     );
   }
+
+  String _shortLabel(String key) {
+    final day = DateTime.tryParse(key);
+    if (day == null) return key;
+    if (key == _todayKey) return '今天';
+    return '${day.month}/${day.day}';
+  }
+}
+
+/// 底部弹层形态（手机）：面板 + 拖拽把手，高度按屏幕 62% 封顶。
+Future<void> showPlanSheet(
+  BuildContext context, {
+  required AppData data,
+  required ValueChanged<TodosTransform> onApply,
+  DateTime? now,
+  Future<String> Function(String text)? remote,
+}) {
+  return showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: PineColors.paper,
+    builder: (sheetContext) => SafeArea(
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          18,
+          10,
+          18,
+          14 + MediaQuery.of(sheetContext).viewInsets.bottom,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const _SheetHandle(),
+            const SizedBox(height: 8),
+            SizedBox(
+              height: MediaQuery.of(sheetContext).size.height * 0.62,
+              child: PlanPanel(
+                data: data,
+                onApply: onApply,
+                now: now,
+                remote: remote,
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
 }
 
 /// 导入对话框：粘贴 → 实时预览天数/条数/跳过行 → 确认返回解析结果。

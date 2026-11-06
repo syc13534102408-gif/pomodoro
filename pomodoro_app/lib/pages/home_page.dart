@@ -414,24 +414,74 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     if (decision.playChime) unawaited(Notifier.chime());
   }
 
-  /// 打开当前任务「进行中」事件的操作面板（暂停/继续/完成/换事件/删除）。
-  void _openEventActions() {
-    final taskName = _data.selectedTask.name;
+  /// 当前任务「还活着」的事件：优先进行中，没有就退回**最近暂停**的那个。
+  ///
+  /// 2026-11-06 修：原来只认 `isRunning`。事件一旦暂停，`_openEventActions` 就再也
+  /// 找不到它，而「继续累计 / 完成 / 删除 / 编辑」全在那个面板里——等于**暂停即失联**。
+  /// 多事件并存时，用户感受到的就是「切不回上一条事件」。
+  FocusEvent? _activeEventFor(String taskName) {
+    FocusEvent? paused;
     for (final event in _data.events) {
-      if (event.taskName == taskName && event.isRunning) {
-        showEventActionSheet(context,
-            data: _data, event: event, onChanged: _replace);
-        return;
+      if (event.taskName != taskName || event.isFinished) continue;
+      if (event.isRunning) return event;
+      if (paused == null ||
+          (event.pausedAt ?? event.startedAt)
+              .isAfter(paused.pausedAt ?? paused.startedAt)) {
+        paused = event;
       }
     }
+    return paused;
   }
 
-  /// 该任务当前「进行中」事件的名字（无则 null）——用于任务行事件徽标。
-  String? _runningEventName(String taskName) {
-    for (final event in _data.events) {
-      if (event.taskName == taskName && event.isRunning) return event.name;
+  /// 打开当前任务事件的操作面板（暂停/继续/完成/编辑/删除）。
+  void _openEventActions() {
+    final event = _activeEventFor(_data.selectedTask.name);
+    if (event == null) return;
+    showEventActionSheet(context,
+        data: _data, event: event, onChanged: _replace);
+  }
+
+  /// 事件入口（桌面舱任务行与手机任务卡共用）：有待处理事件 → 可点徽标；
+  /// 没有 → 轻量「＋事件」。操作面板只从入口进，所以两个布局都必须有。
+  Widget _eventChip() {
+    final event = _activeEventFor(_data.selectedTask.name);
+    if (event == null) {
+      return InkWell(
+        borderRadius: BorderRadius.circular(6),
+        onTap: () =>
+            showEventSheet(context, data: _data, onChanged: _replace),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(color: PineColors.line),
+          ),
+          child: const Text('＋事件',
+              style: TextStyle(color: PineColors.sub, fontSize: 10)),
+        ),
+      );
     }
-    return null;
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 130),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(6),
+        onTap: _openEventActions,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+          decoration: BoxDecoration(
+            color: PineColors.tint(PineColors.pine),
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: Text(
+            // 暂停要写出来：不然徽标看着像还在累计。
+            event.isPaused ? '${event.name} · 已暂停' : event.name,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(color: PineColors.pine, fontSize: 10),
+          ),
+        ),
+      ),
+    );
   }
 
   /// 当前会话的任务名：仅专注阶段返回（取记录里 inProgress 的 taskName，
@@ -1085,53 +1135,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                             ),
                           ),
                           const SizedBox(width: 4),
-                          // 事件入口（操作集中在这里，统计页只做展示）：
-                          // 有进行中事件 → 显示可点击的事件徽标（弹出暂停/完成等操作）；
-                          // 无事件 → 显示轻量「＋事件」开启入口。
-                          if (_runningEventName(_data.selectedTask.name)
-                              case final name?) ...[
-                            const SizedBox(width: 2),
-                            ConstrainedBox(
-                              constraints: const BoxConstraints(maxWidth: 130),
-                              child: InkWell(
-                                borderRadius: BorderRadius.circular(6),
-                                onTap: _openEventActions,
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 6, vertical: 2),
-                                  decoration: BoxDecoration(
-                                    color: PineColors.tint(PineColors.pine),
-                                    borderRadius: BorderRadius.circular(6),
-                                  ),
-                                  child: Text(
-                                    name,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
-                                        color: PineColors.pine, fontSize: 10),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ] else ...[
-                            const SizedBox(width: 2),
-                            InkWell(
-                              borderRadius: BorderRadius.circular(6),
-                              onTap: () => showEventSheet(context,
-                                  data: _data, onChanged: _replace),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 6, vertical: 2),
-                                decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(6),
-                                  border: Border.all(color: PineColors.line),
-                                ),
-                                child: const Text('＋事件',
-                                    style: TextStyle(
-                                        color: PineColors.sub, fontSize: 10)),
-                              ),
-                            ),
-                          ],
+                          const SizedBox(width: 2),
+                          _eventChip(),
                           const Icon(Icons.chevron_right,
                               size: 15, color: PineColors.faint),
                         ],
@@ -1430,6 +1435,10 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               style: const TextStyle(color: PineColors.ink, fontSize: 14),
             ),
           ),
+          const SizedBox(width: 6),
+          // 手机上也要能开/暂停事件：修前这个入口只在桌面舱的任务行里，
+          // 安卓端等于"事件只能看不能动"（2026-11-06 补）。
+          _eventChip(),
           const Icon(Icons.chevron_right, size: 18, color: PineColors.sub),
         ],
       ),

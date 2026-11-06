@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
 import 'engine.dart';
@@ -1032,11 +1033,17 @@ class _PlanPanelState extends State<PlanPanel> {
   }
 
   /// 日期条：每格 = 日期 + 星期 + 当天进度（done/total）。
+  ///
+  /// 外面那层 [ScrollConfiguration] 是给桌面端的：Flutter 默认的 `dragDevices`
+  /// **不含鼠标**，所以 macOS 上点头拖不动这根条（只能两指滑），手感上"这栏不能拖"。
+  /// 放开鼠标后：按住拖动 / 甩一下都能翻，手机端仍走 touch，行为不变。
   Widget _dateStrip(List<String> keys) {
     return SizedBox(
       // 66 = 三行（日期/星期/进度，12+10+10 号字）+ 上下 6 内边距，留 2pt 余量。
       height: 66,
-      child: ListView.separated(
+      child: ScrollConfiguration(
+        behavior: const _DragAllScrollBehavior(),
+        child: ListView.separated(
         scrollDirection: Axis.horizontal,
         controller: _stripScroll,
         padding: EdgeInsets.zero,
@@ -1098,6 +1105,7 @@ class _PlanPanelState extends State<PlanPanel> {
             ),
           );
         },
+        ),
       ),
     );
   }
@@ -1121,6 +1129,19 @@ class _PlanPanelState extends State<PlanPanel> {
     if (key == _todayKey) return '今天';
     return '${day.month}/${day.day}';
   }
+}
+
+/// 让横向日期条在桌面端也能**用鼠标拖着走**。
+///
+/// Flutter 的默认 `ScrollBehavior.dragDevices` 只有 touch/stylus/trackpad 之类，
+/// 不含 `mouse`——桌面端于是只能靠滚轮/两指滑，按住拖是没反应的。
+/// 这里只加 mouse 一项，其余沿用父类（手机端行为完全不变）。
+class _DragAllScrollBehavior extends MaterialScrollBehavior {
+  const _DragAllScrollBehavior();
+
+  @override
+  Set<PointerDeviceKind> get dragDevices =>
+      {...super.dragDevices, PointerDeviceKind.mouse};
 }
 
 /// 底部弹层形态（手机）：面板 + 拖拽把手，高度按屏幕 62% 封顶。

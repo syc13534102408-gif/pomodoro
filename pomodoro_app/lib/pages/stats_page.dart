@@ -521,10 +521,11 @@ class _EventsSection extends StatelessWidget {
           ),
           if (event.isPaused) ...[
             const SizedBox(width: 8),
+            // gold 对纸面只有 2.0:1（11px 正文下限 4.5），文字用 goldInk（3.4:1）。
             const Text(
               '已暂停',
               style: TextStyle(
-                color: PineColors.gold,
+                color: PineColors.goldInk,
                 fontSize: 10.5,
                 fontWeight: FontWeight.w600,
               ),
@@ -547,35 +548,57 @@ class _EventsSection extends StatelessWidget {
     final count = eventStatsOf(data, event.id).tomatoCount;
     final accent = colorFor(event.taskName);
     final shown = count <= 8 ? count : 7;
-    return _open(
-      context,
-      event,
-      Padding(
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        child: Row(
-          children: [
-            Expanded(child: _nameRow(event)),
-            const SizedBox(width: 8),
-            for (var i = 0; i < shown; i++)
-              Padding(
-                padding: const EdgeInsets.only(right: 2),
-                child: Container(
-                  width: 5,
-                  height: 11,
-                  decoration: BoxDecoration(
-                    color: accent.withAlpha(190),
-                    borderRadius: BorderRadius.circular(1.5),
-                  ),
-                ),
+    return Row(
+      children: [
+        Expanded(
+          child: _open(
+            context,
+            event,
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              child: Row(
+                children: [
+                  Expanded(child: _nameRow(event)),
+                  const SizedBox(width: 8),
+                  for (var i = 0; i < shown; i++)
+                    Padding(
+                      padding: const EdgeInsets.only(right: 2),
+                      child: Container(
+                        width: 5,
+                        height: 11,
+                        decoration: BoxDecoration(
+                          color: accent.withAlpha(190),
+                          borderRadius: BorderRadius.circular(1.5),
+                        ),
+                      ),
+                    ),
+                  if (count > 8)
+                    Text('+${count - 7}',
+                        style: const TextStyle(
+                            color: PineColors.sub, fontSize: 9.5)),
+                  const SizedBox(width: 10),
+                  _minutes(event),
+                ],
               ),
-            if (count > 8)
-              Text('+${count - 7}',
-                  style: const TextStyle(color: PineColors.sub, fontSize: 9.5)),
-            const SizedBox(width: 10),
-            _minutes(event),
-          ],
+            ),
+          ),
         ),
-      ),
+        // 操作入口（2026-11-06）：行本身仍是"看明细"，右侧 ⋯ 才是动作面板。
+        // 之前暂停后全 App 都找不到「继续累计/完成/删除」的入口——事件一暂停即失联。
+        IconButton(
+          icon: const Icon(Icons.more_horiz, size: 18, color: PineColors.sub),
+          tooltip: '暂停 / 继续 / 完成 / 编辑',
+          padding: EdgeInsets.zero,
+          constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
+          visualDensity: VisualDensity.compact,
+          onPressed: () => showEventActionSheet(
+            context,
+            data: data,
+            event: event,
+            onChanged: onChanged,
+          ),
+        ),
+      ],
     );
   }
 

@@ -14,9 +14,10 @@ import 'package:pomodoro_app/src/widgets.dart';
 
 String _todayKey() => ymdOf(dayStart(DateTime.now()));
 
-Future<void> _pumpHome(WidgetTester tester, AppData data) async {
+Future<void> _pumpHome(WidgetTester tester, AppData data,
+    {Size size = const Size(1000, 2200)}) async {
   // 默认 800×600 视口装不下「今日日程」卡，会被滚出屏幕导致 tap 打空。
-  tester.view.physicalSize = const Size(1000, 2200);
+  tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1.0;
   addTearDown(tester.view.reset);
   SharedPreferences.setMockInitialValues(<String, Object>{
@@ -157,6 +158,46 @@ void main() {
     // 20 天里最老的一天在左侧视野外（横向懒加载，没滚到就不会构建）。
     expect(find.descendant(of: panel, matching: find.text(md(20))),
         findsNothing);
+  });
+
+  testWidgets('桌面端能用鼠标拖动日期条（默认 dragDevices 不含 mouse）', (tester) async {
+    final now = dayStart(DateTime.now());
+    String key(int ahead) => ymdOf(now.add(Duration(days: ahead)));
+    String md(int ahead) {
+      final d = now.add(Duration(days: ahead));
+      return '${d.month}/${d.day}';
+    }
+
+    // 窄一点，让 13 个日期格真的超出视口（否则拖无可拖）。
+    await _pumpHome(
+      tester,
+      AppData(todos: {
+        for (var i = 1; i <= 12; i++) key(i): [TodoItem(text: 'D+$i')],
+      }),
+      size: const Size(500, 2200),
+    );
+    await tester.tap(find.text('全部 ›').first);
+    await tester.pumpAndSettle();
+
+    final panel = find.byType(PlanPanel);
+    // 最远那天初始在视野外（横向懒加载，没滚到就不会构建）。
+    expect(find.descendant(of: panel, matching: find.text(md(12))),
+        findsNothing);
+
+    // 按住「今天」那格往左甩：桌面端必须真的能拖（2026-11-06 前拖不动）。
+    final gesture = await tester.startGesture(
+      tester.getCenter(find.descendant(of: panel, matching: find.text('今天'))),
+      kind: PointerDeviceKind.mouse,
+    );
+    for (var i = 0; i < 8; i++) {
+      await gesture.moveBy(const Offset(-80, 0));
+      await tester.pump();
+    }
+    await gesture.up();
+    await tester.pumpAndSettle();
+
+    expect(find.descendant(of: panel, matching: find.text(md(12))),
+        findsOneWidget);
   });
 
   testWidgets('日程面板里粘贴导入：预览条数 → 确认后落到对应日期', (tester) async {

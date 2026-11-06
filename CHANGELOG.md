@@ -36,6 +36,35 @@
 - 产物：`outputs/松果-v1.3.10-视觉修正-2026-10-25.apk`（19,708,627 B、versionName 1.3.10、
   versionCode 20）、`outputs/pinecore-macos-2026-10-25.zip`（已装到 /Applications）。
 
+## 2026-11-06（二）· 事件「暂停即失联」修复 + 日期条可拖（v1.3.25）
+
+- **反馈**：「还有多个事件进展的切换问题」＋「日程最上面日期那栏希望能拖动」。
+- **事件侧根因**（这就是"切不回上一条"的成因，是真 bug 不是体验问题）：
+  `TimerEngine.resumeEvent` 全仓**只有一个调用点**——`showEventActionSheet`；
+  而打开那个面板的唯一入口（任务行事件徽标）用 `isRunning` 过滤。
+  ⇒ **事件一暂停，「继续累计 / 完成 / 删除 / 编辑」全部失去入口**，永久卡死。
+- **修法**：
+  1. 新增 `_activeEventFor(task)`：优先进行中，否则退回**最近暂停**的那条；
+     徽标对暂停态显式写「 · 已暂停」（否则看着像还在累计）。
+  2. 顺带补一个更早的坑：这个入口原来只画在**桌面舱**的任务行里，手机
+     `_taskPicker` 根本没有事件入口（安卓端等于"事件只能看不能动"）。
+     抽成 `_eventChip()`，两个布局共用。
+  3. 统计页「事件进展」每行右侧加 ⋯（tooltip：暂停/继续/完成/编辑），
+     行本身仍是"看明细"——卡片从此能直接操作，但点击语义不变。
+  4. 顺手修 `已暂停` 标签：`gold`（对纸面 2.00:1）→ `goldInk`（3.40:1），
+     符合 10-25 定下的 B1 金色规则（gold 只做按钮底）。
+- **日期条可拖**：外面包一层 `_DragAllScrollBehavior`（`dragDevices` 加 `mouse`）。
+  Flutter 默认 `dragDevices` 不含鼠标，所以 macOS 上按住拖完全没反应、只能两指滑，
+  手感上就是"这栏不能拖"。
+- **回归 4 例，逐一验证过"修复前会红"**：
+  - 去掉 `ScrollConfiguration` → 拖拽用例报 `Found 0 widgets with text "11/18"`；
+  - 徽标退回 `isRunning` → 报 `Found 1 widget with text "＋事件"`（且找不到徽标）；
+  - 删掉统计行 ⋯ → 报 `Found 0 widgets with widget matching predicate`；
+  - 手机任务卡去掉 `_eventChip()` → 手机用例找不到徽标。
+- 回归：`dart analyze` 零告警、`flutter test` **209 例全绿**（27 个文件）。
+- 产物：`outputs/pinecore-macos-2026-11-06.zip`（v1.3.25，已装）。
+  安卓包按用户要求**本轮不出**（"手机 apk 暂时不着急"）；代码同源，下次出包自动带上。
+
 ## 2026-11-06 · 日程支持回看往期（v1.3.24）
 
 - **需求**：日程抽屉只能看「今天及以后」，往前翻不到昨天排过什么。

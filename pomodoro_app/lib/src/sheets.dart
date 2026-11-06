@@ -772,7 +772,23 @@ class _PlanPanelState extends State<PlanPanel> {
   late final DateTime _now = widget.now ?? DateTime.now();
   late Map<String, List<TodoItem>> _todos;
   final _controller = TextEditingController();
+  final _stripScroll = ScrollController();
   late String _selectedKey = _todayKey;
+
+  /// 日期格宽与格间距，必须与 [_dateStrip] 里的 `width: 64` / `SizedBox(width: 8)`
+  /// 一致——自动滚动按它们算每格的左边界。
+  static const double _chipWidth = 64;
+  static const double _chipGap = 8;
+
+  /// 上一次同步过滚动位置时的「选中日 + 日期条格数」。
+  ///
+  /// 只在两者变化时同步：否则用户手动把日期条滚到上个月，任何一次重建
+  /// （打勾、切页）都会被拽回今天。
+  String? _stripSyncedKey;
+  int _stripSyncedCount = -1;
+
+  /// 是否已经做过第一次落位（第一次用直接跳，之后才用动画）。
+  bool _stripJumpedOnce = false;
 
   String get _todayKey => ymdOf(dayStart(_now));
 
@@ -788,6 +804,7 @@ class _PlanPanelState extends State<PlanPanel> {
   @override
   void dispose() {
     _controller.dispose();
+    _stripScroll.dispose();
     super.dispose();
   }
 
@@ -796,16 +813,57 @@ class _PlanPanelState extends State<PlanPanel> {
     widget.onApply(transform);
   }
 
-  /// 日期条内容：今天常驻 + 所有"有内容且不在今天之前"的日子。
+  /// 日期条内容：今天常驻 + **所有有内容的日子（过去、将来的都算）**。
   /// 空档期（比如只排了周五周六）不会出现一排空格子。
+  ///
+  /// 2026-11-06 起不再过滤 `key < 今天`：回看往期日程是刚需（核对这周到底
+  /// 落了哪些），而"只有今天及以后"是当初误把日期条当"待办"而非"日历"。
   List<String> get _dayKeys {
     final keys = <String>{_todayKey};
     for (final entry in _todos.entries) {
       if (entry.value.isEmpty) continue;
-      if (entry.key.compareTo(_todayKey) >= 0) keys.add(entry.key);
+      keys.add(entry.key);
     }
     final list = keys.toList()..sort();
     return list;
+  }
+
+  /// 把选中的日期格滚进视野（只在它没被完整看见时才滚，避免点一下就跳）。
+  ///
+  /// 默认停在今天，目标位置刻意比左边缘多让 56pt：这样左边会露出前一天
+  /// 的小半格——用户一眼就知道"还能往左翻"，而不会以为日期条只有今天。
+  void _syncStripToSelected(List<String> keys) {
+    if (_stripSyncedKey == _selectedKey && _stripSyncedCount == keys.length) {
+      return;
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_stripScroll.hasClients) return;
+      final position = _stripScroll.position;
+      if (!position.hasContentDimensions) return;
+      final index = keys.indexOf(_selectedKey);
+      if (index < 0) return;
+      // 走到这里才记账：布局还没完成就返回时，下一帧还有机会再滚一次。
+      _stripSyncedKey = _selectedKey;
+      _stripSyncedCount = keys.length;
+      final left = index * (_chipWidth + _chipGap);
+      final right = left + _chipWidth;
+      final viewStart = position.pixels;
+      final viewEnd = viewStart + position.viewportDimension;
+      // 已完整可见就不动：否则用户点一下右边刚露头的格子，整条会突然平移。
+      if (left >= viewStart && right <= viewEnd) return;
+      final target = (left - 56).clamp(0.0, position.maxScrollExtent);
+      if (!_stripJumpedOnce) {
+        // 首次落位直接跳：有几十天往期时，从最老一天"滑"到今天会是 220ms 的拖影。
+        _stripJumpedOnce = true;
+        position.jumpTo(target);
+        return;
+      }
+      _stripScroll.animateTo(
+        target,
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOutCubic,
+      );
+    });
   }
 
   /// 勾选即重排：完成的按勾选顺序浮到顶部（见 toggleTodoDone）。
@@ -876,6 +934,7 @@ class _PlanPanelState extends State<PlanPanel> {
   Widget build(BuildContext context) {
     final keys = _dayKeys;
     if (!keys.contains(_selectedKey)) _selectedKey = _todayKey;
+    _syncStripToSelected(keys);
     final items = _todos[_selectedKey] ?? const <TodoItem>[];
     final totalItems =
         _todos.values.fold<int>(0, (sum, list) => sum + list.length);
@@ -979,9 +1038,10 @@ class _PlanPanelState extends State<PlanPanel> {
       height: 66,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
+        controller: _stripScroll,
         padding: EdgeInsets.zero,
         itemCount: keys.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        separatorBuilder: (_, __) => const SizedBox(width: _chipGap),
         itemBuilder: (context, index) {
           final key = keys[index];
           final day = DateTime.tryParse(key) ?? _now;
@@ -989,10 +1049,12 @@ class _PlanPanelState extends State<PlanPanel> {
           final done = list.where((item) => item.done).length;
           final selected = key == _selectedKey;
           final isToday = key == _todayKey;
+          // 往期日子整体降一档灰：今天仍是深墨色，扫一眼就能分清"这条是历史"。
+          final isPast = key.compareTo(_todayKey) < 0;
           return GestureDetector(
             onTap: () => setState(() => _selectedKey = key),
             child: Container(
-              width: 64,
+              width: _chipWidth,
               padding: const EdgeInsets.symmetric(vertical: 6),
               decoration: BoxDecoration(
                 color: selected ? PineColors.tint(PineColors.pine) : PineColors.card,
@@ -1006,7 +1068,9 @@ class _PlanPanelState extends State<PlanPanel> {
                   Text(
                     isToday ? '今天' : '${day.month}/${day.day}',
                     style: TextStyle(
-                      color: selected ? PineColors.pine : PineColors.ink,
+                      color: selected
+                          ? PineColors.pine
+                          : (isPast ? PineColors.sub : PineColors.ink),
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
                     ),
@@ -1023,7 +1087,9 @@ class _PlanPanelState extends State<PlanPanel> {
                     style: TextStyle(
                       color: list.isEmpty
                           ? PineColors.faint
-                          : (selected ? PineColors.pine : PineColors.sub),
+                          : (selected
+                              ? PineColors.pine
+                              : (isPast ? PineColors.faint : PineColors.sub)),
                       fontSize: 10,
                     ),
                   ),

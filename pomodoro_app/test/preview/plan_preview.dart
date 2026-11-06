@@ -24,6 +24,13 @@ void main() {
 
     final data = AppData(
       todos: {
+        // 往期：2026-11-06 起日期条也收录过去的日子，预览里带上两三天，
+        // 好确认「今天那格左边会露出前一天小半格」这个可发现性提示。
+        key(-3): [TodoItem(text: '往期：816 真题② 限时', done: true)],
+        key(-1): [
+          TodoItem(text: '往期：现控 ch5 上半', done: true),
+          TodoItem(text: '往期：英语单词', done: true),
+        ],
         key(0): [
           TodoItem(text: '现控 ch5 下半 + ch6 全 收尾', done: true),
           TodoItem(text: '产出「现控四块 ↔ 经典八题型」对应表'),
@@ -66,9 +73,9 @@ void main() {
                   bottom: 0,
                   width: 340,
                   child: Container(
-                    decoration: BoxDecoration(
+                    decoration: const BoxDecoration(
                       color: PineColors.paper,
-                      borderRadius: const BorderRadius.horizontal(
+                      borderRadius: BorderRadius.horizontal(
                           left: Radius.circular(18)),
                       boxShadow: Paper.shadow,
                     ),

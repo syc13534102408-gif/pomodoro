@@ -80,6 +80,85 @@ void main() {
     expect(find.text('816 真题① 限时'), findsOneWidget);
   });
 
+  testWidgets('往期日程可回看：日期条含过去有内容的日子，过去空白日不占格', (tester) async {
+    final now = dayStart(DateTime.now());
+    String key(int back) => ymdOf(now.subtract(Duration(days: back)));
+    String md(int back) {
+      final d = now.subtract(Duration(days: back));
+      return '${d.month}/${d.day}';
+    }
+
+    await _pumpHome(
+      tester,
+      AppData(todos: {
+        key(2): [TodoItem(text: '两天前 复盘')],
+        key(7): [TodoItem(text: '一周前 单词')],
+      }),
+    );
+    await tester.tap(find.text('全部 ›').first);
+    await tester.pumpAndSettle();
+
+    final panel = find.byType(PlanPanel);
+
+    // 2026-11-06 之前这里只放"今天及以后"，往期日程在日期条上是看不到的。
+    expect(find.descendant(of: panel, matching: find.text(md(2))),
+        findsOneWidget);
+    expect(find.descendant(of: panel, matching: find.text(md(7))),
+        findsOneWidget);
+    // 第 4 天从来没排过，不该为了"补空档"多出格子。
+    expect(find.descendant(of: panel, matching: find.text(md(4))),
+        findsNothing);
+
+    // 默认落点仍是今天。
+    expect(find.descendant(of: panel, matching: find.textContaining('还没有安排')),
+        findsOneWidget);
+
+    await tester.tap(find.descendant(of: panel, matching: find.text(md(2))));
+    await tester.pumpAndSettle();
+    expect(find.descendant(of: panel, matching: find.text('两天前 复盘')),
+        findsOneWidget);
+
+    await tester.tap(find.descendant(of: panel, matching: find.text(md(7))));
+    await tester.pumpAndSettle();
+    expect(find.descendant(of: panel, matching: find.text('一周前 单词')),
+        findsOneWidget);
+  });
+
+  testWidgets('往期日程很多时，日期条自动滚到「今天」而不是停在上个月', (tester) async {
+    final now = dayStart(DateTime.now());
+    String key(int back) => ymdOf(now.subtract(Duration(days: back)));
+    String md(int back) {
+      final d = now.subtract(Duration(days: back));
+      return '${d.month}/${d.day}';
+    }
+
+    await _pumpHome(
+      tester,
+      AppData(todos: {
+        for (var back = 1; back <= 20; back++)
+          key(back): [TodoItem(text: '往期 $back')],
+      }),
+    );
+    await tester.tap(find.text('全部 ›').first);
+    await tester.pumpAndSettle();
+
+    final panel = find.byType(PlanPanel);
+    final todayChip = find.descendant(of: panel, matching: find.text('今天'));
+    expect(todayChip, findsOneWidget);
+
+    // 必须真的落在面板可视区里，而不只是"被构建出来"。
+    final chip = tester.getRect(todayChip);
+    final rect = tester.getRect(panel);
+    expect(chip.left, greaterThanOrEqualTo(rect.left));
+    expect(chip.right, lessThanOrEqualTo(rect.right));
+    expect(chip.top, greaterThanOrEqualTo(rect.top));
+    expect(chip.bottom, lessThanOrEqualTo(rect.bottom));
+
+    // 20 天里最老的一天在左侧视野外（横向懒加载，没滚到就不会构建）。
+    expect(find.descendant(of: panel, matching: find.text(md(20))),
+        findsNothing);
+  });
+
   testWidgets('日程面板里粘贴导入：预览条数 → 确认后落到对应日期', (tester) async {
     await _pumpHome(tester, AppData());
     await tester.tap(find.text('全部 ›').first);

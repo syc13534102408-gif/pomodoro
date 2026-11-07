@@ -2381,6 +2381,15 @@ Future<void> showEventActionSheet(
 }) {
   final stats = eventStatsOf(data, event.id);
   final now = DateTime.now();
+  // 可切换的目标：除自己之外的全部**未完成**事件（切到已完成的没有意义）。
+  // 进行中排前面——它们才是"另一条正在累计的"，切换动机最强。
+  final others = [
+    for (final e in data.events)
+      if (e.id != event.id && !e.isFinished) e,
+  ]..sort((a, b) {
+      if (a.isRunning != b.isRunning) return a.isRunning ? -1 : 1;
+      return a.startedAt.compareTo(b.startedAt);
+    });
   return showModalBottomSheet(
     context: context,
     isScrollControlled: true,
@@ -2408,6 +2417,25 @@ Future<void> showEventActionSheet(
                   data: data, onChanged: onChanged, event: event);
             },
           ),
+          if (others.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            // 2026-11-07 反馈：面板里没有"切换"入口，只能靠任务行徽标间接切。
+            // 「切换」不只是换个事件名——它同时要暂停旧事件、恢复新事件、
+            // 并把选中任务换成新事件绑定的任务（否则新一轮专注还记到原来那条）。
+            BrickButton(
+              label: '切换到其他事件（${others.length} 条可选）',
+              icon: Icons.swap_horiz,
+              color: PineColors.card,
+              foregroundColor: PineColors.pine,
+              onPressed: () async {
+                final picked = await _pickEventToSwitch(context, others);
+                if (picked == null || !context.mounted) return;
+                onChanged(TimerEngine.switchEvent(
+                    data, event.id, picked.id, DateTime.now()));
+                if (context.mounted) Navigator.pop(context);
+              },
+            ),
+          ],
           const SizedBox(height: 10),
           if (event.isRunning)
             BrickButton(
@@ -2466,6 +2494,82 @@ Future<void> showEventActionSheet(
             child: const Text('删除事件',
                 style: TextStyle(color: PineColors.sub, fontSize: 12)),
           ),
+        ],
+      ),
+    ),
+  );
+}
+
+/// 选择要切换过去的事件：列出其他未完成事件（进行中排前，暂停的带状态标）。
+Future<FocusEvent?> _pickEventToSwitch(
+  BuildContext context,
+  List<FocusEvent> options,
+) {
+  return showModalBottomSheet<FocusEvent>(
+    context: context,
+    backgroundColor: PineColors.paper,
+    builder: (sheetContext) => SafeArea(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const SizedBox(height: 14),
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 18),
+            child: Text(
+              '切换到哪个事件？',
+              style: TextStyle(
+                color: PineColors.ink,
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          const SizedBox(height: 4),
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 18),
+            child: Text(
+              '切换 = 暂停当前这条 + 恢复所选 + 把选中任务换成它绑定的任务，'
+              '之后的新专注才会记进这条。',
+              style: TextStyle(color: PineColors.sub, fontSize: 10.5),
+            ),
+          ),
+          const SizedBox(height: 6),
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxHeight: 360),
+            child: ListView(
+              shrinkWrap: true,
+              padding: EdgeInsets.zero,
+              children: [
+                for (final option in options)
+                  ListTile(
+                    leading: Icon(
+                      option.isRunning
+                          ? Icons.play_circle_outline
+                          : Icons.pause_circle_outline,
+                      size: 20,
+                      color: option.isRunning
+                          ? PineColors.pine
+                          : PineColors.sub,
+                    ),
+                    title: Text(option.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                            color: PineColors.ink, fontSize: 14)),
+                    subtitle: Text(
+                      '绑定「${option.taskName}」· ${option.statusLabel}',
+                      style: const TextStyle(
+                          color: PineColors.sub, fontSize: 10.5),
+                    ),
+                    trailing: const Icon(Icons.chevron_right,
+                        size: 18, color: PineColors.faint),
+                    onTap: () => Navigator.pop(sheetContext, option),
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
         ],
       ),
     ),

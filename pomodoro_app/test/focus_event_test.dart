@@ -163,6 +163,53 @@ void main() {
     });
   });
 
+  group('事件切换（switchEvent）', () {
+    test('切换 = 暂停旧 + 恢复新 + 选中任务跟着换', () {
+      final t0 = DateTime(2026, 11, 7, 9);
+      // 高数：事件 A 进行中；英语：事件 B 已暂停。
+      var data = TimerEngine.startEvent(_base(),
+          name: '刷真题', taskName: '高数', now: t0);
+      final a = data.events.first.id;
+      data = TimerEngine.startEvent(data,
+          name: '背单词', taskName: '英语', now: t0);
+      final b = data.events.firstWhere((e) => e.name == '背单词').id;
+      data = TimerEngine.pauseEvent(data, b, t0.add(const Duration(hours: 1)));
+      expect(data.selectedTask.name, '高数');
+
+      data = TimerEngine.switchEvent(
+          data, a, b, t0.add(const Duration(hours: 2)));
+
+      // 旧事件被暂停（否则两条同时进行中，事件进展里像并行累计）
+      expect(data.events.firstWhere((e) => e.id == a).isPaused, isTrue);
+      // 目标事件恢复进行中
+      expect(data.events.firstWhere((e) => e.id == b).isRunning, isTrue);
+      // 选中任务换成目标事件绑定的任务，否则新专注还记到旧事件里
+      expect(data.selectedTask.name, '英语');
+      // 记录归属确实落在目标事件上
+      final next = TimerEngine.addManual(data,
+          taskName: data.selectedTask.name, minutes: 50, at: t0);
+      expect(next.records.first.eventId, b);
+    });
+
+    test('目标已完成 / 自己切自己 → 原样返回', () {
+      final t0 = DateTime(2026, 11, 7, 9);
+      var data = TimerEngine.startEvent(_base(),
+          name: 'A', taskName: '高数', now: t0);
+      final a = data.events.first.id;
+      data = TimerEngine.startEvent(data, name: 'B', taskName: '英语', now: t0);
+      final b = data.events.firstWhere((e) => e.name == 'B').id;
+      data = TimerEngine.finishEvent(data, b, t0);
+
+      final sameAsFinished =
+          TimerEngine.switchEvent(data, a, b, t0.add(const Duration(hours: 1)));
+      expect(identical(sameAsFinished, data), isTrue);
+
+      final self =
+          TimerEngine.switchEvent(data, a, a, t0.add(const Duration(hours: 1)));
+      expect(identical(self, data), isTrue);
+    });
+  });
+
   group('事件聚合', () {
     test('累计时长 / 番茄 / 天数', () {
       final t0 = DateTime(2026, 9, 27, 10);

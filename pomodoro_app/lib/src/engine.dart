@@ -571,6 +571,43 @@ class TimerEngine {
     );
   }
 
+  /// 把「当前累计」从一条事件切到另一条。
+  ///
+  /// 一次必须做三件事，少一件用户就会觉得"点了切换但其实没切"：
+  /// 1. **暂停原来那条**——否则两条同时处于进行中，事件进展里看着像并行累计；
+  /// 2. **恢复目标那条**（若它处于暂停）；
+  /// 3. **把选中任务换成目标事件绑定的任务**——记录归属看的是
+  ///    「选中任务 + 它的进行中事件」，只改事件不换任务的话，接下来的专注
+  ///    仍然会记到原来那条事件里。
+  ///
+  /// 目标不存在/已完成/与来源相同 → 原样返回（幂等，不写脏数据）。
+  static AppData switchEvent(
+    AppData data,
+    String fromId,
+    String toId,
+    DateTime now,
+  ) {
+    if (fromId == toId) return data;
+    FocusEvent? target;
+    for (final event in data.events) {
+      if (event.id == toId && !event.isFinished) target = event;
+    }
+    if (target == null) return data;
+    final idx = data.tasks.indexWhere((task) => task.name == target!.taskName);
+    return data.copyWith(
+      events: [
+        for (final event in data.events)
+          if (event.id == fromId && event.isRunning)
+            event.copyWith(pausedAt: now)
+          else if (event.id == toId)
+            event.copyWith(clearPaused: true)
+          else
+            event,
+      ],
+      selectedIndex: idx >= 0 ? idx : null,
+    );
+  }
+
   /// 完成事件（归档保留，统计页进入已完成列表）。
   static AppData finishEvent(AppData data, String eventId, DateTime now) =>
       data.copyWith(

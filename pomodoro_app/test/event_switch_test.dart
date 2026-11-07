@@ -127,4 +127,51 @@ void main() {
     expect(find.text('继续累计'), findsOneWidget);
     expect(find.text('完成此事件（归档保留）'), findsOneWidget);
   });
+
+  testWidgets('操作面板里能直接「切换到其他事件」（暂停旧 + 恢复新 + 换任务）', (tester) async {
+    tester.view.physicalSize = const Size(1000, 3000);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    AppData? applied;
+    final now = DateTime.now();
+    final data = AppData(
+      tasks: [PineTask(name: '自控'), PineTask(name: '高数')],
+      events: [
+        FocusEvent(
+            id: 'e1',
+            name: '刷真题',
+            taskName: '自控',
+            startedAt: now.subtract(const Duration(hours: 3))),
+        FocusEvent(
+            id: 'e2',
+            name: '背单词',
+            taskName: '高数',
+            startedAt: now.subtract(const Duration(hours: 2)),
+            pausedAt: now.subtract(const Duration(hours: 1))),
+      ],
+    );
+    await tester.pumpWidget(MaterialApp(
+      home: StatsPage(data: data, onChanged: (next) => applied = next),
+    ));
+    await tester.pumpAndSettle();
+
+    // 事件进展里 live 顺序是「进行中在前」→ 第一个 ⋯ 就是「刷真题」。
+    await tester.tap(find.byTooltip('暂停 / 继续 / 完成 / 编辑').first);
+    await tester.pumpAndSettle();
+
+    // 2026-11-07 前的面板只有 编辑/暂停/完成/新建/删除，没有切换入口。
+    expect(find.textContaining('切换到其他事件'), findsOneWidget);
+    await tester.tap(find.textContaining('切换到其他事件'));
+    await tester.pumpAndSettle();
+    expect(find.text('切换到哪个事件？'), findsOneWidget);
+
+    await tester.tap(find.text('背单词').last);
+    await tester.pumpAndSettle();
+
+    expect(applied, isNotNull);
+    expect(applied!.selectedTask.name, '高数');
+    expect(applied!.events.firstWhere((e) => e.id == 'e1').isPaused, isTrue);
+    expect(applied!.events.firstWhere((e) => e.id == 'e2').isRunning, isTrue);
+  });
 }

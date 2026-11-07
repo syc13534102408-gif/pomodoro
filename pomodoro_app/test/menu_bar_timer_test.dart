@@ -5,7 +5,7 @@ import 'package:pomodoro_app/src/menu_bar_timer.dart';
 import 'package:pomodoro_app/src/models.dart';
 import 'package:pomodoro_app/src/theme.dart';
 
-const _settings = TimerSettings(focus: 25, short: 5, long: 15);
+const _settings = TimerSettings(focus: 25, short: 5, meal: 15);
 
 AppData _base() => AppData(settings: _settings);
 
@@ -92,14 +92,14 @@ void main() {
     expect(state.confirm, '结束休息');
   });
 
-  test('长休息：标题区分长短休息', () {
+  test('吃饭：标题与短休区分', () {
     final now = DateTime(2026, 9, 6, 10);
     var data = TimerEngine.start(_base(), SessionMode.longBreak, now);
 
     final state = menuBarStateOf(data, now);
 
-    expect(state.title, '长休 00:00');
-    expect(state.head, contains('长休息'));
+    expect(state.title, '吃饭 00:00');
+    expect(state.head, contains('吃饭'));
   });
 
   test('已专注满 1 小时：elapsed 转 h:mm:ss', () {

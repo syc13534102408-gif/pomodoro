@@ -35,7 +35,7 @@ class SettingsPage extends StatefulWidget {
 class _SettingsPageState extends State<SettingsPage> {
   late final TextEditingController _focus;
   late final TextEditingController _short;
-  late final TextEditingController _long;
+  late final TextEditingController _meal;
   late final TextEditingController _goal;
   late final TextEditingController _weekGoal;
   late final TextEditingController _worker;
@@ -49,7 +49,7 @@ class _SettingsPageState extends State<SettingsPage> {
     super.initState();
     _focus = TextEditingController(text: widget.data.settings.focus.toString());
     _short = TextEditingController(text: widget.data.settings.short.toString());
-    _long = TextEditingController(text: widget.data.settings.long.toString());
+    _meal = TextEditingController(text: widget.data.settings.meal.toString());
     _goal = TextEditingController(text: widget.data.goalMinutes.toString());
     _weekGoal = TextEditingController(text: widget.data.weekGoal.toString());
     _worker = TextEditingController(text: CloudSync.defaultBaseUrl);
@@ -59,7 +59,7 @@ class _SettingsPageState extends State<SettingsPage> {
   void dispose() {
     _focus.dispose();
     _short.dispose();
-    _long.dispose();
+    _meal.dispose();
     _goal.dispose();
     _weekGoal.dispose();
     _worker.dispose();
@@ -81,7 +81,7 @@ class _SettingsPageState extends State<SettingsPage> {
       settings: TimerSettings(
         focus: read(_focus, 50, 1, 600),
         short: read(_short, 10, 1, 120),
-        long: read(_long, 25, 1, 180),
+        meal: read(_meal, 40, 1, 180),
       ),
       goalMinutes: read(_goal, 200, 1, 999),
       weekGoal: read(_weekGoal, 20, 1, 999),
@@ -284,7 +284,7 @@ class _SettingsPageState extends State<SettingsPage> {
                     const SizedBox(width: 10),
                     Expanded(child: _numberField('短休息', _short)),
                     const SizedBox(width: 10),
-                    Expanded(child: _numberField('长休息', _long)),
+                    Expanded(child: _numberField('吃饭', _meal)),
                   ],
                 ),
                 const SizedBox(height: 12),
@@ -539,7 +539,7 @@ class _SettingsPageState extends State<SettingsPage> {
                           style:
                               TextStyle(color: PineColors.sub, fontSize: 13)),
                       Spacer(),
-                      Text('v1.3.26 · 松林手帐',
+                      Text('v1.3.27 · 松林手帐',
                           style: TextStyle(
                               color: PineColors.ink,
                               fontSize: 13,

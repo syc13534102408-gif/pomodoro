@@ -3,7 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:pomodoro_app/src/engine.dart';
 import 'package:pomodoro_app/src/models.dart';
 
-const _settings = TimerSettings(focus: 25, short: 5, long: 15);
+const _settings = TimerSettings(focus: 25, short: 5, meal: 15);
 
 AppData _started(DateTime at) => TimerEngine.start(
       AppData(settings: _settings),

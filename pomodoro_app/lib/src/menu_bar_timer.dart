@@ -69,7 +69,7 @@ class MenuBarState {
   /// 是否有进行中的会话；为 false 时悬浮小窗自动隐藏。
   final bool active;
 
-  /// 阶段短标签：专注中 / 短休息 / 长休息 / 已超时 / 已暂停（悬浮窗 V3 用）。
+  /// 阶段短标签：专注 / 短休 / 吃饭 / 已超时 / 已暂停（悬浮窗 V3 用）。
   final String phase;
 
   /// 溢出比例 0..1：超时后又走了几个「计划时长」，封顶 1（＝又干满一整轮）。
@@ -89,7 +89,7 @@ double _overRatio(SessionView view) {
 String _modeShort(SessionMode mode) => switch (mode) {
       SessionMode.focus => '专注',
       SessionMode.shortBreak => '短休',
-      SessionMode.longBreak => '长休',
+      SessionMode.longBreak => '吃饭',
     };
 
 /// 由 [AppData] 推导菜单栏状态的纯函数。

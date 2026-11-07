@@ -11,7 +11,7 @@ extension SessionModeX on SessionMode {
   String get label => switch (this) {
         SessionMode.focus => '专注',
         SessionMode.shortBreak => '短休息',
-        SessionMode.longBreak => '长休息',
+        SessionMode.longBreak => '吃饭',
       };
 
   bool get isFocus => this == SessionMode.focus;
@@ -530,25 +530,32 @@ class SyncState {
 }
 
 class TimerSettings {
-  const TimerSettings({this.focus = 50, this.short = 10, this.long = 25});
+  const TimerSettings({this.focus = 50, this.short = 10, this.meal = 40});
 
   final int focus;
   final int short;
-  final int long;
+
+  /// 「吃饭」时长（默认 40 分钟，2026-11-07 起）。
+  ///
+  /// 语义上顶替了原来的「长休息」：长休息不再自动触发（专注结束固定进短休息），
+  /// 吃饭只能手动点。字段名同时从 `long` 改成 `meal`——旧值是给"长休息"设的
+  /// （例如 20 分钟），直接沿用会让吃饭只有 20 分钟，所以**不读旧的 `long`**，
+  /// 缺 `meal` 一律按默认 40。
+  final int meal;
 
   int forMode(SessionMode mode) => switch (mode) {
         SessionMode.focus => focus,
         SessionMode.shortBreak => short,
-        SessionMode.longBreak => long,
+        SessionMode.longBreak => meal,
       };
 
   Map<String, dynamic> toMap() =>
-      {'focus': focus, 'short': short, 'long': long};
+      {'focus': focus, 'short': short, 'meal': meal};
 
-  TimerSettings copyWith({int? focus, int? short, int? long}) => TimerSettings(
+  TimerSettings copyWith({int? focus, int? short, int? meal}) => TimerSettings(
         focus: focus ?? this.focus,
         short: short ?? this.short,
-        long: long ?? this.long,
+        meal: meal ?? this.meal,
       );
 
   static TimerSettings fromMap(dynamic raw) {
@@ -558,7 +565,8 @@ class TimerSettings {
     return TimerSettings(
       focus: read('focus', 50),
       short: read('short', 10),
-      long: read('long', 25),
+      // 刻意不读旧的 `long`：见 [meal] 的说明。
+      meal: read('meal', 40),
     );
   }
 }
@@ -641,6 +649,7 @@ class AppData {
     this.soundEnabled = true,
     this.notifyEnabled = true,
     this.activeSession,
+    this.restDate,
     SyncState? sync,
     Countdown? countdown,
   })  : tasks = tasks ?? _defaultTasks(),
@@ -669,6 +678,17 @@ class AppData {
   final bool soundEnabled;
   final bool notifyEnabled;
   final ActiveSession? activeSession;
+
+  /// 已标记「今日休息」的日期（自然日键 `ymdOf(dayStart(...))`）。
+  ///
+  /// 语义是"今天到此为止"：按下后结束当前计时、首页显示休息态、按钮变「继续今日」。
+  /// 只存**单个**日期：换天后自然不再命中，不需要清理任务。
+  /// 与 `idleMode` / `countdown` 一样**不进云端净荷**——它是"这台设备上我今天收工了"，
+  /// 两台设备各自表达，避免与另一端的会话状态打架。
+  final String? restDate;
+
+  /// 今天是否已标记休息。
+  bool isRestDay(DateTime now) => restDate == ymdOf(dayStart(now));
   final SyncState sync;
 
   /// 考试倒计时（本地偏好，不进云端净荷，见 [toCloudMap]）。
@@ -707,6 +727,7 @@ class AppData {
         ...toCloudMap(),
         'idleMode': idleMode.key,
         'activeSession': activeSession?.toMap(),
+        if (restDate != null) 'restDate': restDate,
         'sync': sync.toMap(),
         'countdown': countdown.toMap(),
       };
@@ -725,6 +746,8 @@ class AppData {
     bool? notifyEnabled,
     ActiveSession? activeSession,
     bool clearActiveSession = false,
+    String? restDate,
+    bool clearRestDate = false,
     SyncState? sync,
     Countdown? countdown,
   }) =>
@@ -742,6 +765,7 @@ class AppData {
         notifyEnabled: notifyEnabled ?? this.notifyEnabled,
         activeSession:
             clearActiveSession ? null : (activeSession ?? this.activeSession),
+        restDate: clearRestDate ? null : (restDate ?? this.restDate),
         sync: sync ?? this.sync,
         countdown: countdown ?? this.countdown,
       );
@@ -813,6 +837,7 @@ class AppData {
       soundEnabled: map['soundEnabled'] != false,
       notifyEnabled: map['notifyEnabled'] != false,
       activeSession: ActiveSession.fromMap(map['activeSession']),
+      restDate: map['restDate']?.toString(),
       sync: SyncState.fromMap(map['sync']),
       countdown: Countdown.fromMap(map['countdown']),
     );

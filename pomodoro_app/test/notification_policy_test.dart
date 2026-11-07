@@ -18,7 +18,7 @@ void main() {
       expect(copy.body, '「数学真题」计划时长已到，继续专注会累计更多时长。');
     });
 
-    test('短休息/长休息到点：同一套休息文案', () {
+    test('短休/吃饭到点：同一套休息文案', () {
       for (final mode in [SessionMode.shortBreak, SessionMode.longBreak]) {
         final copy = endAlarmCopyFor(mode: mode, taskName: '数学真题');
         expect(copy.title, 'pinecore · 休息结束');

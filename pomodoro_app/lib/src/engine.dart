@@ -358,14 +358,13 @@ class TimerEngine {
           ],
         );
       }
-      // 休息类型按本次实际专注时长决定（2026-10-09 起）：
-      // ≤70 分钟 → 短休息；>70 分钟 → 长休息。
-      // 替代旧的「每完成 4 次一长休」轮换；不触碰任何记录，只是会话状态。
-      final nextMode = view.elapsedMinutes > 70
-          ? SessionMode.longBreak
-          : SessionMode.shortBreak;
+      // 自动休息**固定短休**（2026-11-07 起）。
+      //
+      // 旧规则按本次专注时长分档（≤70 短休 / >70 长休），但长休息/吃饭应该由人决定
+      // 什么时候吃、吃多久，不该由"这一轮学了多久"推断。所以：专注结束 → 短休；
+      // 需要长一点就手动点「吃饭」。
       next = next.copyWith(clearActiveSession: true);
-      return start(next, nextMode, now);
+      return start(next, SessionMode.shortBreak, now);
     }
 
     // 休息结束：清除会话，回到专注但不自动开始。
@@ -376,6 +375,48 @@ class TimerEngine {
           .where((record) => record.id != session.recordId)
           .toList(),
     );
+  }
+
+  /// 手动进入一段休息（短休 / 吃饭）。
+  ///
+  /// 与 [complete] 的区别只在"之后去哪"：这里不自动接短休，而是进调用方指定的阶段。
+  /// 进行中的专注先按完成收口（该记的时长照记），进行中的休息则直接结束。
+  static AppData startBreak(AppData data, SessionMode mode, DateTime now) {
+    if (mode.isFocus) return data;
+    // 无会话时 _settle 返回 null —— 这时**直接开始**，不能原地返回（否则点了没反应）。
+    final settled = _settle(data, now) ?? data;
+    return start(settled, mode, now);
+  }
+
+  /// 今日休息（收工）：结束当前计时并标记今天休息，此后不再自动进入休息。
+  ///
+  /// 进行中的专注按完成收口——已经学掉的时间不该因为"收工"而蒸发。
+  static AppData restForToday(AppData data, DateTime now) {
+    final settled = _settle(data, now) ?? data;
+    return settled.copyWith(
+      idleMode: SessionMode.focus,
+      clearActiveSession: true,
+      restDate: ymdOf(dayStart(now)),
+    );
+  }
+
+  /// 撤销「今日休息」（继续今日）。
+  static AppData resumeToday(AppData data) => data.copyWith(clearRestDate: true);
+
+  /// 收口当前会话：专注 → 按已完成落记录；休息 → 直接丢弃。无会话返回 null。
+  static AppData? _settle(AppData data, DateTime now) {
+    final session = data.activeSession;
+    if (session == null) return null;
+    if (!session.mode.isFocus) {
+      return data.copyWith(
+        idleMode: SessionMode.focus,
+        clearActiveSession: true,
+        records: data.records
+            .where((record) => record.id != session.recordId)
+            .toList(),
+      );
+    }
+    return complete(data, now).copyWith(clearActiveSession: true);
   }
 
   /// 重置：丢弃当前未完成会话，不写入统计。

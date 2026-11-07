@@ -37,7 +37,7 @@ AppData _data({int records = 3, int todos = 5}) {
         for (var i = 0; i < todos; i++) TodoItem(text: '日程条目 ${i + 1}'),
       ],
     },
-    settings: const TimerSettings(focus: 60, short: 10, long: 20),
+    settings: const TimerSettings(focus: 60, short: 10, meal: 20),
   );
 }
 
@@ -168,7 +168,7 @@ void main() {
             today: [TodoItem(text: '今天的活')],
             tomorrow: [TodoItem(text: '明天的活')],
           },
-          settings: const TimerSettings(focus: 60, short: 10, long: 20),
+          settings: const TimerSettings(focus: 60, short: 10, meal: 20),
         ),
       );
 
@@ -214,7 +214,7 @@ void main() {
           todos: {
             ymdOf(dayStart(now)): [TodoItem(text: '今天的活')],
           },
-          settings: const TimerSettings(focus: 60, short: 10, long: 20),
+          settings: const TimerSettings(focus: 60, short: 10, meal: 20),
         ),
       );
 

@@ -37,7 +37,7 @@ AppData _data({required bool paused}) {
         startedAt: now.subtract(const Duration(hours: 1)),
       ),
     ],
-    settings: const TimerSettings(focus: 50, short: 5, long: 15),
+    settings: const TimerSettings(focus: 50, short: 5, meal: 15),
   );
 }
 

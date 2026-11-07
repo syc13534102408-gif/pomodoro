@@ -649,6 +649,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     var next = TimerEngine.advance(_data, now);
     final session = next.activeSession;
     if (session == null) {
+      // 开始专注 = 回到工作，「今日休息」标记自动作废（不用先去点「继续今日」）。
+      if (next.isRestDay(now)) next = TimerEngine.resumeToday(next);
       final started = TimerEngine.start(next, next.idleMode, now);
       // P0-2 权限时机：首次开始专注即请求通知权限（幂等，不打扰已授权用户）。
       // 精确闹钟授权同理，只尝试一次；被拒自动降级 inexact。
@@ -682,14 +684,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         minutes: next.settings.focus.toDouble(),
         at: now,
       );
-      // 休息轮换按完成次数口径（同 engine.complete）。
-      final count = next.records
-          .where((r) => r.counted && r.dayKey == dateKey(now))
-          .length;
-      final breakMode = count > 0 && count % 4 == 0
-          ? SessionMode.longBreak
-          : SessionMode.shortBreak;
-      next = TimerEngine.start(next, breakMode, now);
+      // 与 engine.complete 一致：自动休息固定短休（2026-11-07 起）。
+      next = TimerEngine.start(next, SessionMode.shortBreak, now);
     } else {
       next = TimerEngine.complete(next, now);
     }
@@ -729,9 +725,74 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     _apply(TimerEngine.discard(_data), force: true);
   }
 
-  void _switchMode(SessionMode mode) {
+  /// 手动进入一段休息（短休 / 吃饭）：先把进行中的会话收口，再起目标阶段。
+  void _startBreak(SessionMode mode) {
+    final before = _data.records.length;
+    final next = TimerEngine.startBreak(_data, mode, DateTime.now());
+    if (next == _data) return;
     unawaited(Notifier.cancel());
-    _apply(TimerEngine.switchMode(_data, mode, DateTime.now()), force: true);
+    _apply(next, force: true);
+    // 收口写入了记录（专注被按完成处理）→ 立刻上传，别等下次节流。
+    if (next.records.length > before) {
+      unawaited(_autoSync.afterFocus(context, next));
+    }
+  }
+
+  /// 今日休息（收工）：结束计时 + 标记今天休息，环内文案变「今日休息」。
+  void _restToday() {
+    final before = _data.records.length;
+    final next = TimerEngine.restForToday(_data, DateTime.now());
+    unawaited(Notifier.cancel());
+    _apply(next, force: true);
+    if (next.records.length > before) {
+      unawaited(_autoSync.afterFocus(context, next));
+    }
+  }
+
+  /// 撤销今日休息（继续今日）。
+  void _resumeToday() {
+    _apply(TimerEngine.resumeToday(_data), force: true);
+  }
+
+  /// 第二控制行：短休 / 吃饭 / 今日休息（2026-11-07 需求）。
+  ///
+  /// 取代原来的三段「专注 / 短休息 / 长休息」胶囊：自动休息只剩短休，
+  /// 长段休息由人决定（吃饭），所以阶段切换直接做成"一键进入"的动作。
+  Widget _restRow() {
+    final resting = _data.isRestDay(DateTime.now());
+    return Row(
+      children: [
+        Expanded(
+          child: _RestPill(
+            label: '短休',
+            minutes: _data.settings.short,
+            icon: Icons.local_cafe_outlined,
+            accent: PineColors.mint,
+            onTap: () => _startBreak(SessionMode.shortBreak),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: _RestPill(
+            label: '吃饭',
+            minutes: _data.settings.meal,
+            icon: Icons.restaurant_outlined,
+            accent: PineColors.goldInk,
+            onTap: () => _startBreak(SessionMode.longBreak),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: _RestPill(
+            label: resting ? '继续今日' : '今日休息',
+            icon: resting ? Icons.wb_sunny_outlined : Icons.bedtime_outlined,
+            accent: resting ? PineColors.pine : PineColors.sub,
+            active: resting,
+            onTap: resting ? _resumeToday : _restToday,
+          ),
+        ),
+      ],
+    );
   }
 
   void _replace(AppData next) {
@@ -879,11 +940,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 ),
               ],
               SizedBox(height: compact ? 8 : 12),
-              ModeSwitcher(
-                current: _data.idleMode,
-                minutesFor: _data.settings.forMode,
-                onChanged: _switchMode,
-              ),
               if (_isSuspended()) ...[
                 SizedBox(height: compact ? 8 : 12),
                 _suspendBanner(),
@@ -916,6 +972,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               ),
               SizedBox(height: compact ? 8 : 12),
               _controls(session, view, suspended: _data.activeSession),
+              SizedBox(height: compact ? 6 : 8),
+              _restRow(),
               SizedBox(height: compact ? 8 : 12),
               _planCard(),
               SizedBox(height: compact ? 8 : 12),
@@ -1093,16 +1151,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Center(
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 320),
-                    child: ModeSwitcher(
-                      current: _data.idleMode,
-                      minutesFor: _data.settings.forMode,
-                      onChanged: _switchMode,
-                    ),
-                  ),
-                ),
                 if (_isSuspended()) ...[
                   const SizedBox(height: 10),
                   _suspendBanner(),
@@ -1168,6 +1216,16 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                         const BoxConstraints(maxWidth: Paper.cabinColumn),
                     child: _controls(session, view,
                         suspended: _data.activeSession),
+                  ),
+                ),
+                // 5pt 是量出来的：440×600 与 500×640 两档此前正好贴边，
+                // 新加这一行必须把间距压到这里才不触发滚动（见 desktop_layout_test）。
+                const SizedBox(height: 5),
+                Center(
+                  child: ConstrainedBox(
+                    constraints:
+                        const BoxConstraints(maxWidth: Paper.cabinColumn),
+                    child: _restRow(),
                   ),
                 ),
                 SizedBox(height: gapTail),
@@ -1367,6 +1425,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   /// 处的可用弦长只有 205pt，长任务名会被截断甚至压到 12pt 轨道上。
   /// 手机端同步（`BrickTimer` 与本方法同源），两端文案不再分叉。
   String _caption(ActiveSession? session, SessionView view) {
+    // 今日休息态：环里直接写状态（省一行横幅，垂直预算只剩几 pt）。
+    if (session == null && _data.isRestDay(DateTime.now())) return '今日休息';
     if (session == null) return '准备开始';
     if (view.targetReached) return '已超时 · 仍在累积';
     if (!session.running) {
@@ -1380,7 +1440,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       final count = StatsView.of(_data, DateTime.now()).todayCount + 1;
       return '第 $count 个番茄';
     }
-    return view.mode == SessionMode.shortBreak ? '起身活动一下' : '长休息，恢复状态';
+    return view.mode == SessionMode.shortBreak ? '起身活动一下' : '吃饭，慢慢来';
   }
 
   /// 手机布局顶部：日期（今日语境）+ 右侧松果小标（纸面风格）。
@@ -2087,6 +2147,78 @@ class _CompletionStamp extends StatelessWidget {
                   letterSpacing: 1,
                 ),
               ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 休息行的一格：色点 + 名称 +（可选）分钟数，实底卡片、1px 描边。
+///
+/// 与主控制行刻意拉开层级：那里是墨底/金底的「主行动」，这里是一组**轻量入口**，
+/// 所以只用纸色底 + 阶段色文字，不用实心色块（也避免一屏出现三块重色）。
+class _RestPill extends StatelessWidget {
+  const _RestPill({
+    required this.label,
+    required this.icon,
+    required this.accent,
+    required this.onTap,
+    this.minutes,
+    this.active = false,
+  });
+
+  final String label;
+  final IconData icon;
+  final Color accent;
+  final VoidCallback onTap;
+  final int? minutes;
+
+  /// 「今日休息」已生效时高亮（同一格同时是撤销入口）。
+  final bool active;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: active ? PineColors.tint(PineColors.pine) : PineColors.card,
+      borderRadius: BorderRadius.circular(Paper.chipRadius),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(Paper.chipRadius),
+        onTap: onTap,
+        child: Container(
+          height: 32,
+          padding: const EdgeInsets.symmetric(horizontal: 6),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(Paper.chipRadius),
+            border: Border.all(
+                color: active ? PineColors.pine : PineColors.line),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 14, color: accent),
+              const SizedBox(width: 4),
+              Flexible(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: accent,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              if (minutes != null) ...[
+                const SizedBox(width: 3),
+                Text(
+                  '$minutes 分',
+                  style: const TextStyle(
+                      color: PineColors.sub, fontSize: 10),
+                ),
+              ],
             ],
           ),
         ),

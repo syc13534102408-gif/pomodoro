@@ -5,7 +5,7 @@ import 'package:pomodoro_app/src/engine.dart';
 import 'package:pomodoro_app/src/models.dart';
 
 AppData _base() => AppData(
-      settings: const TimerSettings(focus: 100, short: 5, long: 15),
+      settings: const TimerSettings(focus: 100, short: 5, meal: 15),
       tasks: [PineTask(name: '高数')],
     );
 
@@ -20,7 +20,7 @@ AppData _runFocus(Duration planned) {
 }
 
 void main() {
-  group('休息类型按本次专注时长（2026-10-09 规则）', () {
+  group('自动休息固定短休（2026-11-07 规则）', () {
     test('50 分钟（含 70 以内）→ 短休息', () {
       final data = _runFocus(const Duration(minutes: 50));
       expect(data.activeSession!.mode, SessionMode.shortBreak);
@@ -31,14 +31,14 @@ void main() {
       expect(data.activeSession!.mode, SessionMode.shortBreak);
     });
 
-    test('超过 70 分钟 → 长休息', () {
+    test('超过 70 分钟也只进短休（旧规则的 70 分档已取消）', () {
       final data = _runFocus(const Duration(minutes: 75));
-      expect(data.activeSession!.mode, SessionMode.longBreak);
+      expect(data.activeSession!.mode, SessionMode.shortBreak);
     });
 
-    test('长专注（100 分钟）→ 长休息', () {
+    test('长专注（100 分钟）→ 短休', () {
       final data = _runFocus(const Duration(minutes: 100));
-      expect(data.activeSession!.mode, SessionMode.longBreak);
+      expect(data.activeSession!.mode, SessionMode.shortBreak);
     });
   });
 }

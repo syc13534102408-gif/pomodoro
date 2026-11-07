@@ -8,7 +8,7 @@ import 'package:pomodoro_app/src/engine.dart';
 import 'package:pomodoro_app/src/models.dart';
 
 AppData _base({int focus = 1}) => AppData(
-      settings: TimerSettings(focus: focus, short: 5, long: 15),
+      settings: TimerSettings(focus: focus, short: 5, meal: 15),
     );
 
 void main() {
@@ -56,7 +56,7 @@ void main() {
           at: now.subtract(const Duration(days: 1)),
         ),
       ],
-      settings: const TimerSettings(focus: 25, short: 5, long: 15),
+      settings: const TimerSettings(focus: 25, short: 5, meal: 15),
     );
     await tester.pumpWidget(MaterialApp(home: StatsPage(data: withData, onChanged: (_) {})));
     expect(find.text('本月回顾'), findsOneWidget);
@@ -93,7 +93,7 @@ void main() {
     expect(view.elapsedMinutes, closeTo(2.5, 0.05));
   });
 
-  test('确认完成后记录完整时长并自动进入长休息（72 分钟 > 70）', () {
+  test('确认完成后记录完整时长并自动进入短休（72 分钟也一样）', () {
     final start = DateTime(2026, 8, 29, 9, 0);
     var data = TimerEngine.start(_base(focus: 50), SessionMode.focus, start);
     final later = start.add(const Duration(minutes: 72));
@@ -111,9 +111,9 @@ void main() {
     expect(record.status, RecordStatus.completed);
     expect(record.minutes, closeTo(72.0, 0.05));
 
-    // 自动开始休息：本次 72 分钟（>70）→ 长休息。
+    // 自动开始休息：2026-11-07 起一律短休，不再按 70 分钟分档。
     expect(data.activeSession, isNotNull);
-    expect(data.activeSession!.mode, SessionMode.longBreak);
+    expect(data.activeSession!.mode, SessionMode.shortBreak);
     expect(data.activeSession!.running, isTrue);
   });
 

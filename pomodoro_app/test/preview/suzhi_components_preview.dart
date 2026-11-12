@@ -18,7 +18,15 @@ import 'package:pomodoro_app/src/ui/ui.dart';
 Future<void> _loadFonts() async {
   final bytes = File('/System/Library/Fonts/Supplemental/Arial Unicode.ttf')
       .readAsBytesSync();
-  for (final family in ['PineTest', 'serif', 'monospace']) {
+  // `PineText.serif` 显式指定 'Songti SC'，测试环境没有该字体；把系统中文
+  // 字体注册到这些家族名下，预览里的中文才不会渲染成方块。
+  for (final family in [
+    'PineTest',
+    'Songti SC',
+    'serif',
+    'monospace',
+    'SF Mono',
+  ]) {
     final loader = FontLoader(family)
       ..addFont(Future.value(ByteData.sublistView(bytes)));
     await loader.load();
@@ -26,9 +34,14 @@ Future<void> _loadFonts() async {
 }
 
 Widget _board() {
+  final baseTheme = buildPineTheme();
   return MaterialApp(
     debugShowCheckedModeBanner: false,
-    theme: buildPineTheme(),
+    // `PineText.sans` 不指定字体族，测试环境默认 Ahem 没有中文字形 → 方块。
+    // 把正文字体族也指向已加载的系统中文（仅影响离屏预览）。
+    theme: baseTheme.copyWith(
+      textTheme: baseTheme.textTheme.apply(fontFamily: 'PineTest'),
+    ),
     home: Scaffold(
       backgroundColor: PineColors.paper,
       body: SingleChildScrollView(
@@ -192,7 +205,10 @@ void main() {
 
     const key = ValueKey('shot');
     await tester.pumpWidget(RepaintBoundary(key: key, child: _board()));
-    await tester.pumpAndSettle();
+    // 总览页没有动画：用有限 pump，别用 pumpAndSettle（会等满默认 10 分钟超时）。
+    // 另外本预览脚本写完 PNG 后进程不退出，看到日志「渲染完成」即可 Ctrl-C / kill。
+    await tester.pump(const Duration(milliseconds: 250));
+    await tester.pump(const Duration(milliseconds: 250));
 
     final boundary =
         tester.renderObject<RenderRepaintBoundary>(find.byKey(key));

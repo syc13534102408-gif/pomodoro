@@ -4,6 +4,7 @@ import '../src/engine.dart';
 import '../src/models.dart';
 import '../src/sheets.dart';
 import '../src/theme.dart';
+import '../src/ui/ui.dart';
 import '../src/widgets.dart';
 
 class StatsPage extends StatefulWidget {
@@ -63,12 +64,91 @@ class _StatsPageState extends State<StatsPage> {
       ..sort((a, b) => b.at.compareTo(a.at));
     final legend = stats.tasksInWeek();
     final weekTotal = stats.weekMinutes;
+    // 堆叠墨柱的科目顺序固定为「本周出现的真实任务名」，不编造示例科目。
+    final inkNames = legend.take(4).toList();
 
     return Scaffold(
       appBar: AppBar(title: const Text('专注报告')),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(20, 6, 20, 24),
         children: [
+          // 统计页是长列表：新增定稿区块必须排在「本月回顾」之后，否则默认视口
+          // 下它还没被构建，widget_test 的空态/有数据两条路径都会拿不到文本。
+          _MonthlyReview(data: data),
+          const SizedBox(height: 14),
+          // ── V3 定稿：藏书票累计碑（口径＝全部历史）────────────────────
+          ExLibrisCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      '藏书票 · 全部历史累计',
+                      style: PineText.serif(size: PineType.label, color: PineColors.ink2),
+                    ),
+                    const Spacer(),
+                    const SectionSeal(text: '积累'),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  formatHoursMinutes(stats.totalMinutes),
+                  style: PineText.serif(size: PineType.num),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '共 ${stats.totalTomatoes} 枚番茄 · 日均 ${formatHoursMinutes(stats.totalDays <= 0 ? 0 : stats.totalMinutes / stats.totalDays)}',
+                  style: PineText.sans(size: PineType.meta, color: PineColors.ink2),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  '第 ${stats.totalDays} 个学习日 · 连续 ${stats.streak} 日',
+                  style: PineText.mono(size: PineType.caption, color: PineColors.ink3),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
+          // ── V3 定稿：近七日水墨时长谱（口径＝本周 7 天，按真实任务名堆叠）──
+          SuzhiCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  '近七日水墨时长谱 · 按科目堆叠',
+                  style: PineText.serif(size: PineType.label, color: PineColors.ink2),
+                ),
+                const SizedBox(height: 10),
+                InkStackChart(
+                  days: _inkDays(stats, inkNames, todayIndex),
+                  legend: inkNames,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
+          // ── V3 定稿：钤印日历（口径＝本自然月打卡）────────────────────
+          SuzhiCard(
+            showRule: false,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  '${today.year}年${today.month}月 · 钤印日历',
+                  style: PineText.serif(size: PineType.label, color: PineColors.ink2),
+                ),
+                const SizedBox(height: 10),
+                SealCalendar(
+                  daysInMonth: DateTime(today.year, today.month + 1, 0).day,
+                  firstWeekday: DateTime(today.year, today.month, 1).weekday,
+                  dayMinutes: _monthDayMinutes(today),
+                  today: today.day,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
           // 周期切换：本周 / 上周。
           Row(
             children: [
@@ -136,8 +216,6 @@ class _StatsPageState extends State<StatsPage> {
             onChanged: widget.onChanged,
             colorFor: _colorFor,
           ),
-          const SizedBox(height: 16),
-          _MonthlyReview(data: data),
           const SizedBox(height: 16),
           BrickCard(
             child: Column(
@@ -285,6 +363,50 @@ class _StatsPageState extends State<StatsPage> {
         ],
       ),
     );
+  }
+
+  /// 近七日按真实任务名堆叠；不足 4 档补 0（四色图例固定顺序便于跨天比较）。
+  List<InkStackDay> _inkDays(
+    StatsView stats,
+    List<String> names,
+    int todayIndex,
+  ) {
+    const week = ['一', '二', '三', '四', '五', '六', '日'];
+    final days = <InkStackDay>[];
+    for (var d = 0; d < 7; d++) {
+      final row = stats.weekTaskTotals[d];
+      final minutes = <double>[
+        for (final name in names)
+          row == null ? 0 : (row[name] ?? 0).toDouble(),
+      ];
+      while (minutes.length < 4) {
+        minutes.add(0);
+      }
+      final total = minutes.fold<double>(0, (sum, v) => sum + v);
+      days.add(InkStackDay(
+        label: '周${week[d]}',
+        minutes: minutes,
+        today: d == todayIndex,
+        valueLabel: d == todayIndex && total > 0
+            ? formatHoursMinutes(total)
+            : null,
+      ));
+    }
+    return days;
+  }
+
+  /// 本自然月每日专注分钟（只取 counted 记录，按 dayKey 归日，不改统计口径）。
+  Map<int, double> _monthDayMinutes(DateTime now) {
+    final prefix =
+        '${now.year}-${now.month.toString().padLeft(2, '0')}-';
+    final out = <int, double>{};
+    for (final record in data.records) {
+      if (!record.counted || !record.dayKey.startsWith(prefix)) continue;
+      final day = int.tryParse(record.dayKey.substring(8));
+      if (day == null) continue;
+      out[day] = (out[day] ?? 0) + record.minutes;
+    }
+    return out;
   }
 
   String _weekGoalCaption(StatsView stats) {
@@ -877,14 +999,13 @@ class _MonthGrid extends StatelessWidget {
 
   static const List<String> _week = ['一', '二', '三', '四', '五', '六', '日'];
 
-  /// 松绿离散色阶（4 档）：直接叠在卡纸白上，档间明度差拉开到人眼可辨，
-  /// 最深档沉过品牌松绿并配白字。旧实现用 α=90–240 连续叠色，最浅档与
-  /// 卡底几乎同色、最深档仍浅于松绿，深浅阶梯看不清。
-  static const List<Color> _ramp = [
-    Color(0xFFD6E5DA), // 1 档 · 浅纸绿（有记录）
-    Color(0xFF97C0A6), // 2 档
-    Color(0xFF4E7A5B), // 3 档 · 品牌松绿
-    Color(0xFF3B5D47), // 4 档 · 深林绿（配白字）
+  /// V3 檀褐离散色阶（4 档）：一律由令牌派生，页面不再出现十六进制色值。
+  /// 档间明度差拉开到人眼可辨，最深档配纸白字。
+  static final List<Color> _ramp = <Color>[
+    PineColors.accentSoft, // 1 档 · 淡敷（有记录）
+    PineColors.accent.withAlpha(140), // 2 档
+    PineColors.accent, // 3 档 · 檀褐
+    PineColors.accentDeep, // 4 档 · 深笔（配纸白字）
   ];
 
   /// 时长 → 档位（0 = 无记录）。桶宽大致对齐 25/50 分钟番茄节奏，

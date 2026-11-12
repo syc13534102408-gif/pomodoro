@@ -132,12 +132,28 @@ class FolioBar extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 10),
-          Text(dateText, style: PineText.serif(size: PineType.body)),
+          // 390 宽下「日期 + 倒计时 + 同步点」会挤到溢出 15px：两端文案都允许
+          // 压缩省略，分隔线与同步点保持不缩。
+          Flexible(
+            child: Text(
+              dateText,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: PineText.serif(size: PineType.body),
+            ),
+          ),
           if (examText != null) ...[
             const SizedBox(width: 10),
             Container(width: 1, height: 11, color: PineColors.lineStrong),
             const SizedBox(width: 10),
-            Text(examText!, style: PineText.sans(size: PineType.meta, color: PineColors.ink2)),
+            Flexible(
+              child: Text(
+                examText!,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: PineText.sans(size: PineType.meta, color: PineColors.ink2),
+              ),
+            ),
           ],
           const Spacer(),
           if (syncText != null) ...[
@@ -523,7 +539,15 @@ class LedgerBar extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(kicker, style: PineText.serif(size: PineType.meta, color: PineColors.ink2)),
+              Flexible(
+                child: Text(
+                  kicker,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: PineText.serif(size: PineType.meta, color: PineColors.ink2),
+                ),
+              ),
+              const SizedBox(width: 6),
               Text(percent, style: PineText.mono(size: PineType.label, color: PineColors.accent)),
             ],
           ),
@@ -532,8 +556,24 @@ class LedgerBar extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.end,
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(value, style: PineText.serif(size: PineType.num, weight: FontWeight.w500)),
-              Text(detail, style: PineText.sans(size: PineType.caption, color: PineColors.ink3)),
+              Flexible(
+                child: Text(
+                  value,
+                  maxLines: 1,
+                  overflow: TextOverflow.fade,
+                  style: PineText.serif(size: PineType.num, weight: FontWeight.w500),
+                ),
+              ),
+              const SizedBox(width: 6),
+              Flexible(
+                child: Text(
+                  detail,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.right,
+                  style: PineText.sans(size: PineType.caption, color: PineColors.ink3),
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 8),
@@ -551,12 +591,25 @@ class LedgerBar extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(footLeft ?? '', style: PineText.sans(size: PineType.caption, color: PineColors.ink3)),
-                GestureDetector(
-                  onTap: onDetail,
+                Flexible(
                   child: Text(
-                    footRight ?? '',
-                    style: PineText.serif(size: PineType.caption, color: PineColors.accent),
+                    footLeft ?? '',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: PineText.sans(size: PineType.caption, color: PineColors.ink3),
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Flexible(
+                  child: GestureDetector(
+                    onTap: onDetail,
+                    child: Text(
+                      footRight ?? '',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.right,
+                      style: PineText.serif(size: PineType.caption, color: PineColors.accent),
+                    ),
                   ),
                 ),
               ],
@@ -931,16 +984,25 @@ class InkStackChart extends StatelessWidget {
   Widget _column(InkStackDay day, double maxTotal) {
     final total = day.minutes.fold<double>(0, (s, v) => s + v);
     final fill = (total / maxTotal).clamp(0.0, 1.0);
+    // 数值标签要占掉柱顶的一段高度，否则满格柱 + 标签会撑破外层固定高度。
+    final labelReserve = day.valueLabel != null ? 20.0 : 0.0;
+    final barHeight = (height - labelReserve) * fill;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 3),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.end,
+        // 关键：Column 默认 crossAxisAlignment.center，柱子会按 child 内在宽度
+        // 塌成 0 宽（只有今日柱的描边显出一条细线）。必须拉伸到 Expanded 给的宽度。
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           if (day.valueLabel != null)
             Padding(
               padding: const EdgeInsets.only(bottom: 2),
               child: Text(
                 day.valueLabel!,
+                maxLines: 1,
+                overflow: TextOverflow.fade,
+                textAlign: TextAlign.center,
                 style: PineText.mono(
                   size: PineType.caption,
                   color: day.today ? PineColors.accent : PineColors.ink3,
@@ -948,7 +1010,9 @@ class InkStackChart extends StatelessWidget {
               ),
             ),
           SizedBox(
-            height: height * fill,
+            key: ValueKey('ink-bar-${day.label}'),
+            width: double.infinity,
+            height: barHeight,
             child: Container(
               decoration: BoxDecoration(
                 border: day.today
@@ -960,6 +1024,9 @@ class InkStackChart extends StatelessWidget {
               child: total <= 0
                   ? const SizedBox.shrink()
                   : Column(
+                      // 内外两层 Column 都要 stretch：`ColoredBox` 没有 child，
+                      // 不拉伸时内在宽度为 0，柱子会只剩描边、看不到色段。
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
                       // 自下而上按科目堆叠：列表头（高数）落在柱底。
                       children: [
                         for (var i = day.minutes.length - 1; i >= 0; i--)

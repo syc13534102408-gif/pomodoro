@@ -142,6 +142,31 @@ void main() {
     expect(find.byType(PaperTabs), findsOneWidget);
     expect(find.text('28:14'), findsOneWidget);
     expect(find.text('专注中'), findsOneWidget);
+    // 堆叠柱必须有实际宽度：Column 默认不拉伸时宽度会塌成 0，
+    // 视觉上只剩今日柱描边的一条细线（2026-11-12 预览发现的回归）。
+    final firstBar = tester.getSize(find.byKey(const ValueKey('ink-bar-05')));
+    expect(firstBar.width, greaterThan(20));
+    expect(firstBar.height, greaterThan(20));
+    // 色段本身也要有宽度：内层 Column 不拉伸时 ColoredBox 宽为 0，
+    // 柱子会只剩一个空心描边框。
+    final segment = tester.getSize(find.descendant(
+      of: find.byType(InkStackChart),
+      matching: find.byType(ColoredBox),
+    ).first);
+    expect(segment.width, greaterThan(20));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('390 宽手机视口下组件不横向溢出', (tester) async {
+    tester.view.devicePixelRatio = 1.0;
+    tester.view.physicalSize = const Size(390, 844);
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(_harness(
+      toggleValue: false,
+      onToggle: (_) {},
+      tab: 0,
+      onTab: (_) {},
+    ));
     expect(tester.takeException(), isNull);
   });
 

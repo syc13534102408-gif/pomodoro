@@ -708,13 +708,11 @@ class PaperComposer extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 9),
-          Row(
-            children: [
-              Expanded(child: phases),
-              const SizedBox(width: 10),
-              actions,
-            ],
-          ),
+          // 390 宽的手机上，阶段段选与三键同行会互相挤压；设计稿桌面宽屏
+          // 是同一行，这里按响应式规则收成两行，语义与回调完全不变。
+          Row(children: [Expanded(child: phases)]),
+          const SizedBox(height: 8),
+          SizedBox(width: double.infinity, child: actions),
         ],
       ),
     );

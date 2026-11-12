@@ -18,6 +18,7 @@ import '../src/session_channel.dart';
 import '../src/sheets.dart';
 import '../src/storage.dart';
 import '../src/theme.dart';
+import '../src/ui/ui.dart';
 import '../src/widgets.dart';
 import 'settings_page.dart';
 import 'stats_page.dart';
@@ -986,110 +987,128 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
           ],
         ),
       ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _tab,
-        onDestinationSelected: (index) => setState(() => _tab = index),
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.timer_outlined),
-            selectedIcon: Icon(Icons.timer),
-            label: '专注',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.bar_chart_rounded),
-            label: '报告',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.tune_rounded),
-            label: '设置',
-          ),
-        ],
+      // 定稿书签栏 40px：选中项顶部 2px 檀褐短线，取代 iOS 胶囊式底栏。
+      bottomNavigationBar: PaperTabs(
+        index: _tab,
+        labels: const ['专注书房', '专注报告', '偏好设置'],
+        onChanged: (index) => setState(() => _tab = index),
       ),
     );
   }
 
-  /// 手机布局 · 专注子页（方案 E）：日期行 → 阶段 → 任务 → 计时卡 → 控制行
-  /// → 今日卡 → 最近记录。整页可滚动，杜绝小屏/大字号溢出。
+  /// 手机布局 · 专注页（V3 素纸书房）：
+  /// 书眉 48 → 铭文 34 → 手稿页卡（主题 / 64px 活字读数 / 比例尺 / 内嵌今日课业）
+  /// → 达成条 → 底部笺纸 Composer（阶段段选 + 三键）→ 书签栏（在 `_page`）。
+  ///
+  /// 只重排 widget 树：所有既有功能节点（`_taskPicker` / `_planCard` / `_phaseRow` /
+  /// `_controls` / `_metrics` / `_recent` / `_cumulative`）与其回调原样保留，
+  /// 只是把「圆环」换成「活字读数 + 尺规比例尺」，并把控制行收进 Composer。
   Widget _timerTab() {
     final now = DateTime.now();
     final session = _displaySession;
     final resting = _isResting(now);
     final view = resting ? _restView : _displayView(now);
     final stats = StatsView.of(_data, now);
+    const week = ['一', '二', '三', '四', '五', '六', '日'];
+    final examText = _data.countdown.enabled
+        ? '距考研 ${_data.countdown.daysFrom(now)} 日'
+        : null;
     return LayoutBuilder(
       builder: (context, constraints) {
         final compact = constraints.maxHeight < 720;
-        return SingleChildScrollView(
-          padding: EdgeInsets.fromLTRB(20, compact ? 6 : 10, 20, 10),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              _dateHeader(),
-              if (_data.countdown.enabled) ...[
-                SizedBox(height: compact ? 8 : 10),
-                CountdownCard(
-                  countdown: _data.countdown,
-                  now: now,
-                  onTap: () => showCountdownSheet(context,
-                      data: _data, onChanged: _replace),
-                ),
-              ],
-              SizedBox(height: compact ? 8 : 12),
-              if (_isSuspended()) ...[
-                SizedBox(height: compact ? 8 : 12),
-                _suspendBanner(),
-              ],
-              SizedBox(height: compact ? 8 : 12),
-              _taskPicker(),
-              SizedBox(height: compact ? 10 : 14),
-              Center(
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(
-                    maxWidth: 420,
-                    maxHeight: compact ? 200 : 260,
-                  ),
-                  child: Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      PaperRing(
-                        progress: resting ? 1 : view.progress,
-                        color: resting
-                            ? PineColors.pine
-                            : (view.targetReached
-                                ? PineColors.goldInk
-                                : view.mode.lineColor),
-                        timeText: resting ? '收工' : view.clockText,
-                        caption: _caption(session, view),
-                        overtime: !resting && view.targetReached,
-                        diameter: compact ? 184 : 208,
-                        timeStyle: resting ? _restCenterStyle : null,
-                        dimArc: session != null && !session.running,
+        final gap = compact ? 8.0 : 12.0;
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            FolioBar(
+              dateText: '${now.month}月${now.day}日 · 周${week[now.weekday - 1]}',
+              examText: examText,
+              syncText: _mirrorEnabled ? '已同步' : '本地',
+              onMenu: _openPlanSheet,
+            ),
+            InscriptionRow(
+              totalText: '全部历史累计 ${formatHoursMinutes(stats.totalMinutes)}',
+              rightText: '第 ${stats.totalDays} 日 · 连续 ${stats.streak} 日',
+            ),
+            Expanded(
+              child: SingleChildScrollView(
+                padding: EdgeInsets.fromLTRB(16, compact ? 8 : 10, 16, 10),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _dateHeader(),
+                    if (_data.countdown.enabled) ...[
+                      SizedBox(height: compact ? 8 : 10),
+                      CountdownCard(
+                        countdown: _data.countdown,
+                        now: now,
+                        onTap: () => showCountdownSheet(context,
+                            data: _data, onChanged: _replace),
                       ),
-                      if (_stampVisible)
-                        const Positioned(
-                          top: -10,
-                          right: -8,
-                          child: _CompletionStamp(),
-                        ),
                     ],
-                  ),
+                    if (_isSuspended()) ...[
+                      SizedBox(height: gap),
+                      _suspendBanner(),
+                    ],
+                    SizedBox(height: gap),
+                    SuzhiCard(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          _taskPicker(),
+                          const SizedBox(height: 12),
+                          Stack(
+                            clipBehavior: Clip.none,
+                            children: [
+                              PaperClockDigits(
+                                timeText: resting ? '收工' : view.clockText,
+                                caption: _caption(session, view),
+                                totalText:
+                                    '/ ${view.plannedSeconds ~/ 60}:00',
+                                note: !resting && view.targetReached
+                                    ? '到点不停 · 继续累计'
+                                    : null,
+                                overtime: !resting && view.targetReached,
+                              ),
+                              if (_stampVisible)
+                                const Positioned(
+                                  top: -10,
+                                  right: -8,
+                                  child: _CompletionStamp(),
+                                ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          RuledScale(
+                            progress: resting ? 1 : view.progress,
+                            targetMinutes: view.plannedSeconds ~/ 60,
+                            meta: '尺规进度 · 已历 ${view.elapsedSeconds ~/ 60} 分',
+                          ),
+                          const SizedBox(height: 12),
+                          // 今日课业批注就地内嵌手稿页卡，不再另起一张卡。
+                          _planCard(),
+                        ],
+                      ),
+                    ),
+                    SizedBox(height: gap),
+                    _cumulative(stats),
+                    SizedBox(height: gap),
+                    _metrics(stats),
+                    SizedBox(height: gap),
+                    _recent(),
+                    const SizedBox(height: 4),
+                  ],
                 ),
               ),
-              SizedBox(height: compact ? 8 : 12),
-              _controls(session, view, suspended: _data.activeSession),
-              SizedBox(height: compact ? 6 : 8),
-              _cumulative(stats),
-              SizedBox(height: compact ? 6 : 8),
-              _phaseRow(),
-              SizedBox(height: compact ? 8 : 12),
-              _planCard(),
-              SizedBox(height: compact ? 8 : 12),
-              _metrics(stats),
-              SizedBox(height: compact ? 8 : 12),
-              _recent(),
-              const SizedBox(height: 4),
-            ],
-          ),
+            ),
+            PaperComposer(
+              hintText: '✎ 添写今日课业，或手动补记一笔…',
+              sealText: '今日收工',
+              onSeal: resting ? _resumeToday : _openRestCeremony,
+              phases: _phaseRow(),
+              actions: _controls(session, view, suspended: _data.activeSession),
+            ),
+          ],
         );
       },
     );
@@ -1104,82 +1123,320 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     final now = DateTime.now();
     final session = _displaySession;
     final view = _displayView(now);
-    return Scaffold(
-      body: CallbackShortcuts(
-        bindings: {
-          const SingleActivator(LogicalKeyboardKey.keyR): _desktopReset,
-          const SingleActivator(LogicalKeyboardKey.space): _desktopToggle,
-          const SingleActivator(LogicalKeyboardKey.escape):
-              _desktopCloseOverlay,
-        },
-        child: Stack(
-          children: [
-            Positioned.fill(child: _desktopCabin(session, view)),
-            if (_desktopOverlay != _overlayNone) ...[
-              // 遮罩：ink 18%，点任意处关闭（160ms 淡入）。
-              Positioned.fill(
-                child: TweenAnimationBuilder<double>(
-                  tween: Tween(begin: 0.0, end: 1.0),
-                  duration: const Duration(milliseconds: 160),
-                  curve: Curves.easeOut,
-                  builder: (context, value, child) => Opacity(
-                    opacity: value,
-                    child: GestureDetector(
-                      behavior: HitTestBehavior.opaque,
-                      onTap: _desktopCloseOverlay,
-                      child: const ColoredBox(color: Color(0x2E33302A)),
+    // 定稿响应式：≥720 走「楮皮目录栏 / 日课笺中栏 / 专注手稿画布」三栏书斋；
+    // <720 收成单列专注舱（440×600 最小窗的垂直预算断言依赖这条路径，勿改）。
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final wide = constraints.maxWidth >= 720;
+        return Scaffold(
+          body: CallbackShortcuts(
+            bindings: {
+              const SingleActivator(LogicalKeyboardKey.keyR): _desktopReset,
+              const SingleActivator(LogicalKeyboardKey.space): _desktopToggle,
+              const SingleActivator(LogicalKeyboardKey.escape):
+                  _desktopCloseOverlay,
+            },
+            child: Stack(
+              children: [
+                Positioned.fill(
+                  child: wide
+                      ? _desktopThreeColumn(session, view)
+                      : _desktopCabin(session, view),
+                ),
+                if (_desktopOverlay != _overlayNone) ...[
+                  // 遮罩：浓墨 18%，点任意处关闭（160ms 淡入）。
+                  Positioned.fill(
+                    child: TweenAnimationBuilder<double>(
+                      tween: Tween(begin: 0.0, end: 1.0),
+                      duration: const Duration(milliseconds: 160),
+                      curve: Curves.easeOut,
+                      builder: (context, value, child) => Opacity(
+                        opacity: value,
+                        child: GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTap: _desktopCloseOverlay,
+                          child: ColoredBox(
+                            color: PineColors.ink.withAlpha(46),
+                          ),
+                        ),
+                      ),
                     ),
                   ),
-                ),
-              ),
-              // 抽屉：右侧滑入 220ms（内容切换时重放入场）。
-              Positioned(
-                top: 0,
-                right: 0,
-                bottom: 0,
-                child: TweenAnimationBuilder<double>(
-                  tween: Tween(begin: 0.0, end: 1.0),
-                  duration: const Duration(milliseconds: 220),
-                  curve: Curves.easeOutCubic,
-                  builder: (context, value, child) => Transform.translate(
-                    offset: Offset(48 * (1 - value), 0),
-                    child: child,
+                  // 抽屉：右侧滑入 220ms（内容切换时重放入场）。
+                  Positioned(
+                    top: 0,
+                    right: 0,
+                    bottom: 0,
+                    child: TweenAnimationBuilder<double>(
+                      tween: Tween(begin: 0.0, end: 1.0),
+                      duration: const Duration(milliseconds: 220),
+                      curve: Curves.easeOutCubic,
+                      builder: (context, value, child) => Transform.translate(
+                        offset: Offset(48 * (1 - value), 0),
+                        child: child,
+                      ),
+                      child: _desktopDrawer(),
+                    ),
                   ),
-                  child: _desktopDrawer(),
-                ),
+                ],
+                // 窄窗：右上角三只抽屉开关（必须放在 Stack 最后、最上层）。
+                // 宽窗三栏由楮皮目录栏提供同样的入口，这里不再重复一排按钮。
+                if (!wide)
+                  Positioned(
+                    top: 10,
+                    right: 14,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _desktopOverlayButton(
+                          which: _overlayPlan,
+                          icon: Icons.checklist_rtl_rounded,
+                          tooltip: '日程',
+                        ),
+                        const SizedBox(width: 8),
+                        _desktopOverlayButton(
+                          which: _overlayStats,
+                          icon: Icons.bar_chart_rounded,
+                          tooltip: '统计',
+                        ),
+                        const SizedBox(width: 8),
+                        _desktopOverlayButton(
+                          which: _overlaySettings,
+                          icon: Icons.tune_rounded,
+                          tooltip: '设置',
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  // ==================== V3 桌面三栏书斋（≥720px） ====================
+
+  /// 216px 楮皮目录栏 + 弹性中栏（日课笺 / 落账手记 / Composer）+ 420px 手稿画布。
+  /// 三栏内容全部复用现有功能节点，不新增任何业务状态。
+  Widget _desktopThreeColumn(ActiveSession? session, SessionView view) {
+    final now = DateTime.now();
+    final stats = StatsView.of(_data, now);
+    final resting = _isResting(now);
+    final displayView = resting ? _restView : view;
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        SizedBox(
+          key: const ValueKey('study-sidebar'),
+          width: 216,
+          child: _studySidebar(now, stats),
+        ),
+        Expanded(
+          key: const ValueKey('study-center'),
+          child: _studyCenter(now, stats, session, displayView, resting),
+        ),
+        SizedBox(
+          key: const ValueKey('study-canvas'),
+          width: 420,
+          child: _studyCanvas(session, displayView, resting),
+        ),
+      ],
+    );
+  }
+
+  Widget _studySidebar(DateTime now, StatsView stats) {
+    const week = ['一', '二', '三', '四', '五', '六', '日'];
+    return Container(
+      color: PineColors.sand,
+      padding: const EdgeInsets.fromLTRB(16, 18, 16, 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('素纸书房', style: PineText.serif(size: PineType.body)),
+          const SizedBox(height: 4),
+          Text(
+            '${now.month}月${now.day}日 周${week[now.weekday - 1]}',
+            style: PineText.mono(size: PineType.caption, color: PineColors.ink2),
+          ),
+          const SizedBox(height: 18),
+          Text('八日排程',
+              style: PineText.serif(size: PineType.label, color: PineColors.ink2)),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: [
+              for (var i = 7; i >= 0; i--)
+                _dateSeal(now.subtract(Duration(days: i)), today: i == 0),
+            ],
+          ),
+          const SizedBox(height: 18),
+          Text('卷宗',
+              style: PineText.serif(size: PineType.label, color: PineColors.ink2)),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              _desktopOverlayButton(
+                which: _overlayPlan,
+                icon: Icons.checklist_rtl_rounded,
+                tooltip: '日程',
+              ),
+              const SizedBox(width: 8),
+              _desktopOverlayButton(
+                which: _overlayStats,
+                icon: Icons.bar_chart_rounded,
+                tooltip: '统计',
+              ),
+              const SizedBox(width: 8),
+              _desktopOverlayButton(
+                which: _overlaySettings,
+                icon: Icons.tune_rounded,
+                tooltip: '设置',
               ),
             ],
-            // 右上角：统计 / 设置抽屉开关（打开时高亮，再点同键或 Esc 关闭）。
-            // 必须放在 Stack 最后（最上层）：否则抽屉打开时会盖住这两只按钮——
-            // 用户点按钮想关抽屉、实际点在抽屉内容上，观感就是「统计按钮一直
-            // 卡在灰色按下态，关不掉」（2026-10-13 修）。
-            Positioned(
-              top: 10,
-              right: 14,
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
+          ),
+          // 事件徽标只出现在右侧手稿画布的主题行（`_taskPicker`），侧栏不再重复一份：
+          // 两处同时渲染会让「暂停事件仍可点开」的 findsOneWidget 断言拿到 2 个。
+          const SizedBox(height: 18),
+          Text('专注主题卷宗',
+              style: PineText.serif(size: PineType.label, color: PineColors.ink2)),
+          const SizedBox(height: 6),
+          Text('按主题累计 · 八日排程',
+              style: PineText.sans(size: PineType.caption, color: PineColors.ink3)),
+          const Spacer(),
+          Text(
+            '累计 ${formatHoursMinutes(stats.totalMinutes)}',
+            style: PineText.serif(size: PineType.label, color: PineColors.ink2),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '第 ${stats.totalDays} 日 · 连续 ${stats.streak} 日',
+            style: PineText.mono(size: PineType.caption, color: PineColors.ink3),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _dateSeal(DateTime date, {required bool today}) {
+    return Container(
+      width: 42,
+      height: 26,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: today ? PineColors.accent : PineColors.sheet,
+        border: Border.all(
+          color: today ? PineColors.accentDeep : PineColors.lineStrong,
+        ),
+        borderRadius: BorderRadius.circular(PineRadius.seal),
+      ),
+      child: Text(
+        '${date.month}/${date.day}',
+        style: PineText.mono(
+          size: PineType.caption,
+          color: today ? PineColors.sheet : PineColors.ink2,
+        ),
+      ),
+    );
+  }
+
+  Widget _studyCenter(
+    DateTime now,
+    StatsView stats,
+    ActiveSession? session,
+    SessionView view,
+    bool resting,
+  ) {
+    return Container(
+      color: PineColors.paper,
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Text('日课笺', style: PineText.serif(size: PineType.body)),
+              const Spacer(),
+              SectionSeal(text: '今日 ${stats.todayCount} 番'),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Expanded(
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  _desktopOverlayButton(
-                    which: _overlayPlan,
-                    icon: Icons.checklist_rtl_rounded,
-                    tooltip: '日程',
-                  ),
-                  const SizedBox(width: 8),
-                  _desktopOverlayButton(
-                    which: _overlayStats,
-                    icon: Icons.bar_chart_rounded,
-                    tooltip: '统计',
-                  ),
-                  const SizedBox(width: 8),
-                  _desktopOverlayButton(
-                    which: _overlaySettings,
-                    icon: Icons.tune_rounded,
-                    tooltip: '设置',
-                  ),
+                  _desktopInfoCard(stats),
+                  const SizedBox(height: 10),
+                  _cumulative(stats),
+                  const SizedBox(height: 10),
+                  _recent(),
                 ],
               ),
             ),
-          ],
+          ),
+          const SizedBox(height: 10),
+          PaperComposer(
+            hintText: '✎ 添写今日课业，或手动补记一笔…',
+            sealText: '今日收工',
+            onSeal: resting ? _resumeToday : _openRestCeremony,
+            phases: _phaseRow(),
+            actions: _controls(session, view, suspended: _data.activeSession),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _studyCanvas(
+    ActiveSession? session,
+    SessionView view,
+    bool resting,
+  ) {
+    return Container(
+      color: PineColors.paper,
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 18),
+      child: SizedBox.expand(
+        child: SuzhiCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _taskPicker(),
+              const SizedBox(height: 20),
+              PaperClockDigits(
+                timeText: resting ? '收工' : view.clockText,
+                caption: _caption(session, view),
+                totalText: '/ ${view.plannedSeconds ~/ 60}:00',
+                note: !resting && view.targetReached
+                    ? '到点不停 · 继续累计'
+                    : null,
+                overtime: !resting && view.targetReached,
+              ),
+              const SizedBox(height: 24),
+              RuledScale(
+                progress: resting ? 1 : view.progress,
+                targetMinutes: view.plannedSeconds ~/ 60,
+                meta: '尺规进度 · 已历 ${view.elapsedSeconds ~/ 60} 分',
+              ),
+              const SizedBox(height: 14),
+              Row(
+                children: [
+                  Expanded(
+                    child: CinnabarButton(
+                      label: '完成',
+                      onPressed: () => _confirm(),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: PaperButton(label: '重置', onPressed: _discard),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -1212,7 +1469,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         color: on ? PineColors.tint(PineColors.pine) : PineColors.card,
         borderRadius: BorderRadius.circular(10),
         elevation: on ? 0 : 1,
-        shadowColor: const Color(0x3333302A),
+        shadowColor: PineColors.ink.withAlpha(51),
         child: InkWell(
           customBorder:
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
@@ -1510,14 +1767,16 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     return Container(
       width: width,
       clipBehavior: Clip.antiAlias,
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: PineColors.paper,
-        borderRadius: BorderRadius.horizontal(left: Radius.circular(18)),
+        borderRadius: const BorderRadius.horizontal(
+          left: Radius.circular(PineRadius.card),
+        ),
         boxShadow: [
           BoxShadow(
-            color: Color(0x3333302A),
+            color: PineColors.ink.withAlpha(51),
             blurRadius: 28,
-            offset: Offset(-6, 0),
+            offset: const Offset(-6, 0),
           ),
         ],
       ),

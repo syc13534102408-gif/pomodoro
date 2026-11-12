@@ -36,6 +36,37 @@
 - 产物：`outputs/松果-v1.3.10-视觉修正-2026-10-25.apk`（19,708,627 B、versionName 1.3.10、
   versionCode 20）、`outputs/pinecore-macos-2026-10-25.zip`（已装到 /Applications）。
 
+## 2026-11-12 · 「素纸书房」界面重设计落地（P0–P5，分支 feature/ui-suzhi）
+
+设计权威：`outputs/redesign-v3-2026-11-12/01-claude-studio.html` + `design-spec-v3.md`，
+交接单 `HANDOFF.md`。旧稿 `outputs/redesign-2026-11-11/` 已否掉，仅存档。
+
+- **P0 令牌层**：17 色檀褐素纸色板（纸面四阶 / 墨阶四阶 / 装帧线 / 檀褐 / 矿物色）、
+  六档字号（clock 64 / num 24 / body 15 / label 13 / meta 12 / caption 11）、
+  `PineRadius` / `PineShadow` / `PineDecoration` / `PineText`（宋体-苹方-等宽三线）。
+  **保留全部旧令牌名作别名**（`card/sub/pine/focus/mint/gold/goldInk/track`）——
+  `models.dart` 的 `SessionMode.color/lineColor` 引用了它们，逻辑层一行未动。
+- **P1 组件库**：`lib/src/ui/` 新增 `SuzhiCard`、`SectionSeal`、`FolioBar`、`InscriptionRow`、
+  `PaperClockDigits`、`RuledScale`（25 档尺规）、`PaperChecklist`、`LedgerBar`、
+  `CinnabarButton` / `PaperButton`、`PaperComposer`、`PaperToggle`、`PaperTabs`、
+  `InkStackChart`、`ExLibrisCard`、`SealCalendar`；配 `test/suzhi_ui_test.dart` 与
+  `test/preview/suzhi_components_preview.dart`。
+- **P2 专注页**：书眉 → 铭文 → 手稿页卡（主题行 + 64px 活字读数 + 尺规比例尺 + 内嵌今日课业）
+  → 达成条 → 笺纸 Composer → 书签栏。**圆环退场**；既有功能节点、文案与回调原样保留。
+- **P3 报告页**：藏书票累计碑（全部历史）/ 近七日按真实任务名堆叠墨柱 / 本自然月钤印日历；
+  `_MonthGrid` 色阶改令牌派生；统计口径一行未动。
+- **P4 设置与弹层**：素纸拨子、危险区茜红淡框、`_SheetScaffold` 宋体标题 + 14px 定界短横、
+  `SectionHeader` 松绿竖条改檀褐短横。409 / 恢复确认 / 危险确认三条路径未动。
+- **P5 桌面**：≥720 三栏书斋（216 楮皮目录栏 / 弹性中栏 / 420 手稿画布），<720 收单列；
+  新增 `test/desktop_wide_test.dart`（1120×680 宽度精确断言），
+  `desktop_layout_test` 的 440×600 不裁切断言**未放宽**。
+- **验收**：`dart analyze` 零告警；`flutter --suppress-analytics test` **244 例全绿**
+  （基线 239 + 组件 3 + 宽屏 2）。P0 / P1 / P2+P5 / P3 / P4 分批提交、分批推送。
+  新增的 390 宽组件回归抓到并修掉了书眉、达成条两处横向溢出，
+  预览图又抓到堆叠柱因 `Column` 默认不拉伸而塌成 0 宽（补了 `crossAxisAlignment.stretch` 与几何断言）。
+- **未验证**：安卓真机与 macOS 实机观感、宋体在低端 Android 的回退效果、
+  设计稿 390×844 逐像素 golden 对比（本轮未生成 golden 基线）。
+
 ## 2026-11-11 · 阶段条改回「点谁进谁」+ 收工仪式（v1.3.28）
 
 反馈两条：① 短休 / 吃饭 / 主计时 之间切换的逻辑不好；② 「今日休息」不够有仪式感，

@@ -97,6 +97,8 @@ class StatsView {
     required this.weekCount,
     required this.streak,
     required this.weekTaskTotals,
+    this.totalMinutes = 0,
+    this.totalDays = 0,
   });
 
   final double todayMinutes;
@@ -104,6 +106,16 @@ class StatsView {
   final int todayCount;
   final int weekCount;
   final int streak;
+
+  /// 全部历史累计（不随日/周滚动清零）：只增不减，是「积累」这件事本身。
+  /// 同样只统计 counted 记录；进行中的实时时长会计进来。
+  final double totalMinutes;
+
+  /// 有记录的天数（按统计日去重）。
+  final int totalDays;
+
+  /// 累计番茄当量，与今日/本周同一套口径。
+  int get totalTomatoes => pomodoroEquiv(totalMinutes);
 
   /// 键为 0=周一 … 6=周日，值为 任务名 -> 分钟数。
   final Map<int, Map<String, double>> weekTaskTotals;
@@ -203,6 +215,14 @@ class StatsView {
       cursor = cursor.subtract(const Duration(days: 1));
     }
 
+    var totalMinutes = 0.0;
+    for (final record in counted) {
+      totalMinutes += record.minutes;
+    }
+    if (view != null && view.mode.isFocus) {
+      totalMinutes += view.elapsedMinutes;
+    }
+
     return StatsView(
       todayMinutes: todayMinutes,
       weekMinutes: weekMinutes,
@@ -210,6 +230,8 @@ class StatsView {
       weekCount: weekCount,
       streak: streak,
       weekTaskTotals: weekTaskTotals,
+      totalMinutes: totalMinutes,
+      totalDays: days.length,
     );
   }
 }
@@ -388,6 +410,37 @@ class TimerEngine {
     return start(settled, mode, now);
   }
 
+  /// 阶段条语义的切换：**点谁就进入谁**（专注 / 短休 / 吃饭三段对称）。
+  ///
+  /// 与 [startBreak] 的差别只有一处：目标可以是专注，于是「从休息回主计时」也是一次
+  /// 点击，而不是先按 ✓「结束休息」再按「开始」——那两步在 UI 上根本不像同一件事。
+  ///
+  /// 三条刻意的规则：
+  /// 1. **幂等**：点当前所在的阶段直接返回原对象（同一实例）。旧实现是
+  ///    settle + start，于是「短休还剩 6 分钟」会变成满 10 分钟重新起算，
+  ///    读数与真实剩余对不上——这是"切换逻辑不好"最直接的体感来源；
+  /// 2. **不丢时长**：离开专注时按完成收口（见 [_settle]），离开休息时直接丢弃；
+  /// 3. **回到工作就作废收工标记**：与 `_toggleRun` 的开始语义一致，否则会出现
+  ///    「正在专注但今天已收工」的自相矛盾状态。
+  ///
+  /// 空闲态点「专注」只清标记、不启动——起不停交给主按钮（「开始」），
+  /// 免得每次点一下阶段条就凭空多出一条 in_progress 记录。
+  static AppData switchPhase(AppData data, SessionMode mode, DateTime now) {
+    final session = data.activeSession;
+    final resting = data.isRestDay(now);
+    if (session != null && session.mode == mode) {
+      // 收工标记还在却是同一段在跑（会话镜像可能造出这种组合）：顺手清掉。
+      return resting ? data.copyWith(clearRestDate: true) : data;
+    }
+    // 注意 `copyWith` 无条件新建实例：不在休息日就原样返回同一实例，调用方才能用
+    // `identical` 判断"其实什么都没变"并跳过写盘与上传。
+    final cleared = resting ? data.copyWith(clearRestDate: true) : data;
+    if (session == null) {
+      return mode.isFocus ? cleared : start(cleared, mode, now);
+    }
+    return start(_settle(cleared, now) ?? cleared, mode, now);
+  }
+
   /// 今日休息（收工）：结束当前计时并标记今天休息，此后不再自动进入休息。
   ///
   /// 进行中的专注按完成收口——已经学掉的时间不该因为"收工"而蒸发。
@@ -404,6 +457,11 @@ class TimerEngine {
   static AppData resumeToday(AppData data) => data.copyWith(clearRestDate: true);
 
   /// 收口当前会话：专注 → 按已完成落记录；休息 → 直接丢弃。无会话返回 null。
+  ///
+  /// **不足 1 分钟的专注直接丢弃，不写记录**（2026-11-11）：本方法是"顺路收口"
+  /// ——切阶段、收工时顺手结账，不是用户按「完成」确认这一轮。旧实现在这里无条件
+  /// 走 [complete]，于是「专心了 40 秒发现选错任务 → 切短休」也会留下一条 0 分钟
+  /// 记录，最近记录里全是这种噪音条目。真按「完成」的那条路径（`_confirm`）不受影响。
   static AppData? _settle(AppData data, DateTime now) {
     final session = data.activeSession;
     if (session == null) return null;
@@ -416,6 +474,8 @@ class TimerEngine {
             .toList(),
       );
     }
+    final view = SessionView.of(data, now);
+    if (view == null || view.elapsedSeconds < 60) return discard(data);
     return complete(data, now).copyWith(clearActiveSession: true);
   }
 

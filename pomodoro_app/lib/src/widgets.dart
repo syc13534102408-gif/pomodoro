@@ -364,19 +364,34 @@ class BrickTimer extends StatelessWidget {
     super.key,
     required this.view,
     required this.caption,
+    this.timeText,
+    this.accent,
+    this.timeStyle,
   });
 
   final SessionView view;
   final String caption;
 
+  /// 环心大字；null 取 `view.clockText`。收工态要写「收工」而不是 00:00。
+  final String? timeText;
+
+  /// 阶段色（色条/色点/进度/数字）；null 按阶段 + 超时推导。
+  /// 收工态传松绿：那不是"某个阶段"，是"今天收完了"。
+  final Color? accent;
+
+  /// 环心大字样式；null 用 [brickNumberStyle]。
+  /// 中文文案不能走等宽字形（等宽字体没有中文字形，会掉到未知回退路径）。
+  final TextStyle? timeStyle;
+
   @override
   Widget build(BuildContext context) {
     final overtime = view.targetReached;
     // 弧线与大数字用 lineColor：gold 只作实底（评审 P0-2 / 决策 B1）。
-    final phase = overtime ? PineColors.goldInk : view.mode.lineColor;
+    final phase =
+        accent ?? (overtime ? PineColors.goldInk : view.mode.lineColor);
     final clockColor = overtime ? PineColors.gold : PineColors.ink;
     return Semantics(
-      label: '$caption，${view.clockText}',
+      label: '$caption，${timeText ?? view.clockText}',
       child: BrickCard(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
         child: LayoutBuilder(
@@ -427,11 +442,12 @@ class BrickTimer extends StatelessWidget {
                   child: FittedBox(
                     fit: BoxFit.scaleDown,
                     child: Text(
-                      view.clockText,
-                      style: brickNumberStyle(
-                        fontSize: clockSize,
-                        color: clockColor,
-                      ),
+                      timeText ?? view.clockText,
+                      style: timeStyle ??
+                          brickNumberStyle(
+                            fontSize: clockSize,
+                            color: clockColor,
+                          ),
                     ),
                   ),
                 ),
@@ -449,28 +465,44 @@ class BrickTimer extends StatelessWidget {
   }
 }
 
-/// 阶段切换：三段胶囊。选中 = 阶段色浅底 + 实心色点 + 深色字；
-/// 未选中 = 浅字 + 无色点。
-class ModeSwitcher extends StatelessWidget {
-  const ModeSwitcher({
+/// 阶段条：专注 / 短休 / 吃饭三段等宽，**当前所在的那一段**就是选中态。
+///
+/// 2026-11-11 取代 10-07 的「三颗等宽休息胶囊」。三颗胶囊的问题是三格长得完全一样：
+/// 看不出自己现在在哪一段，也回不到主计时（只能绕去按 ✓「结束休息」）。
+/// 这里恢复"段选"的语言——选中 = 阶段色浅底 + 实心色点 + ink 字 + w500。
+///
+/// 点当前那一段是**幂等**的：绝不重置剩余时间（重置是「重置」按钮的职责）。
+/// 具体落账（离开专注要不要写记录）由 [onChanged] 的调用方决定，本组件只管点。
+class PhaseSwitcher extends StatelessWidget {
+  const PhaseSwitcher({
     super.key,
     required this.current,
     required this.minutesFor,
     required this.onChanged,
   });
 
-  final SessionMode current;
+  /// 当前所在阶段（有会话取会话阶段，空闲取待开始阶段）。
+  /// null = 今天已收工，不属于任何阶段：三段全部回到未选中态（段选留白是刻意的，
+  /// 收工态下再高亮「专注」等于在已收工的界面上说"你正在专注"）。
+  final SessionMode? current;
   final int Function(SessionMode mode) minutesFor;
   final ValueChanged<SessionMode> onChanged;
+
+  /// 段选里塞得下的短名：`label` 的「短休息」三字 + 分钟数在 360 宽手机上会顶格。
+  static String shortLabel(SessionMode mode) => switch (mode) {
+        SessionMode.focus => '专注',
+        SessionMode.shortBreak => '短休',
+        SessionMode.longBreak => '吃饭',
+      };
 
   @override
   Widget build(BuildContext context) {
     return Row(
       children: [
         for (var i = 0; i < SessionMode.values.length; i++) ...[
-          if (i > 0) const SizedBox(width: 8),
+          if (i > 0) const SizedBox(width: 6),
           Expanded(
-            child: _ModeBrick(
+            child: _PhaseSegment(
               mode: SessionMode.values[i],
               minutes: minutesFor(SessionMode.values[i]),
               selected: SessionMode.values[i] == current,
@@ -483,8 +515,8 @@ class ModeSwitcher extends StatelessWidget {
   }
 }
 
-class _ModeBrick extends StatelessWidget {
-  const _ModeBrick({
+class _PhaseSegment extends StatelessWidget {
+  const _PhaseSegment({
     required this.mode,
     required this.minutes,
     required this.selected,
@@ -498,55 +530,69 @@ class _ModeBrick extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tint = PineColors.tint(mode.color);
+    final reduceMotion =
+        MediaQuery.maybeOf(context)?.disableAnimations ?? false;
+    final accent = mode.color;
+    final textColor = selected ? PineColors.ink : PineColors.sub;
     return Semantics(
       button: true,
       selected: selected,
-      label: mode.label,
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 180),
-          curve: Curves.easeOut,
-          height: 40,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: selected ? tint : Colors.transparent,
-            borderRadius: BorderRadius.circular(999),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 8,
-                height: 8,
-                decoration: BoxDecoration(
-                  color: selected ? mode.color : PineColors.line,
-                  shape: BoxShape.circle,
+      label: '${mode.label} $minutes 分钟',
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        child: GestureDetector(
+          // 不要 InkWell：方案 E 红线禁止水波纹，反馈只走颜色与色点变化。
+          behavior: HitTestBehavior.opaque,
+          onTap: onTap,
+          child: AnimatedContainer(
+            duration: reduceMotion
+                ? Duration.zero
+                : const Duration(milliseconds: 180),
+            curve: Curves.easeOut,
+            height: 32,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: selected ? PineColors.tint(accent) : Colors.transparent,
+              borderRadius: BorderRadius.circular(Paper.chipRadius),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 6,
+                  height: 6,
+                  decoration: BoxDecoration(
+                    color: selected ? accent : PineColors.faint,
+                    shape: BoxShape.circle,
+                  ),
                 ),
-              ),
-              const SizedBox(width: 6),
-              Text(
-                mode.label,
-                style: TextStyle(
-                  color: selected ? PineColors.ink : PineColors.sub,
-                  fontSize: 14,
-                  fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
-                  letterSpacing: 0,
+                const SizedBox(width: 5),
+                Flexible(
+                  child: Text(
+                    PhaseSwitcher.shortLabel(mode),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: textColor,
+                      fontSize: 12,
+                      fontWeight:
+                          selected ? FontWeight.w500 : FontWeight.w400,
+                      letterSpacing: 0,
+                    ),
+                  ),
                 ),
-              ),
-              const SizedBox(width: 4),
-              Text(
-                '$minutes',
-                style: TextStyle(
-                  fontFamily: 'monospace',
-                  fontSize: 11,
-                  color: selected ? PineColors.ink : PineColors.sub,
-                  fontFeatures: kNumericFont,
+                const SizedBox(width: 4),
+                Text(
+                  '$minutes',
+                  maxLines: 1,
+                  style: brickNumberStyle(
+                    fontSize: 10,
+                    color: textColor,
+                    weight: FontWeight.w400,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -1184,4 +1230,160 @@ class CountdownCard extends StatelessWidget {
       ],
     );
   }
+}
+
+/// 环形计时（2026-11-11 改版）：环是唯一的视觉中心，环心只放时间与状态。
+///
+/// 与旧 [BrickTimer] 卡片的区别：不再给计时套一层纸卡，环直接排在纸面上；
+/// 环心数字按环径算（0.19 倍），不再固定 50 —— 固定值在 188 环上会顶到轨道，
+/// 看起来像数字"撑"在环上。
+class PaperRing extends StatelessWidget {
+  const PaperRing({
+    super.key,
+    required this.progress,
+    required this.color,
+    required this.timeText,
+    required this.caption,
+    this.overtime = false,
+    this.diameter = 208,
+    this.stroke = 2.5,
+    this.timeStyle,
+    this.dimArc = false,
+  });
+
+  final double progress;
+
+  /// 阶段色：只给弧、色点与小面积，不做底。
+  final Color color;
+  final String timeText;
+  final String caption;
+  final bool overtime;
+  final double diameter;
+
+  /// 弧线粗细：纸面风格用 2.5，不再用 12 的粗环。
+  final double stroke;
+
+  /// 收工态环心写「收工」二字，等宽字体没有中文字形，必须整段覆盖。
+  final TextStyle? timeStyle;
+
+  /// 暂停时弧线变淡（旧 BrickTimer 的 is-paused 语义）。
+  final bool dimArc;
+
+  @override
+  Widget build(BuildContext context) {
+    final clockSize = (diameter * 0.19).clamp(32.0, 46.0);
+    return Semantics(
+      label: '$caption，$timeText',
+      child: SizedBox(
+        width: diameter,
+        height: diameter,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            CustomPaint(
+              painter: RingProgressPainter(
+                progress: progress,
+                color: color,
+                stroke: stroke,
+                dimmed: dimArc,
+              ),
+            ),
+            Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    timeText,
+                    maxLines: 1,
+                    style: timeStyle ??
+                        brickNumberStyle(
+                          fontSize: clockSize,
+                          weight: FontWeight.w300,
+                          color:
+                              overtime ? PineColors.goldInk : PineColors.ink,
+                        ),
+                  ),
+                  const SizedBox(height: 6),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 5,
+                        height: 5,
+                        decoration: BoxDecoration(
+                          color: color,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        caption,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: PineColors.sub,
+                          fontSize: 12,
+                          letterSpacing: 0,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// 圆环：纸色轨道 + 阶段色圆弧（顺时针从 12 点起），平头端点。
+///
+/// 端点用 butt 而不是 round：圆头会在轨道内外各多出半个线宽，看起来像
+/// 弧"凸"出圆环（2026-11-11 设计评审）。超时由调用方传整环 progress=1。
+class RingProgressPainter extends CustomPainter {
+  const RingProgressPainter({
+    required this.progress,
+    required this.color,
+    this.stroke = 2.5,
+    this.dimmed = false,
+  });
+
+  final double progress;
+  final Color color;
+  final double stroke;
+  final bool dimmed;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rect = Offset.zero & size;
+    final radius = (size.shortestSide - stroke) / 2;
+    final track = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = stroke
+      ..color = PineColors.track;
+    canvas.drawCircle(rect.center, radius, track);
+    final p = progress.clamp(0.0, 1.0);
+    if (p <= 0) return;
+    final arc = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = stroke
+      ..strokeCap = StrokeCap.butt
+      ..color = dimmed ? color.withAlpha(107) : color;
+    canvas.drawArc(
+      rect.deflate(stroke / 2),
+      -3.1415926 / 2,
+      6.2831852 * p,
+      false,
+      arc,
+    );
+  }
+
+  @override
+  bool shouldRepaint(RingProgressPainter old) =>
+      old.progress != progress ||
+      old.color != color ||
+      old.stroke != stroke ||
+      old.dimmed != dimmed;
 }

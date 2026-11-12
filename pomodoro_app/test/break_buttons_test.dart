@@ -9,6 +9,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:pomodoro_app/main.dart';
 import 'package:pomodoro_app/src/engine.dart';
 import 'package:pomodoro_app/src/models.dart';
+import 'package:pomodoro_app/src/widgets.dart';
 
 /// 2026-11-07 需求：
 /// 1. 自动休息只触发**短休**（不再按 70 分钟分档）；
@@ -102,7 +103,7 @@ void main() {
     });
   });
 
-  group('首屏三个休息入口', () {
+  group('首屏：阶段条 + 收工入口', () {
     Future<void> pump(WidgetTester tester, AppData data) async {
       tester.view.physicalSize = const Size(1120, 1520); // 560×760
       tester.view.devicePixelRatio = 2.0;
@@ -116,42 +117,134 @@ void main() {
       }
     }
 
-    testWidgets('「短休」「吃饭」「今日休息」都在，且带分钟数', (tester) async {
+    testWidgets('三段阶段条（专注/短休/吃饭）都在，且带各自的分钟数', (tester) async {
       debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
       try {
         await pump(tester, _base());
+        expect(find.text('专注'), findsOneWidget);
         expect(find.text('短休'), findsOneWidget);
         expect(find.text('吃饭'), findsOneWidget);
-        expect(find.text('今日休息'), findsOneWidget);
-        expect(find.text('10 分'), findsOneWidget); // 短休时长
-        expect(find.text('40 分'), findsOneWidget); // 吃饭时长
+        expect(find.text('50'), findsOneWidget); // 专注时长
+        expect(find.text('10'), findsOneWidget); // 短休时长
+        expect(find.text('40'), findsOneWidget); // 吃饭时长
       } finally {
         debugDefaultTargetPlatformOverride = null;
       }
     });
 
-    testWidgets('点「吃饭」→ 环内切成吃饭；点「今日休息」→ 状态与按钮同时变', (tester) async {
+    testWidgets('点「吃饭」→ 环内切成吃饭', (tester) async {
       debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
       try {
         await pump(tester, _base());
-
         await tester.tap(find.text('吃饭'));
         await tester.pumpAndSettle();
         expect(find.text('吃饭，慢慢来'), findsOneWidget);
         // 时钟按真实时间倒数，精确值会飘（39:59…），只验"起了 40 分钟的一轮"。
-        expect(find.textContaining('40 分'), findsOneWidget);
+        expect(find.textContaining(RegExp(r'^(40:00|39:\d\d)$')), findsOneWidget);
+      } finally {
+        debugDefaultTargetPlatformOverride = null;
+      }
+    });
 
-        // 收工：结束吃饭、标记今日休息
-        await tester.tap(find.text('今日休息'));
+    testWidgets('短休中点「专注」一步回到主计时（不必先按 ✓ 结束休息）', (tester) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
+      try {
+        await pump(tester, _base());
+        await tester.tap(find.text('短休'));
         await tester.pumpAndSettle();
-        expect(find.text('今日休息'), findsOneWidget); // 环内文案
-        expect(find.text('继续今日'), findsOneWidget); // 同一格变成撤销入口
+        expect(find.text('起身活动一下'), findsOneWidget);
+
+        await tester.tap(find.text('专注'));
+        await tester.pumpAndSettle();
+        expect(find.text('起身活动一下'), findsNothing);
+        expect(find.text('专注中'), findsOneWidget);
+      } finally {
+        debugDefaultTargetPlatformOverride = null;
+      }
+    });
+
+    testWidgets('点当前阶段不会把剩余时间重置成满格（幂等）', (tester) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
+      try {
+        await pump(tester, _base());
+        await tester.tap(find.text('短休'));
+        await tester.pumpAndSettle();
+        // 让 10 分钟真的走掉 90 秒
+        await tester.pump(const Duration(seconds: 90));
+        final before = tester.widget<Text>(find.textContaining('09:')).data;
+        expect(before, isNotNull);
+
+        await tester.tap(find.text('短休'), warnIfMissed: false);
+        await tester.pump(const Duration(seconds: 1));
+        // 仍是从 09:xx 继续倒数，不是回到 10:00
+        expect(find.textContaining('10:00'), findsNothing);
+        expect(find.textContaining('09:'), findsOneWidget);
+      } finally {
+        debugDefaultTargetPlatformOverride = null;
+      }
+    });
+
+    testWidgets('收工入口 → 仪式浮层 →「再学一会儿」退出且今天不算收工', (tester) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
+      try {
+        await pump(tester, _base());
+        expect(find.text('收工'), findsOneWidget);
+
+        await tester.tap(find.text('收工'));
+        await tester.pumpAndSettle();
+        expect(find.text('今天收工了'), findsOneWidget);
+        // 仪式里报今日总账
+        expect(find.text('今日专注'), findsOneWidget);
+        expect(find.text('连续'), findsOneWidget);
+
+        await tester.tap(find.text('再学一会儿'));
+        await tester.pumpAndSettle();
+        expect(find.text('今天收工了'), findsNothing);
+        expect(find.text('准备开始'), findsOneWidget);
+        expect(find.text('继续今日'), findsNothing);
+      } finally {
+        debugDefaultTargetPlatformOverride = null;
+      }
+    });
+
+    testWidgets('仪式里按「收工」→ 盖章 → 1.2 秒收起 → 环内变「收工」+ 入口转「继续今日」',
+        (tester) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
+      try {
+        await pump(tester, _base());
+        await tester.tap(find.text('收工'));
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.widgetWithText(BrickButton, '收工'));
+        await tester.pump();
+        // 第二幕：数据已落，标题换成「今日已收工」
+        expect(find.text('今日已收工'), findsOneWidget);
         expect(find.text('准备开始'), findsNothing);
+
+        // 盖章停留 1.2 秒后自动收起
+        await tester.pump(const Duration(milliseconds: 1400));
+        await tester.pumpAndSettle();
+        expect(find.text('今日已收工'), findsNothing);
+        expect(find.text('继续今日'), findsOneWidget);
+        // 环内文案带总账（今天 0 分钟 → 就是「今日休息」）
+        expect(find.text('今日休息'), findsOneWidget);
+        expect(find.text('准备开始'), findsNothing);
+      } finally {
+        debugDefaultTargetPlatformOverride = null;
+      }
+    });
+
+    testWidgets('收工态点「继续今日」→ 回到可开始', (tester) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
+      try {
+        await pump(tester, TimerEngine.restForToday(_base(), DateTime.now()));
+        expect(find.text('今日休息'), findsOneWidget);
+        expect(find.text('继续今日'), findsOneWidget);
 
         await tester.tap(find.text('继续今日'));
         await tester.pumpAndSettle();
         expect(find.text('准备开始'), findsOneWidget);
-        expect(find.text('今日休息'), findsOneWidget); // 变回可点的收工入口
+        expect(find.text('收工'), findsOneWidget); // 胶囊回到"可点收工"
       } finally {
         debugDefaultTargetPlatformOverride = null;
       }
@@ -166,9 +259,9 @@ void main() {
 
         await tester.tap(find.text('开始'));
         await tester.pumpAndSettle();
-        expect(find.text('今日休息'), findsOneWidget); // 胶囊回到"可点收工"
+        expect(find.text('收工'), findsOneWidget); // 胶囊回到"可点收工"
         expect(find.text('准备开始'), findsNothing);
-        expect(find.textContaining('个番茄'), findsOneWidget); // 专注已开始
+        expect(find.text('专注中'), findsOneWidget); // 专注已开始
       } finally {
         debugDefaultTargetPlatformOverride = null;
       }

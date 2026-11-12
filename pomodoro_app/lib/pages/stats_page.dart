@@ -78,6 +78,30 @@ class _StatsPageState extends State<StatsPage> {
             ],
           ),
           const SizedBox(height: 12),
+          // 全部历史累计：只增不减，是「积累」这件事本身（2026-11-11）。
+          if (stats.totalMinutes >= 1) ...[
+            BrickCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('累计专注',
+                      style: TextStyle(color: PineColors.sub, fontSize: 12)),
+                  const SizedBox(height: 4),
+                  MinutesText(
+                    stats.totalMinutes,
+                    style: brickNumberStyle(fontSize: 30),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    '第 ${stats.totalDays} 天 · 平均每天 '
+                    '${formatHoursMinutes(stats.totalDays <= 0 ? 0 : stats.totalMinutes / stats.totalDays)}',
+                    style: const TextStyle(color: PineColors.sub, fontSize: 11.5),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
           // 汇总便签（R1：周目标按「次」，N / 20 个番茄）。
           BrickCard(
             child: Column(

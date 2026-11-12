@@ -3051,3 +3051,121 @@ Widget _recordTile(
     ),
   );
 }
+
+/// 完成一轮之后的「主题归属」（2026-11-11 改版）。
+///
+/// 从"开始前先选主题"改成"记完再选"：开始只需要一个动作，
+/// 主题在落库那一刻再补。默认选中上次用过的主题，点一下即完成；
+/// 直接关掉弹层 = 保持默认，这条记录照常存在（不会丢）。
+Future<PineTask?> showTopicSheet(
+  BuildContext context, {
+  required AppData data,
+  required String timeLabel,
+}) {
+  if (data.tasks.isEmpty) return Future<PineTask?>.value();
+  return showModalBottomSheet<PineTask>(
+    context: context,
+    backgroundColor: PineColors.paper,
+    builder: (context) => _SheetScaffold(
+      title: '这一轮记到哪个主题？',
+      trailing: Text(
+        timeLabel,
+        style: const TextStyle(color: PineColors.sub, fontSize: 12),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxHeight: 360),
+            child: ListView(
+              shrinkWrap: true,
+              padding: EdgeInsets.zero,
+              children: [
+                for (var i = 0; i < data.tasks.length; i++)
+                  _TopicOption(
+                    task: data.tasks[i],
+                    selected: i == data.selectedIndex,
+                    onTap: () => Navigator.of(context).pop(data.tasks[i]),
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            '默认是上次用过的主题；直接关掉就保持默认，这条记录不会丢。',
+            style: TextStyle(color: PineColors.sub, fontSize: 11.5),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+/// 主题选项行：色点 + 名称 + 「上次」标记。
+class _TopicOption extends StatelessWidget {
+  const _TopicOption({
+    required this.task,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final PineTask task;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        height: 52,
+        padding: const EdgeInsets.symmetric(horizontal: 6),
+        decoration: BoxDecoration(
+          border: Border(
+            bottom: BorderSide(
+              color: selected ? PineColors.line : PineColors.line,
+              width: 1,
+            ),
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 9,
+              height: 9,
+              decoration: BoxDecoration(
+                color: task.swatch,
+                shape: BoxShape.circle,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                task.name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(color: PineColors.ink, fontSize: 14.5),
+              ),
+            ),
+            if (selected) ...[
+              const Text(
+                '上次',
+                style: TextStyle(color: PineColors.sub, fontSize: 11),
+              ),
+              const SizedBox(width: 6),
+            ],
+            Icon(
+              selected
+                  ? Icons.radio_button_checked_rounded
+                  : Icons.radio_button_unchecked_rounded,
+              size: 18,
+              color: selected ? PineColors.focus : PineColors.faint,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}

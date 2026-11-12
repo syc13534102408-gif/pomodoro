@@ -37,6 +37,11 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   bool _goalPulse = false;
   bool _stampVisible = false;
 
+  /// 收工仪式浮层（2026-11-11）。不弹 dialog：它要盖住整屏、自带遮罩与两段式
+  /// 动画，而 AlertDialog 走内在宽度测量（docs/07 §7 #3/#7），装不住这些组件。
+  bool _ceremonyOpen = false;
+  Timer? _ceremonyTimer;
+
   /// 今日日程的「内联加一条」状态（不弹面板，直接在卡里输入）。
   bool _planAdding = false;
   final TextEditingController _planController = TextEditingController();
@@ -162,6 +167,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     _planController.dispose();
     _ticker?.cancel();
     _stampTimer?.cancel();
+    _ceremonyTimer?.cancel();
     _mirrorTimer?.cancel();
     _backupSyncTimer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
@@ -669,11 +675,16 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     _apply(next, force: true);
   }
 
-  void _confirm() {
+  Future<void> _confirm() async {
     final now = DateTime.now();
     final hadRecord = _data.records.length;
+    final session = _data.activeSession;
+    // 这一轮是不是专注：只有专注轮次才需要事后选主题。
+    final focusRound =
+        session != null ? session.mode.isFocus : _data.idleMode.isFocus;
     var next = TimerEngine.advance(_data, now);
     next = TimerEngine.syncMinutes(next, now);
+    String? recordId;
 
     if (next.activeSession == null) {
       if (!next.idleMode.isFocus) return;
@@ -686,7 +697,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       );
       // 与 engine.complete 一致：自动休息固定短休（2026-11-07 起）。
       next = TimerEngine.start(next, SessionMode.shortBreak, now);
+      recordId = next.records.isEmpty ? null : next.records.first.id;
     } else {
+      recordId = next.activeSession!.recordId;
       next = TimerEngine.complete(next, now);
     }
     unawaited(Notifier.cancel());
@@ -696,6 +709,43 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     _pulseGoalCard();
     // 完成专注（写入了记录）后自动上传，让网页端尽快看到。
     unawaited(_autoSync.afterFocus(context, next));
+
+    // 记完再选主题（2026-11-11）：开始前不必先决定这一步属于谁。
+    if (focusRound && recordId != null) {
+      await _assignTopic(recordId);
+    }
+  }
+
+  /// 完成后的主题归属：默认上次用过的主题，选完写回记录（含事件归属）。
+  Future<void> _assignTopic(String recordId) async {
+    if (!mounted) return;
+    FocusRecord? record;
+    for (final item in _data.records) {
+      if (item.id == recordId) {
+        record = item;
+        break;
+      }
+    }
+    if (record == null) return;
+    final picked = await showTopicSheet(
+      context,
+      data: _data,
+      timeLabel: '${formatHoursMinutes(record.minutes)} · 刚刚完成',
+    );
+    if (picked == null || !mounted) return;
+    var next = TimerEngine.updateRecord(_data, recordId, taskName: picked.name);
+    final index = _data.tasks.indexWhere((task) => task.id == picked.id);
+    if (index >= 0) next = next.copyWith(selectedIndex: index);
+    // 该主题若有进行中的事件，这条记录自动归入（与开始计时时的口径一致）。
+    String? eventId;
+    for (final event in _data.events) {
+      if (event.isRunning && event.taskName == picked.name) {
+        eventId = event.id;
+        break;
+      }
+    }
+    next = TimerEngine.setRecordEvent(next, recordId, eventId);
+    _replace(next);
   }
 
   void _pulseGoalCard() {
@@ -725,14 +775,16 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     _apply(TimerEngine.discard(_data), force: true);
   }
 
-  /// 手动进入一段休息（短休 / 吃饭）：先把进行中的会话收口，再起目标阶段。
-  void _startBreak(SessionMode mode) {
+  /// 阶段条：**点谁进谁**。落账口径全在 [TimerEngine.switchPhase]（纯函数，有单测）。
+  void _switchPhase(SessionMode mode) {
     final before = _data.records.length;
-    final next = TimerEngine.startBreak(_data, mode, DateTime.now());
-    if (next == _data) return;
+    final now = DateTime.now();
+    final next = TimerEngine.switchPhase(_data, mode, now);
+    // 点当前所在阶段引擎原样返回同一实例——别为一次空操作制造写盘与云端上传。
+    if (identical(next, _data)) return;
     unawaited(Notifier.cancel());
     _apply(next, force: true);
-    // 收口写入了记录（专注被按完成处理）→ 立刻上传，别等下次节流。
+    // 离开专注时收口写了记录 → 立刻上传，别等下次节流（与 _startBreak 同）。
     if (next.records.length > before) {
       unawaited(_autoSync.afterFocus(context, next));
     }
@@ -754,42 +806,64 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     _apply(TimerEngine.resumeToday(_data), force: true);
   }
 
-  /// 第二控制行：短休 / 吃饭 / 今日休息（2026-11-07 需求）。
+  /// 「收工」入口：今天还没收工 → 开仪式；已经收工 → 同一格撤销（继续今日）。
   ///
-  /// 取代原来的三段「专注 / 短休息 / 长休息」胶囊：自动休息只剩短休，
-  /// 长段休息由人决定（吃饭），所以阶段切换直接做成"一键进入"的动作。
-  Widget _restRow() {
+  /// 2026-11-11 起收工不再是"点一下就没了"的开关，而是一段有开头有结尾的仪式
+  /// （[_RestCeremony]）。数据改动仍然只发生在仪式里按下「收工」那一刻。
+  void _openRestCeremony() {
+    if (_data.isRestDay(DateTime.now())) {
+      _resumeToday();
+      return;
+    }
+    setState(() => _ceremonyOpen = true);
+  }
+
+  /// 关掉仪式（「再学一会儿」/ 点遮罩）：不改任何数据。
+  void _closeRestCeremony() {
+    _ceremonyTimer?.cancel();
+    _ceremonyTimer = null;
+    if (!mounted || !_ceremonyOpen) return;
+    setState(() => _ceremonyOpen = false);
+  }
+
+  /// 仪式里按下「收工」：**立刻**落标记（动画中途被杀也不丢），再让盖章停留 1.2 秒。
+  /// 那 1.2 秒是"仪式感"真正的载体——点完立刻消失的确认框只是一个开关。
+  void _confirmRest() {
+    _restToday();
+    _ceremonyTimer?.cancel();
+    _ceremonyTimer = Timer(const Duration(milliseconds: 1200), () {
+      if (mounted) setState(() => _ceremonyOpen = false);
+    });
+  }
+
+  /// 第二控制行：阶段条（专注 / 短休 / 吃饭）+ 右侧「收工」。
+  ///
+  /// 2026-11-07 那版是「短休 / 吃饭 / 今日休息」三个等宽胶囊，三个毛病：
+  /// ① 回不到主计时（只能绕去按 ✓「结束休息」）；② 三格长得一样，看不出在哪一段；
+  /// ③ 点当前那段会把剩余时间重置成满格。现在：
+  /// - 三段按 [SessionMode] 对称，**选中态就是"我在这"**，点当前段是幂等空操作；
+  /// - 「收工」从"第三个休息选项"里拎出来单独一颗描边胶囊——它不是休息，是收尾，
+  ///   点它进仪式而不是直接改状态。
+  Widget _phaseRow() {
     final resting = _data.isRestDay(DateTime.now());
+    // 与环内显示同一口径：挂起时显示的是待开始阶段，阶段条也照此高亮；
+    // 已收工则一段都不选中（这一天不在任何阶段里）。
+    final SessionMode? current = resting
+        ? null
+        : (_displaySession?.mode ?? _data.idleMode);
     return Row(
       children: [
         Expanded(
-          child: _RestPill(
-            label: '短休',
-            minutes: _data.settings.short,
-            icon: Icons.local_cafe_outlined,
-            accent: PineColors.mint,
-            onTap: () => _startBreak(SessionMode.shortBreak),
+          child: PhaseSwitcher(
+            current: current,
+            minutesFor: (mode) => _data.settings.forMode(mode),
+            onChanged: _switchPhase,
           ),
         ),
         const SizedBox(width: 8),
-        Expanded(
-          child: _RestPill(
-            label: '吃饭',
-            minutes: _data.settings.meal,
-            icon: Icons.restaurant_outlined,
-            accent: PineColors.goldInk,
-            onTap: () => _startBreak(SessionMode.longBreak),
-          ),
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: _RestPill(
-            label: resting ? '继续今日' : '今日休息',
-            icon: resting ? Icons.wb_sunny_outlined : Icons.bedtime_outlined,
-            accent: resting ? PineColors.pine : PineColors.sub,
-            active: resting,
-            onTap: resting ? _resumeToday : _restToday,
-          ),
+        _RestEntryChip(
+          active: resting,
+          onTap: resting ? _resumeToday : _openRestCeremony,
         ),
       ],
     );
@@ -872,6 +946,26 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         body: Center(child: CircularProgressIndicator(color: PineColors.ink)),
       );
     }
+    // 收工仪式浮在**页面之上**（含桌面端三只抽屉之上）：它是"今天结束"这件事
+    // 的独立场景，不该被抽屉或底部导航挤在旁边。
+    return Stack(
+      children: [
+        Positioned.fill(child: _page(context)),
+        if (_ceremonyOpen)
+          Positioned.fill(
+            child: _RestCeremony(
+              stats: StatsView.of(_data, DateTime.now()),
+              goalMinutes: _data.goalMinutes,
+              resting: _data.isRestDay(DateTime.now()),
+              onConfirm: _confirmRest,
+              onCancel: _closeRestCeremony,
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _page(BuildContext context) {
     // macOS 走独立桌面布局（专注舱 + 统计/设置抽屉），安卓保持手机布局不变。
     if (_desktop) return _buildDesktop(context);
     // 手机布局：底部导航 3 Tab（专注 / 报告 / 设置），三页共享同一 AppData
@@ -919,7 +1013,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   Widget _timerTab() {
     final now = DateTime.now();
     final session = _displaySession;
-    final view = _displayView(now);
+    final resting = _isResting(now);
+    final view = resting ? _restView : _displayView(now);
     final stats = StatsView.of(_data, now);
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -956,9 +1051,19 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                   child: Stack(
                     clipBehavior: Clip.none,
                     children: [
-                      BrickTimer(
-                        view: view,
+                      PaperRing(
+                        progress: resting ? 1 : view.progress,
+                        color: resting
+                            ? PineColors.pine
+                            : (view.targetReached
+                                ? PineColors.goldInk
+                                : view.mode.lineColor),
+                        timeText: resting ? '收工' : view.clockText,
                         caption: _caption(session, view),
+                        overtime: !resting && view.targetReached,
+                        diameter: compact ? 184 : 208,
+                        timeStyle: resting ? _restCenterStyle : null,
+                        dimArc: session != null && !session.running,
                       ),
                       if (_stampVisible)
                         const Positioned(
@@ -973,7 +1078,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               SizedBox(height: compact ? 8 : 12),
               _controls(session, view, suspended: _data.activeSession),
               SizedBox(height: compact ? 6 : 8),
-              _restRow(),
+              _cumulative(stats),
+              SizedBox(height: compact ? 6 : 8),
+              _phaseRow(),
               SizedBox(height: compact ? 8 : 12),
               _planCard(),
               SizedBox(height: compact ? 8 : 12),
@@ -1131,6 +1238,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   /// 收进底部一张信息小卡。窗口矮时可滚动，拖宽只留白。
   Widget _desktopCabin(ActiveSession? session, SessionView view) {
     final stats = StatsView.of(_data, DateTime.now());
+    final resting = _isResting(DateTime.now());
     // 500×640 是默认窗口，原布局内容 624.5pt > 视口 574pt，信息卡底缘被视口硬切
     // （2026-10-25 评审 P0-1）。按可用高度分档收紧，环径是最大的一块预算。
     final height = MediaQuery.sizeOf(context).height;
@@ -1195,17 +1303,20 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 const SizedBox(height: 8),
                 Center(
                   child: _DesktopRing(
-                    progress: view.progress,
+                    progress: resting ? 1 : view.progress,
                     diameter: ring,
                     // 金色不能直接用 gold（对纸面 2.00:1），字与弧改 goldInk（3.40:1）；
                     // gold 只留给「按钮底 + ink 字」。
-                    color: view.targetReached
-                        ? PineColors.goldInk
-                        : view.mode.lineColor,
-                    timeText: view.clockText,
+                    color: resting
+                        ? PineColors.pine
+                        : (view.targetReached
+                            ? PineColors.goldInk
+                            : view.mode.lineColor),
+                    timeText: resting ? '收工' : view.clockText,
+                    timeStyle: resting ? _restCenterStyle : null,
                     caption: _caption(session, view),
-                    overtime: view.targetReached,
-                    stamp: _stampVisible,
+                    overtime: !resting && view.targetReached,
+                    stamp: !resting && _stampVisible,
                   ),
                 ),
                 const SizedBox(height: 4),
@@ -1225,7 +1336,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                   child: ConstrainedBox(
                     constraints:
                         const BoxConstraints(maxWidth: Paper.cabinColumn),
-                    child: _restRow(),
+                    child: _phaseRow(),
                   ),
                 ),
                 SizedBox(height: gapTail),
@@ -1426,22 +1537,53 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   /// 手机端同步（`BrickTimer` 与本方法同源），两端文案不再分叉。
   String _caption(ActiveSession? session, SessionView view) {
     // 今日休息态：环里直接写状态（省一行横幅，垂直预算只剩几 pt）。
-    if (session == null && _data.isRestDay(DateTime.now())) return '今日休息';
+    // 2026-11-11：带上今天的总账——收工后环心是「收工」，这行就是唯一的成绩单。
+    if (session == null && _data.isRestDay(DateTime.now())) {
+      final total = StatsView.of(_data, DateTime.now()).todayMinutes;
+      return total <= 0 ? '今日休息' : '今日休息 · ${formatHoursMinutes(total)}';
+    }
     if (session == null) return '准备开始';
-    if (view.targetReached) return '已超时 · 仍在累积';
+    // 到点后的措辞分两种：专注是"还可以继续攒"，休息是"该回去了"。
+    // 旧文案对休息也说「已超时 · 仍在累积」，等于叫人在休息里多待一会儿。
+    if (view.targetReached) {
+      return view.mode.isFocus ? '已超时 · 仍在累积' : '休息够了 · 切回专注';
+    }
     if (!session.running) {
-      if (view.mode.isFocus) {
-        final count = StatsView.of(_data, DateTime.now()).todayCount + 1;
-        return '已暂停 · 第 $count 个番茄';
-      }
+      if (view.mode.isFocus) return '已暂停';
       return '已暂停 · ${view.mode.label}';
     }
-    if (view.mode == SessionMode.focus) {
-      final count = StatsView.of(_data, DateTime.now()).todayCount + 1;
-      return '第 $count 个番茄';
-    }
+    if (view.mode == SessionMode.focus) return '专注中';
     return view.mode == SessionMode.shortBreak ? '起身活动一下' : '吃饭，慢慢来';
   }
+
+  /// 收工态：今天已经没有"进行中的会话"，但环不该是空的。
+  bool _isResting(DateTime now) =>
+      _data.activeSession == null && _data.isRestDay(now);
+
+  /// 收工态的合成视图：progress 恒为 1（整圈闭合），环心大字另有覆盖。
+  ///
+  /// 旧行为在收工后照样画一个 50:00 的空环 —— 对刚收工的人是"你还没开始"，
+  /// 与「今天结束了」的正反馈正好相反。
+  SessionView get _restView => const SessionView(
+        mode: SessionMode.focus,
+        running: false,
+        targetReached: false,
+        // progress 的分母不能是 0；1 − 0 = 1 → 整圈闭合。
+        plannedSeconds: 1,
+        remainingSeconds: 0,
+        overtimeSeconds: 0,
+        elapsedSeconds: 0,
+      );
+
+  /// 收工态环心字。**刻意不用 [brickNumberStyle]**：它指定 monospace，
+  /// 而等宽字体没有中文字形，中文要交给系统回退链。
+  static const TextStyle _restCenterStyle = TextStyle(
+    color: PineColors.pine,
+    fontSize: 34,
+    fontWeight: FontWeight.w500,
+    letterSpacing: 8,
+    height: 1.1,
+  );
 
   /// 手机布局顶部：日期（今日语境）+ 右侧松果小标（纸面风格）。
   Widget _dateHeader() {
@@ -1553,6 +1695,49 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
           onPressed: _discard,
         ),
       ],
+    );
+  }
+
+  /// 全部历史累计：只增不减的那三个数，紧贴主按钮下方。
+  Widget _cumulative(StatsView stats) {
+    if (stats.totalMinutes < 1) return const SizedBox.shrink();
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+      decoration: BoxDecoration(
+        color: PineColors.paper,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: PineColors.line, width: 1),
+      ),
+      child: Row(
+        children: [
+          const Text(
+            '累计',
+            style: TextStyle(
+              fontSize: 11,
+              color: PineColors.sub,
+              letterSpacing: .06,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            formatHoursMinutes(stats.totalMinutes),
+            style: const TextStyle(
+              fontSize: 14,
+              color: PineColors.ink,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const Spacer(),
+          Text(
+            '第 ${stats.totalDays} 天 · ${stats.totalTomatoes} 番茄',
+            style: const TextStyle(
+              fontSize: 10.5,
+              color: PineColors.sub,
+              letterSpacing: .02,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -2011,6 +2196,7 @@ class _DesktopRing extends StatelessWidget {
     required this.caption,
     required this.overtime,
     required this.diameter,
+    this.timeStyle,
     this.stamp = false,
   });
 
@@ -2019,6 +2205,10 @@ class _DesktopRing extends StatelessWidget {
   final String timeText;
   final String caption;
   final bool overtime;
+
+  /// 环心大字样式；null 走 [brickNumberStyle]（等宽 + tabular）。
+  /// 收工态环心写「收工」二字，等宽字体没有中文字形，必须整段覆盖。
+  final TextStyle? timeStyle;
 
   /// 完成章（桌面）：一次专注完成时在环右上角盖下。
   final bool stamp;
@@ -2036,7 +2226,11 @@ class _DesktopRing extends StatelessWidget {
         fit: StackFit.expand,
         children: [
           CustomPaint(
-            painter: _RingPainter(progress: progress, color: color),
+            painter: RingProgressPainter(
+              progress: progress,
+              color: color,
+              stroke: 3,
+            ),
           ),
           Center(
             child: Column(
@@ -2044,13 +2238,15 @@ class _DesktopRing extends StatelessWidget {
               children: [
                 Text(
                   timeText,
-                  style: brickNumberStyle(
-                    // 小环降一档，避免数字顶到 12pt 轨道。
-                    fontSize: diameter >= Paper.ringMax
-                        ? 50
-                        : (diameter < 200 ? 44 : 46),
-                    color: overtime ? PineColors.goldInk : PineColors.ink,
-                  ),
+                  style: timeStyle ??
+                      brickNumberStyle(
+                        // 小环降一档，避免数字顶到 12pt 轨道。
+                        fontSize: diameter >= Paper.ringMax
+                            ? 42
+                            : (diameter < 200 ? 38 : 40),
+                        color:
+                            overtime ? PineColors.goldInk : PineColors.ink,
+                      ),
                 ),
                 const SizedBox(height: 2),
                 Text(
@@ -2074,42 +2270,6 @@ class _DesktopRing extends StatelessWidget {
   }
 }
 
-/// 圆环：纸色轨道 + 阶段色圆弧（顺时针从 12 点起），超时后整环闭合。
-class _RingPainter extends CustomPainter {
-  const _RingPainter({required this.progress, required this.color});
-
-  final double progress;
-  final Color color;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    const stroke = 12.0;
-    final rect = Offset.zero & size;
-    final track = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = stroke
-      ..color = PineColors.track;
-    canvas.drawCircle(rect.center, (size.width - stroke) / 2, track);
-    final p = progress.clamp(0.0, 1.0);
-    if (p <= 0) return;
-    final arc = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = stroke
-      ..strokeCap = StrokeCap.round
-      ..color = color;
-    canvas.drawArc(
-      rect.deflate(stroke / 2),
-      -3.14159 / 2,
-      6.28318 * p,
-      false,
-      arc,
-    );
-  }
-
-  @override
-  bool shouldRepaint(_RingPainter old) =>
-      old.progress != progress || old.color != color;
-}
 
 /// 完成章（P8）：一次专注完成时在计时卡右上角盖下，弹性入场。
 class _CompletionStamp extends StatelessWidget {
@@ -2155,74 +2315,418 @@ class _CompletionStamp extends StatelessWidget {
   }
 }
 
-/// 休息行的一格：色点 + 名称 +（可选）分钟数，实底卡片、1px 描边。
+/// 阶段条右侧的「收工」入口。
 ///
-/// 与主控制行刻意拉开层级：那里是墨底/金底的「主行动」，这里是一组**轻量入口**，
-/// 所以只用纸色底 + 阶段色文字，不用实心色块（也避免一屏出现三块重色）。
-class _RestPill extends StatelessWidget {
-  const _RestPill({
-    required this.label,
-    required this.icon,
-    required this.accent,
-    required this.onTap,
-    this.minutes,
-    this.active = false,
-  });
+/// 与三格阶段条刻意不同形：阶段条是**平铺的段选**（无边框、选中才上色），
+/// 这颗是**一颗描边胶囊**（常态无底、hairline 边、sub 字）。它不是"第三种休息"，
+/// 是"今天到此为止"，所以不能和短休/吃饭长得一样。
+/// 收工态下它变成「继续今日」并整体上松绿——同一格既显示状态又是撤销入口。
+class _RestEntryChip extends StatelessWidget {
+  const _RestEntryChip({required this.active, required this.onTap});
 
-  final String label;
-  final IconData icon;
-  final Color accent;
-  final VoidCallback onTap;
-  final int? minutes;
-
-  /// 「今日休息」已生效时高亮（同一格同时是撤销入口）。
   final bool active;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: active ? PineColors.tint(PineColors.pine) : PineColors.card,
-      borderRadius: BorderRadius.circular(Paper.chipRadius),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(Paper.chipRadius),
+    final accent = active ? PineColors.pine : PineColors.sub;
+    return Semantics(
+      button: true,
+      label: active ? '继续今日（撤销收工）' : '收工',
+      child: BrickPressable(
         onTap: onTap,
+        shadowed: false,
         child: Container(
           height: 32,
-          padding: const EdgeInsets.symmetric(horizontal: 6),
+          padding: const EdgeInsets.symmetric(horizontal: 10),
           decoration: BoxDecoration(
+            color: active ? PineColors.tint(PineColors.pine) : PineColors.card,
             borderRadius: BorderRadius.circular(Paper.chipRadius),
             border: Border.all(
-                color: active ? PineColors.pine : PineColors.line),
+              color: active ? PineColors.pine : PineColors.line,
+              width: Paper.chipBorder,
+            ),
           ),
           child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(icon, size: 14, color: accent),
+              Icon(
+                active ? Icons.wb_sunny_outlined : Icons.bedtime_outlined,
+                size: 14,
+                color: accent,
+              ),
               const SizedBox(width: 4),
-              Flexible(
-                child: Text(
-                  label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: accent,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                  ),
+              Text(
+                active ? '继续今日' : '收工',
+                maxLines: 1,
+                style: TextStyle(
+                  color: accent,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                  letterSpacing: 0,
                 ),
               ),
-              if (minutes != null) ...[
-                const SizedBox(width: 3),
-                Text(
-                  '$minutes 分',
-                  style: const TextStyle(
-                      color: PineColors.sub, fontSize: 10),
-                ),
-              ],
             ],
           ),
         ),
       ),
     );
   }
+}
+
+/// 收工仪式（2026-11-11）。
+///
+/// 为什么不是 AlertDialog：① 它要盖住整屏并自带遮罩，才算"天黑下来"；
+/// ② 对话框走内在宽度/高度测量，`docs/07 §7` 记着在这条路上踩过的两个坑
+/// （stretch+Expanded、BrickButton 进 OverflowBar）；③ 仪式要两段式动画，
+/// 对话框的 builder 不适合承载。
+///
+/// 两段式（由 [resting] 驱动，**不另设本地状态**——数据一落，第二幕就是事实）：
+/// 1. 确认幕：松果按今日进度长成 → 报总账 → 「收工 / 再学一会儿」；
+/// 2. 盖章幕：按下「收工」后 `restDate` 已落，松果盖住「收工」章，1.2 秒后自动收起。
+///
+/// 「再学一会儿」只关浮层，**一个字节都不改**——仪式不能变成惩罚。
+class _RestCeremony extends StatelessWidget {
+  const _RestCeremony({
+    required this.stats,
+    required this.goalMinutes,
+    required this.resting,
+    required this.onConfirm,
+    required this.onCancel,
+  });
+
+  final StatsView stats;
+  final int goalMinutes;
+
+  /// 今天已经收工了吗：true = 盖章幕。
+  final bool resting;
+
+  final VoidCallback onConfirm;
+  final VoidCallback onCancel;
+
+  /// 按目标达成度给一句收尾话。不做拟人化的夸张褒奖——"松林手帐"的调子偏克制。
+  static String closingLine(double ratio) {
+    if (ratio >= 1) return '目标达成 · 今天很稳';
+    if (ratio >= 0.6) return '今天攒下了一整段完整的专注';
+    if (ratio > 0) return '有开始，就已经和昨天不一样';
+    return '今天没计时也算数 · 明天再来';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final reduceMotion =
+        MediaQuery.maybeOf(context)?.disableAnimations ?? false;
+    final goal = goalMinutes <= 0 ? 1 : goalMinutes;
+    final ratio = (stats.todayMinutes / goal).clamp(0.0, 1.0);
+    final growTo = resting ? 1.0 : ratio;
+
+    // 遮罩：盖章幕不再响应点击（1.2 秒后自动收起，别让人点空）。
+    // 颜色取自 ink 令牌（禁止裸色值）。
+    return Stack(
+      children: [
+        Positioned.fill(
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: resting ? null : onCancel,
+            child: Container(color: PineColors.ink.withAlpha(118)),
+          ),
+        ),
+        Center(
+          child: TweenAnimationBuilder<double>(
+            tween: Tween(begin: 0, end: 1),
+            duration: reduceMotion
+                ? Duration.zero
+                : const Duration(milliseconds: 240),
+            curve: Curves.easeOutCubic,
+            builder: (context, t, child) => Opacity(
+              opacity: t,
+              child: Transform.translate(
+                offset: Offset(0, (1 - t) * 14),
+                child: child,
+              ),
+            ),
+            // 矮窗口兜底：仪式卡固定 320 宽，但高度随内容长；窗口更矮时让它自己滚，
+            // 否则 Column 会直接溢出（横屏手机 / 拖扁的桌面窗都会踩到）。
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.sizeOf(context).height - 48,
+              ),
+              child: SingleChildScrollView(
+                child: Container(
+              width: 320,
+              padding: const EdgeInsets.fromLTRB(22, 20, 22, 18),
+              decoration: BoxDecoration(
+                color: PineColors.paper,
+                borderRadius: BorderRadius.circular(Paper.cardRadius),
+                boxShadow: Paper.shadow,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _ceremonyPinecone(context, growTo, reduceMotion),
+                  const SizedBox(height: 14),
+                  Text(
+                    resting ? '今日已收工' : '今天收工了',
+                    style: const TextStyle(
+                      color: PineColors.ink,
+                      fontSize: 19,
+                      fontWeight: FontWeight.w500,
+                      letterSpacing: 1,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    resting ? '计时与提醒都关掉了 · 明天见' : closingLine(ratio),
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: PineColors.sub,
+                      fontSize: 12.5,
+                      height: 1.5,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  const Divider(height: 1, color: PineColors.line),
+                  const SizedBox(height: 14),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: MetricTile(
+                          value: '${stats.todayMinutes.round()} 分钟',
+                          label: '今日专注',
+                        ),
+                      ),
+                      Expanded(
+                        child: MetricTile(
+                          value: '${stats.todayCount} 个',
+                          label: '番茄',
+                        ),
+                      ),
+                      Expanded(
+                        child: MetricTile(
+                          value: '${stats.streak} 天',
+                          label: '连续',
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  Row(
+                    children: [
+                      const Text(
+                        '今日目标',
+                        style: TextStyle(color: PineColors.sub, fontSize: 11),
+                      ),
+                      const Spacer(),
+                      Text(
+                        '$goalMinutes 分钟 · 达成 ${(ratio * 100).round()}%',
+                        style: brickNumberStyle(
+                          fontSize: 10,
+                          color: PineColors.sub,
+                          weight: FontWeight.w400,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  BrickProgress(value: ratio),
+                  if (!resting) ...[
+                    const SizedBox(height: 18),
+                    BrickButton(
+                      label: '收工',
+                      icon: Icons.check_rounded,
+                      height: 44,
+                      onPressed: onConfirm,
+                    ),
+                    const SizedBox(height: 6),
+                    // 次行动用 TextButton：胶囊已经给了主行动，这里只是"退出仪式"。
+                    TextButton(
+                      onPressed: onCancel,
+                      child: const Text(
+                        '再学一会儿',
+                        style: TextStyle(color: PineColors.sub, fontSize: 13),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// 松果：确认幕按进度自下而上长成，盖章幕一次性长满并盖上「收工」章。
+  ///
+  /// 两幕共用同一个 112×90 的画框、松果在其中居中——只多盖一枚印章。
+  /// 换画框尺寸会让松果在第一幕→第二幕之间**跳一下**，而那正是要给正反馈的瞬间。
+  Widget _ceremonyPinecone(
+    BuildContext context,
+    double growTo,
+    bool reduceMotion,
+  ) {
+    final cone = SizedBox(
+      width: 72,
+      height: 86,
+      child: TweenAnimationBuilder<double>(
+        tween: Tween(begin: 0, end: growTo),
+        duration: reduceMotion
+            ? Duration.zero
+            : const Duration(milliseconds: 720),
+        curve: Curves.easeOutCubic,
+        builder: (context, value, child) => CustomPaint(
+          painter: _PineconePainter(growth: value),
+        ),
+      ),
+    );
+    return SizedBox(
+      width: 112,
+      height: 90,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Positioned.fill(child: Center(child: cone)),
+          // 印章压在松果**右下角外侧**，只咬住一角：盖在果体正中会把"长成的松果"
+          // 整个遮掉，那正是要让用户看见的东西。
+          if (resting)
+            Positioned(
+              right: -10,
+              bottom: -4,
+              child: TweenAnimationBuilder<double>(
+                tween: Tween(begin: 0.4, end: 1),
+                duration: reduceMotion
+                    ? Duration.zero
+                    : const Duration(milliseconds: 320),
+                curve: Curves.elasticOut,
+                builder: (context, scale, child) =>
+                    Transform.scale(scale: scale, child: child),
+                child: const _RestStamp(),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 收工章：与「专注完成」章同语言（墨绿描边圆 + 小字），内容换成「收工」。
+class _RestStamp extends StatelessWidget {
+  const _RestStamp();
+
+  @override
+  Widget build(BuildContext context) {
+    return Transform.rotate(
+      angle: -0.16,
+      child: Container(
+        width: 46,
+        height: 46,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: PineColors.paper,
+          shape: BoxShape.circle,
+          border: Border.all(color: PineColors.pine, width: 2),
+        ),
+        child: const Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.check, size: 12, color: PineColors.pine),
+            Text(
+              '收工',
+              style: TextStyle(
+                color: PineColors.pine,
+                fontSize: 9,
+                fontWeight: FontWeight.w500,
+                letterSpacing: 1,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// 今日长成的松果：18 枚鳞片**自下而上**按进度点亮。
+///
+/// 为什么是松果：App 就叫 pinecone，日期条右侧那枚小松标是全站唯一的品牌记号
+/// （见 `_dateHeader`）。收工时给它一个"长成"的动作，比再画一圈进度弧更像一件事——
+/// 环已经在主界面上报过一次数了，仪式该给的是另一个说法。
+///
+/// 画法照真松果的样子：每枚鳞片是一个**朝下的半圆**，行与行重叠 25%、自下而上叠画，
+/// 上面一行压住下面一行的"平顶"，于是整棵读起来是层层叠叠的鳞片而不是一堆圆点。
+/// 行数自下而上 4/4/4/3/2/1：下宽上尖，收口在顶部。
+class _PineconePainter extends CustomPainter {
+  const _PineconePainter({required this.growth});
+
+  /// 0..1，按比例点亮鳞片（自下而上，行内自左向右）。
+  final double growth;
+
+  static const List<int> _rows = [4, 4, 4, 3, 2, 1];
+  static const int _total = 18;
+
+  /// 设计盒（鳞片半径 8.5、行距 13 时的实际外框），按可用空间等比缩放。
+  /// 高宽比约 1.3：松果是竖着的椭球，做方了像一堆碗。
+  static const double _designW = 63.5;
+  static const double _designH = 82.0;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final scale = (size.width / _designW).clamp(0.0, size.height / _designH);
+    if (scale <= 0) return;
+    const radius = 8.5;
+    const pitchY = 13.0;
+    const gapX = 15.5;
+    final r = radius * scale;
+    final filled =
+        (growth.clamp(0.0, 1.0) * _total).round().clamp(0, _total);
+
+    final originX = size.width / 2;
+    final originY = (size.height - _designH * scale) / 2;
+    final bottomY = originY + _designH * scale - r;
+
+    final fillPaint = Paint()..style = PaintingStyle.fill;
+    // 空鳞片用 faint 而不是 line：line 对纸面只有 1.19:1，"还没长成的部分"
+    // 几乎看不见，整棵就只剩下半截，读不出"长成了多少"。
+    final outlinePaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.2 * scale
+      ..color = PineColors.faint;
+    // 已长成的鳞片之间用纸色刻一道缝：不刻就并成一条实心带，看不出层次。
+    final carvePaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.2 * scale
+      ..color = PineColors.paper;
+
+    var drawn = 0;
+    for (var row = 0; row < _rows.length; row++) {
+      final count = _rows[row];
+      final cy = bottomY - row * pitchY * scale;
+      for (var i = 0; i < count; i++) {
+        final cx = originX + (i - (count - 1) / 2) * gapX * scale;
+        final path = _scalePath(cx, cy, r);
+        if (drawn < filled) {
+          fillPaint.color = PineColors.pine;
+          canvas.drawPath(path, fillPaint);
+          canvas.drawPath(path, carvePaint);
+        } else {
+          canvas.drawPath(path, outlinePaint);
+        }
+        drawn++;
+      }
+    }
+  }
+
+  /// 一枚鳞片：比正圆略瘦的朝下半圆（宽度 > 高度的一半），平顶留给上一行压。
+  static Path _scalePath(double cx, double cy, double r) => Path()
+    ..addArc(
+      Rect.fromCenter(center: Offset(cx, cy), width: r * 1.86, height: r * 2),
+      0,
+      3.141592653589793,
+    )
+    ..close();
+
+  @override
+  bool shouldRepaint(_PineconePainter old) => old.growth != growth;
 }

@@ -1,0 +1,635 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>松果 · macOS 桌面重设计提案（2026-11-11）</title>
+<style>
+/* ===== 提案页外壳：固定中性色，不随主题变化，避免控制条被染色 ===== */
+:root{
+  --ui-bg:#EDEEEA; --ui-card:#FBFBF8; --ui-ink:#20241F; --ui-sub:#5E645C;
+  --ui-line:#D8DAD2; --ui-accent:#3A5A46;
+  --ui-font:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+  --ui-mono:ui-monospace,"SF Mono","JetBrains Mono",Menlo,monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{background:var(--ui-bg);color:var(--ui-ink);font-family:var(--ui-font);font-size:14px;line-height:1.6;-webkit-font-smoothing:antialiased}
+.wrap{max-width:1180px;margin:0 auto;padding:36px 28px 80px}
+.masthead{display:flex;align-items:flex-end;justify-content:space-between;gap:24px;flex-wrap:wrap;padding-bottom:20px;border-bottom:1px solid var(--ui-line)}
+.eyebrow{font:11px/1.4 var(--ui-mono);letter-spacing:.14em;text-transform:uppercase;color:var(--ui-accent);margin:0 0 10px}
+h1{font-size:28px;line-height:1.25;margin:0 0 8px;letter-spacing:-.02em;font-weight:650}
+.lede{margin:0;color:var(--ui-sub);max-width:660px;font-size:13px}
+.badge{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--ui-line);background:var(--ui-card);padding:7px 12px;border-radius:999px;font:11px var(--ui-mono);color:var(--ui-sub);white-space:nowrap}
+.badge i{width:6px;height:6px;border-radius:50%;background:#C08A32;display:block}
+
+.toolbar{display:flex;gap:22px;flex-wrap:wrap;align-items:flex-end;margin:22px 0 18px;padding:16px 18px;background:var(--ui-card);border:1px solid var(--ui-line);border-radius:12px}
+.group{display:flex;flex-direction:column;gap:7px}
+.group>span{font:10px var(--ui-mono);letter-spacing:.12em;text-transform:uppercase;color:var(--ui-sub)}
+.segs{display:flex;gap:4px;flex-wrap:wrap}
+.seg{appearance:none;border:1px solid var(--ui-line);background:transparent;color:var(--ui-sub);font:12px var(--ui-font);padding:7px 12px;border-radius:7px;cursor:pointer;transition:background .16s,color .16s,border-color .16s,transform .12s}
+.seg:hover{border-color:var(--ui-accent);color:var(--ui-ink)}
+.seg:active{transform:scale(.97)}
+.seg:focus-visible{outline:2px solid var(--ui-accent);outline-offset:2px}
+.seg[aria-pressed="true"]{background:var(--ui-ink);border-color:var(--ui-ink);color:#FBFBF8}
+
+.canvas{display:flex;justify-content:center;padding:30px 0 34px;background:repeating-linear-gradient(45deg,rgba(0,0,0,.018) 0 1px,transparent 1px 9px);border:1px solid var(--ui-line);border-radius:12px;overflow:auto}
+.win-holder{width:var(--win-w,560px);transition:width .24s cubic-bezier(.22,1,.36,1);flex:none}
+
+/* ===== 产品窗口：以下变量由主题切换 ===== */
+.window{
+  --win-w:560px; --win-h:760px; --ring:236px; --gap:18px;
+  width:100%;height:var(--win-h);position:relative;overflow:hidden;
+  background:var(--bg);color:var(--ink);border-radius:10px;
+  border:1px solid rgba(0,0,0,.16);box-shadow:0 18px 48px rgba(20,26,22,.20);
+  font-family:var(--font-body);transition:background .26s,color .26s,height .24s cubic-bezier(.22,1,.36,1);
+}
+body[data-theme="console"] .window{
+  --bg:#0E1519; --panel:#162127; --panel2:#1B2930; --ink:#E6EEEB; --sub:#93A7A9;
+  --faint:#5A6E72; --line:#26363C; --track:#2B3B42; --accent:#FF7A45;
+  --accent2:#6FD3C7; --accent3:#E8B75D; --on-accent:#14191C;
+  --radius:3px; --shadow:none; --tick:1; --grid:0;
+  --font-display:"IBM Plex Mono","SF Mono",ui-monospace,monospace;
+  --font-body:-apple-system,BlinkMacSystemFont,"PingFang SC",system-ui,sans-serif;
+  --cap:uppercase; --cap-space:.13em; --clock-weight:500;
+}
+body[data-theme="editorial"] .window{
+  --bg:#F7F8F6; --panel:#FCFDFB; --panel2:#F1F3F0; --ink:#161B19; --sub:#5A635E;
+  --faint:#A3ABA4; --line:#DDE2DC; --track:#C9D0C9; --accent:#2C5A8B;
+  --accent2:#4E7A5B; --accent3:#A87A2B; --on-accent:#FCFDFB;
+  --radius:0px; --shadow:none; --tick:0; --grid:0;
+  --font-display:"Noto Serif SC","Songti SC","STSong",Georgia,serif;
+  --font-body:-apple-system,BlinkMacSystemFont,"PingFang SC",system-ui,sans-serif;
+  --cap:none; --cap-space:0em; --clock-weight:400;
+}
+body[data-theme="workshop"] .window{
+  --bg:#ECEBE6; --panel:#F8F7F3; --panel2:#E3E1DA; --ink:#262A27; --sub:#5C605A;
+  --faint:#969990; --line:#C9C7BE; --track:#BDBAAF; --accent:#C04B32;
+  --accent2:#4E7A5B; --accent3:#9A7420; --on-accent:#F8F7F3;
+  --radius:2px; --shadow:none; --tick:0; --grid:1;
+  --font-display:ui-monospace,"SF Mono","JetBrains Mono",Menlo,monospace;
+  --font-body:-apple-system,BlinkMacSystemFont,"PingFang SC",system-ui,sans-serif;
+  --cap:uppercase; --cap-space:.1em; --clock-weight:600;
+}
+body[data-size="440"] .window{--win-h:600px;--ring:168px;--gap:11px}
+body[data-size="500"] .window{--win-h:640px;--ring:196px;--gap:14px}
+body[data-size="560"] .window{--win-h:760px;--ring:236px;--gap:18px}
+
+.titlebar{height:34px;display:flex;align-items:center;gap:8px;padding:0 12px;border-bottom:1px solid var(--line);background:var(--panel)}
+.dots{display:flex;gap:6px}
+.dots i{width:9px;height:9px;border-radius:50%;display:block}
+.dots i:nth-child(1){background:#E0685A}.dots i:nth-child(2){background:#DDB44E}.dots i:nth-child(3){background:#68B57A}
+.titlebar .name{margin-left:8px;font:11px var(--font-display);letter-spacing:.06em;color:var(--sub)}
+.titlebar .sync{margin-left:auto;display:flex;align-items:center;gap:6px;font:10px var(--font-display);letter-spacing:var(--cap-space);text-transform:var(--cap);color:var(--sub)}
+.titlebar .sync i{width:5px;height:5px;border-radius:50%;background:var(--accent2);display:block}
+
+.app{position:relative;height:calc(100% - 34px);display:flex;overflow:hidden}
+.app:before{content:"";position:absolute;inset:0;pointer-events:none;opacity:var(--grid);
+  background-image:linear-gradient(rgba(38,42,39,.055) 1px,transparent 1px),linear-gradient(90deg,rgba(38,42,39,.055) 1px,transparent 1px);
+  background-size:24px 24px}
+
+/* 左侧常驻导航：取代右上角三个孤立图标 */
+.rail{width:60px;flex:none;border-right:1px solid var(--line);background:var(--panel);display:flex;flex-direction:column;align-items:center;padding:14px 0 12px;gap:5px;z-index:3}
+.rail .mark{font:15px var(--font-display);color:var(--accent);letter-spacing:-.04em;margin-bottom:16px;line-height:1}
+.nav{width:44px;height:44px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;border:1px solid transparent;border-radius:var(--radius);background:transparent;color:var(--sub);cursor:pointer;transition:background .18s,color .18s,transform .12s;position:relative}
+.nav:hover{background:var(--panel2);color:var(--ink)}
+.nav:active{transform:scale(.95)}
+.nav:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.nav[aria-current="true"]{background:var(--panel2);color:var(--accent)}
+.nav[aria-current="true"]:before{content:"";position:absolute;left:-8px;top:11px;bottom:11px;width:2px;background:var(--accent)}
+.nav svg{width:17px;height:17px;stroke:currentColor;fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.nav span{font:9px var(--font-display);letter-spacing:.02em}
+.rail .foot{margin-top:auto;display:flex;flex-direction:column;align-items:center;gap:6px;color:var(--faint)}
+.rail .foot i{width:6px;height:6px;border-radius:50%;background:var(--accent2)}
+.rail .foot small{font:8px var(--font-display);letter-spacing:.08em;text-transform:var(--cap)}
+
+.main{flex:1;min-width:0;padding:16px 20px 14px;display:flex;flex-direction:column;gap:var(--gap);overflow:hidden;transition:filter .22s,opacity .22s}
+body[data-panel]:not([data-panel="none"]) .main{filter:saturate(.55);opacity:.46}
+
+.topbar{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+.topbar .date{font:11px var(--font-display);letter-spacing:var(--cap-space);text-transform:var(--cap);color:var(--sub)}
+.topbar .exam{font:11px var(--font-display);color:var(--ink);font-variant-numeric:tabular-nums}
+.topbar .exam b{color:var(--accent);font-weight:600}
+
+/* 阶段条：四段，选中态语义色小面积 */
+.phases{display:flex;gap:5px;align-items:center}
+.phase{flex:1;min-width:0;height:30px;border:1px solid var(--line);border-radius:var(--radius);background:transparent;color:var(--sub);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;font:11px var(--font-body);transition:background .18s,border-color .18s,transform .12s}
+.phase:hover{border-color:var(--sub);color:var(--ink)}
+.phase:active{transform:scale(.97)}
+.phase:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.phase i{width:5px;height:5px;border-radius:50%;background:var(--faint);flex:none}
+.phase em{font:10px var(--font-display);font-style:normal;opacity:.75;font-variant-numeric:tabular-nums}
+.phase[data-on="true"]{border-color:var(--accent);color:var(--ink);background:var(--panel)}
+.phase[data-on="true"] i{background:var(--accent)}
+.phase.rest{flex:0 0 auto;padding:0 11px;border-style:dashed}
+
+.taskline{display:flex;align-items:center;gap:9px;padding:0 2px;cursor:pointer;min-height:26px}
+.taskline .swatch{width:8px;height:8px;border-radius:var(--radius);background:var(--accent2);flex:none}
+.taskline .t{font:13px var(--font-body);color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.taskline .chip{margin-left:auto;font:9px var(--font-display);letter-spacing:var(--cap-space);text-transform:var(--cap);color:var(--sub);border:1px solid var(--line);padding:3px 7px;border-radius:var(--radius);white-space:nowrap}
+
+/* 计时主体：三套主题三种形态 */
+.timer{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;position:relative}
+.ring{width:var(--ring);height:var(--ring);border-radius:50%;position:relative;transition:width .24s cubic-bezier(.22,1,.36,1),height .24s cubic-bezier(.22,1,.36,1),border-radius .26s;
+  background:conic-gradient(from -90deg,var(--accent) 0 var(--p,0%),var(--track) var(--p,0%) 100%)}
+.ring:after{content:"";position:absolute;inset:13px;border-radius:50%;background:var(--bg);transition:border-radius .26s,inset .24s}
+.ring .ticks{position:absolute;inset:0;border-radius:50%;opacity:var(--tick);pointer-events:none;
+  background:repeating-conic-gradient(from 0deg,var(--sub) 0 .45deg,transparent .45deg 6deg);
+  -webkit-mask:radial-gradient(farthest-side,transparent calc(100% - 11px),#000 calc(100% - 10px));
+  mask:radial-gradient(farthest-side,transparent calc(100% - 11px),#000 calc(100% - 10px))}
+.ring .face{position:absolute;inset:0;z-index:2;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;text-align:center}
+.ring .clock{font:var(--clock-weight) clamp(30px,7vw,52px)/1 var(--font-display);letter-spacing:-.05em;color:var(--ink);font-variant-numeric:tabular-nums}
+.ring .state{font:10px var(--font-display);letter-spacing:var(--cap-space);text-transform:var(--cap);color:var(--sub)}
+.ring .hint{font:10px/1.5 var(--font-body);color:var(--faint);max-width:74%}
+/* 主题 B：去环，超大衬线数字 + 细进度线 */
+body[data-theme="editorial"] .timer .ring{display:none}
+.digital{display:none;flex-direction:column;align-items:flex-start;gap:16px;width:100%;padding:0 4px}
+body[data-theme="editorial"] .digital{display:flex}
+.digital .big{font:400 clamp(58px,13vw,98px)/.95 var(--font-display);letter-spacing:-.06em;color:var(--ink);font-variant-numeric:tabular-nums}
+.digital .state{font:11px var(--font-display);letter-spacing:.1em;text-transform:uppercase;color:var(--accent)}
+.digital .bar{height:2px;width:100%;background:var(--track);position:relative}
+.digital .bar i{position:absolute;left:0;top:0;bottom:0;width:var(--p,0%);background:var(--accent);transition:width .3s}
+.digital .hint{font:11px/1.6 var(--font-body);color:var(--sub)}
+/* 主题 C：方形进度框 */
+body[data-theme="workshop"] .timer .ring{border-radius:var(--radius)}
+body[data-theme="workshop"] .timer .ring:after{border-radius:var(--radius)}
+body[data-theme="workshop"] .timer .ring .ticks{display:none}
+
+.controls{display:flex;align-items:center;justify-content:center;gap:9px}
+.btn{height:38px;min-width:88px;padding:0 18px;border:1px solid var(--line);border-radius:var(--radius);background:var(--panel);color:var(--ink);font:12px var(--font-body);cursor:pointer;transition:transform .12s,background .18s,border-color .18s,box-shadow .18s}
+.btn:hover{border-color:var(--accent)}
+.btn:active{transform:scale(.97)}
+.btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.btn.primary{background:var(--ink);color:var(--bg);border-color:var(--ink);min-width:112px;font-weight:600}
+.btn.primary:hover{box-shadow:0 4px 14px rgba(0,0,0,.14)}
+.btn.ghost{min-width:38px;padding:0 11px;color:var(--sub)}
+
+/* 信息区：分区而非堆叠卡片，细线 + 留白 */
+.info{border-top:1px solid var(--line);padding-top:11px;display:flex;flex-direction:column;gap:10px}
+.info .row{display:flex;align-items:baseline;justify-content:space-between;gap:12px}
+.kicker{font:9px var(--font-display);letter-spacing:var(--cap-space);text-transform:var(--cap);color:var(--sub)}
+.info .val{font:13px var(--font-display);color:var(--ink);font-variant-numeric:tabular-nums}
+.info .val b{color:var(--accent);font-weight:600}
+.meter{height:3px;background:var(--track);position:relative;border-radius:var(--radius);overflow:hidden}
+.meter i{position:absolute;inset:0 auto 0 0;width:64%;background:var(--accent)}
+.sub-block{border-top:1px dashed var(--line);padding-top:9px}
+.sub-block .row{margin-bottom:7px}
+.todo{display:flex;align-items:center;gap:8px;padding:4px 0;font:11px var(--font-body);color:var(--ink)}
+.todo .box{width:11px;height:11px;border:1px solid var(--sub);border-radius:var(--radius);flex:none;display:grid;place-items:center;font-size:9px;color:var(--accent2)}
+.todo.done{color:var(--faint);text-decoration:line-through}
+.todo.done .box{border-color:var(--accent2);background:var(--accent2);color:var(--bg)}
+.todo .when{margin-left:auto;font:9px var(--font-display);color:var(--faint);font-variant-numeric:tabular-nums}
+.empty{font:11px/1.6 var(--font-body);color:var(--faint);border:1px dashed var(--line);padding:10px 12px;border-radius:var(--radius)}
+.recent{display:flex;flex-direction:column;gap:5px}
+.recent .r{display:flex;justify-content:space-between;gap:10px;font:10px var(--font-body);color:var(--sub);border-bottom:1px solid var(--line);padding-bottom:4px}
+.recent .r b{color:var(--ink);font:10px var(--font-display);font-variant-numeric:tabular-nums;font-weight:500}
+.more{border:0;background:none;color:var(--accent);font:10px var(--font-body);cursor:pointer;padding:2px 0;align-self:flex-start}
+.more:hover{text-decoration:underline}
+body[data-size="440"] .recent{display:none}
+body[data-size="440"] .compact-hide{display:none}
+
+/* 右侧面板：导航选中后滑入，rail 始终可见 */
+.drawer{position:absolute;top:0;right:0;bottom:0;width:min(316px,72%);background:var(--panel);border-left:1px solid var(--line);z-index:4;
+  transform:translateX(102%);transition:transform .3s cubic-bezier(.22,1,.36,1);display:flex;flex-direction:column;box-shadow:-10px 0 30px rgba(0,0,0,.10)}
+body[data-panel]:not([data-panel="none"]) .drawer{transform:translateX(0)}
+.drawer .dh{height:44px;flex:none;display:flex;align-items:center;gap:10px;padding:0 16px;border-bottom:1px solid var(--line)}
+.drawer .dh h3{margin:0;font:12px var(--font-display);letter-spacing:var(--cap-space);text-transform:var(--cap);color:var(--ink)}
+.drawer .dh button{margin-left:auto;border:1px solid var(--line);background:transparent;color:var(--sub);width:24px;height:24px;border-radius:var(--radius);cursor:pointer;line-height:1}
+.drawer .db{padding:16px;overflow:auto;flex:1;display:flex;flex-direction:column;gap:16px}
+.dsec{display:flex;flex-direction:column;gap:8px}
+.dsec>.kicker{border-bottom:1px solid var(--line);padding-bottom:6px}
+.drow{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid var(--line);font:11px var(--font-body);color:var(--ink)}
+.drow small{font:10px var(--font-display);color:var(--sub);font-variant-numeric:tabular-nums}
+.drow input[type="number"]{width:56px;background:var(--panel2);border:1px solid var(--line);color:var(--ink);border-radius:var(--radius);padding:5px 7px;font:11px var(--font-display)}
+.pill{display:inline-flex;align-items:center;gap:5px;padding:4px 9px;border:1px solid var(--line);border-radius:var(--radius);font:10px var(--font-display);color:var(--sub)}
+.pill[data-on="true"]{border-color:var(--accent);color:var(--accent)}
+.dbars{display:flex;align-items:flex-end;gap:6px;height:76px}
+.dbars i{flex:1;background:var(--track);border-radius:var(--radius) var(--radius) 0 0;position:relative;display:block}
+.dbars i:after{content:"";position:absolute;left:0;right:0;bottom:0;height:var(--h);background:var(--accent2);border-radius:var(--radius) var(--radius) 0 0}
+.dnote{font:10px/1.6 var(--font-body);color:var(--faint)}
+
+/* 反馈：toast */
+.toast{position:absolute;left:50%;bottom:16px;transform:translate(-50%,14px);opacity:0;pointer-events:none;z-index:9;
+  background:var(--ink);color:var(--bg);font:11px var(--font-body);padding:9px 14px;border-radius:var(--radius);transition:opacity .24s,transform .24s}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+
+/* ===== 规格区 ===== */
+.spec{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:26px}
+.card{background:var(--ui-card);border:1px solid var(--ui-line);border-radius:12px;padding:20px 22px}
+.card h2{font-size:15px;margin:0 0 4px;letter-spacing:-.01em}
+.card .sub{font:11px var(--ui-mono);color:var(--ui-sub);margin:0 0 16px}
+.card h3{font-size:12px;margin:18px 0 8px;color:var(--ui-accent);font-weight:600}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th,td{text-align:left;padding:7px 8px;border-bottom:1px solid var(--ui-line);vertical-align:top}
+th{font:10px var(--ui-mono);letter-spacing:.06em;text-transform:uppercase;color:var(--ui-sub);font-weight:500}
+td code{font:11px var(--ui-mono);background:#F0F1EC;padding:1px 5px;border-radius:4px}
+.sw{display:inline-block;width:11px;height:11px;border-radius:3px;vertical-align:-1px;margin-right:6px;border:1px solid rgba(0,0,0,.1)}
+.ok{color:#2F6B43;font-weight:600}.no{color:#B4452F;font-weight:600}
+ul{margin:8px 0 0;padding-left:18px}li{margin:5px 0;font-size:12px;color:var(--ui-sub)}
+li b{color:var(--ui-ink);font-weight:600}
+.note{margin-top:18px;padding:14px 16px;background:#F4F2EA;border:1px solid #E2DCC8;border-left:3px solid #C08A32;border-radius:8px;font-size:12px;color:#5A5547}
+.note b{color:#3A352A}
+footer{margin-top:30px;padding-top:16px;border-top:1px solid var(--ui-line);font:11px var(--ui-mono);color:var(--ui-sub);display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px}
+@media(max-width:860px){.spec{grid-template-columns:1fr}.wrap{padding:24px 16px 60px}}
+@media(prefers-reduced-motion:reduce){*{transition-duration:.01ms!important;animation-duration:.01ms!important}}
+</style>
+</head>
+<body data-theme="console" data-size="560" data-panel="none" data-state="idle">
+
+<div class="wrap">
+  <header class="masthead">
+    <div>
+      <p class="eyebrow">Pinecone / macOS Desktop / Redesign Proposal</p>
+      <h1>松果 · macOS 桌面端重设计提案</h1>
+      <p class="lede">推翻「方案 E 松林手帐」，三套全新视觉语言共用同一套组件树与信息层级。切换下方按钮可实时对比；本页为提案，<b>未改动任何 Flutter 代码</b>。</p>
+    </div>
+    <span class="badge"><i></i>提案稿 · 待选方向 · 2026-11-11</span>
+  </header>
+
+  <div class="toolbar">
+    <div class="group"><span>设计方向</span><div class="segs" id="themeSegs">
+      <button class="seg" data-v="console" aria-pressed="true">A · 深空仪表</button>
+      <button class="seg" data-v="editorial" aria-pressed="false">B · 清晨纸墨</button>
+      <button class="seg" data-v="workshop" aria-pressed="false">C · 暖灰工坊</button>
+    </div></div>
+    <div class="group"><span>会话状态</span><div class="segs" id="stateSegs">
+      <button class="seg" data-v="idle" aria-pressed="true">待开始</button>
+      <button class="seg" data-v="running" aria-pressed="false">专注中</button>
+      <button class="seg" data-v="rest" aria-pressed="false">已收工</button>
+    </div></div>
+    <div class="group"><span>导航面板</span><div class="segs" id="panelSegs">
+      <button class="seg" data-v="none" aria-pressed="true">关闭</button>
+      <button class="seg" data-v="plan" aria-pressed="false">日程</button>
+      <button class="seg" data-v="stats" aria-pressed="false">报告</button>
+      <button class="seg" data-v="settings" aria-pressed="false">设置</button>
+    </div></div>
+    <div class="group"><span>窗口尺寸</span><div class="segs" id="sizeSegs">
+      <button class="seg" data-v="440" aria-pressed="false">440×600</button>
+      <button class="seg" data-v="500" aria-pressed="false">500×640</button>
+      <button class="seg" data-v="560" aria-pressed="true">560×760</button>
+    </div></div>
+  </div>
+
+  <div class="canvas">
+    <div class="win-holder" id="holder">
+    <div class="window" id="win">
+      <div class="titlebar">
+        <div class="dots"><i></i><i></i><i></i></div>
+        <span class="name">松果 · 专注</span>
+        <span class="sync"><i></i>已同步</span>
+      </div>
+      <div class="app">
+        <nav class="rail" aria-label="主导航">
+          <div class="mark">松</div>
+          <button class="nav" data-panel="none" aria-current="true" title="专注">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 7v5l3 2"/></svg><span>专注</span></button>
+          <button class="nav" data-panel="plan" aria-current="false" title="日程">
+            <svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/><path d="M8 4v4M8 10v4M8 16v4"/></svg><span>日程</span></button>
+          <button class="nav" data-panel="stats" aria-current="false" title="报告">
+            <svg viewBox="0 0 24 24"><path d="M5 19V9M12 19V5M19 19v-7"/><path d="M3 19h18"/></svg><span>报告</span></button>
+          <button class="nav" data-panel="settings" aria-current="false" title="设置">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M18.4 5.6L17 7M7 17l-1.4 1.4"/></svg><span>设置</span></button>
+          <div class="foot"><i></i><small>LOCAL</small></div>
+        </nav>
+
+        <main class="main">
+          <div class="topbar">
+            <span class="date">2026 / 11 / 11 · 周三</span>
+            <span class="exam">距 2027 考研初试 <b>38</b> 天</span>
+          </div>
+
+          <div class="phases" id="phases">
+            <button class="phase" data-phase="focus" data-on="true"><i></i>专注 <em>50</em></button>
+            <button class="phase" data-phase="short" data-on="false"><i></i>短休 <em>10</em></button>
+            <button class="phase" data-phase="meal" data-on="false"><i></i>吃饭 <em>40</em></button>
+            <button class="phase rest" data-phase="rest" data-on="false"><i></i>收工</button>
+          </div>
+
+          <div class="taskline" id="taskline" role="button" tabindex="0">
+            <span class="swatch"></span><span class="t">自控原理 · 根轨迹 ch4</span>
+            <span class="chip">事件 · 现控复习</span>
+          </div>
+
+          <section class="timer">
+            <div class="ring">
+              <div class="ticks"></div>
+              <div class="face">
+                <div class="clock" id="clock">50:00</div>
+                <div class="state" id="ringState">准备开始</div>
+                <div class="hint" id="ringHint">选好任务，按开始进入这一轮</div>
+              </div>
+            </div>
+            <div class="digital">
+              <div class="big" id="digitalClock">50:00</div>
+              <div class="state" id="digitalState">准备开始</div>
+              <div class="bar"><i></i></div>
+              <div class="hint" id="digitalHint">选好任务，按开始进入这一轮</div>
+            </div>
+          </section>
+
+          <div class="controls">
+            <button class="btn ghost" id="resetBtn" title="重置">↺</button>
+            <button class="btn primary" id="mainBtn">开始</button>
+            <button class="btn" id="doneBtn">完成</button>
+          </div>
+
+          <section class="info">
+            <div class="row"><span class="kicker">今日专注 / 目标</span><span class="val"><b id="todayMin">0</b> / 200 分钟 · <b id="todayCount">0</b> 番茄</span></div>
+            <div class="meter"><i></i></div>
+            <div class="sub-block">
+              <div class="row"><span class="kicker">今日日程</span><span class="val">2 / 5 <button class="more" data-goto="plan">全部 ›</button></span></div>
+              <div class="todo done"><span class="box">✓</span>线代 880 复盘<span class="when">08:30</span></div>
+              <div class="todo"><span class="box"></span>自控 ch4 课后题<span class="when">14:00</span></div>
+              <div class="todo compact-hide"><span class="box"></span>英语阅读 2019 T2<span class="when">19:30</span></div>
+            </div>
+            <div class="sub-block recent">
+              <div class="row"><span class="kicker">最近完成</span><button class="more" data-goto="stats">全部 ›</button></div>
+              <div class="r"><span>自控原理 · 根轨迹</span><b>1 小时 5 分钟</b></div>
+              <div class="r"><span>880 高数 第 4 章</span><b>50 分钟</b></div>
+            </div>
+          </section>
+        </main>
+
+        <aside class="drawer" id="drawer">
+          <div class="dh"><h3 id="drawerTitle">日程</h3><button id="drawerClose" aria-label="关闭">×</button></div>
+          <div class="db" id="drawerBody"></div>
+        </aside>
+      </div>
+      <div class="toast" id="toast">已保存</div>
+    </div>
+    </div>
+  </div>
+
+  <div class="spec">
+    <section class="card">
+      <h2>设计上下文（请校准）</h2>
+      <p class="sub">Impeccable 要求先确认「为谁设计 / 什么任务 / 什么调性」——以下为从项目文档与既有协作中归纳，非代码推断</p>
+      <table>
+        <tr><th style="width:88px">维度</th><th>归纳</th></tr>
+        <tr><td>使用者</td><td>本人自用，非通用产品：哈工大自动化大三、备考 2027 交大 816；长期熬夜、高压，一天开关窗口十几次</td></tr>
+        <tr><td>使用情境</td><td>macOS 菜单栏常驻的「专注可视化同伴」；窗口 440–600 宽，多数时候只瞥一眼，不做深度操作</td></tr>
+        <tr><td>核心任务</td><td>① 开始 / 暂停 / 完成一轮专注 ② 确认「今天做了多少、接下来做什么」 ③ 到点不自动结束、由用户收口</td></tr>
+        <tr><td>情绪目标</td><td>平静、克制、不催逼；收工要有正反馈（现有收工仪式保留，不重做）</td></tr>
+        <tr><td>反参照</td><td>现有暖米纸 + 20px 圆角 + 柔和投影卡片 + 居中大环；以及紫蓝渐变 / 玻璃拟态 / 发光 / 万物皆卡片</td></tr>
+        <tr><td>待校准</td><td><b>品牌三词？明暗偏好？有无必须保留或回避的颜色？</b>（选方向时一并告诉我即可）</td></tr>
+      </table>
+      <h3>三套方向的差异化定位</h3>
+      <table id="themeTable">
+        <tr><th>方向</th><th>调性</th><th>材质与记忆点</th></tr>
+      </table>
+      <h3>层级与导航改动（三套共用）</h3>
+      <ul>
+        <li><b>常驻左导航</b>取代右上角三个孤立图标：专注 / 日程 / 报告 / 设置，选中态有 2px 语义色标记，新增模块只需加一项</li>
+        <li><b>主窗只回答两件事</b>：这一轮在做什么、今天做了多少；最近完成在 ≤500×640 自动折叠（沿用现有垂直预算分档）</li>
+        <li><b>抽屉覆盖而非挤压</b>：导航始终可见，主区降饱和度作反馈，避免小窗下主内容被挤没</li>
+        <li><b>统一反馈</b>：按压 scale .97、焦点 2px 描边、toast、空态与加载态共用一套组件；无 ripple，尊重减弱动画</li>
+      </ul>
+    </section>
+
+    <section class="card">
+      <h2>当前方向的设计令牌 <span id="tokenName" style="font:11px var(--ui-mono);color:var(--ui-sub)"></span></h2>
+      <p class="sub">对比度由本页实时计算（WCAG 2.1 相对亮度），非估值</p>
+      <h3>色板与对比度</h3>
+      <table id="colorTable"><tr><th>令牌</th><th>色值</th><th>对底对比度</th><th>判定</th></tr></table>
+      <h3>排版 / 几何 / 动效</h3>
+      <table id="typeTable"><tr><th>类别</th><th>规格</th></tr></table>
+      <h3>三处架构冲突与隔离方案</h3>
+      <table>
+        <tr><th>冲突</th><th>事实</th><th>解法</th></tr>
+        <tr><td>色板全局耦合</td><td><code>PineColors</code> 是 <code>static const</code>，全仓 428 处直接引用，<code>main.dart</code> 一次性套到 MaterialApp</td><td>新增<b>桌面令牌作用域</b>（ThemeExtension / InheritedTheme）挂在桌面外壳；桌面读新令牌，手机端继续读原 <code>PineColors</code>，零改动</td></tr>
+        <tr><td>抽屉内容同源</td><td><code>_desktopDrawer()</code> 直接嵌 <code>StatsPage / SettingsPage / PlanPanel</code></td><td>共用组件改为「先查作用域、无则回退原色板」，桌面抽屉自动跟随新视觉，不产生「新外壳 + 旧抽屉」</td></tr>
+        <tr><td>测试锁定</td><td><code>stage_color_test</code> 锁死 PineColors 对比度；<code>desktop_layout_test</code> 锁死 4 档窗口零滚动</td><td>原 <code>theme.dart</code> 一字不改 → 色板测试不动；新布局沿用同一垂直预算分档，补跑布局回归</td></tr>
+      </table>
+      <h3>落地顺序（选定方向后）</h3>
+      <ul>
+        <li>① 新文件 <code>desktop_tokens.dart</code>：三选一令牌 + 间距 / 圆角 / 动效常量（不动 <code>theme.dart</code>）</li>
+        <li>② 共用组件取色适配层：<code>widgets.dart</code> / <code>sheets.dart</code> 加作用域回退</li>
+        <li>③ 重写 <code>home_page.dart</code> 桌面分支：左导航骨架 + 主窗分区 + 抽屉</li>
+        <li>④ 抽屉内三页跟随；统一空态 / toast / 焦点态</li>
+        <li>⑤ <code>dart analyze</code> 零告警 + <code>flutter test</code> 全绿 + 4 档窗口零滚动 + 真机截图，分阶段提交推送</li>
+      </ul>
+    </section>
+  </div>
+
+  <div class="note">
+    <b>关于「只改 macOS」这个前提：</b>双端同源架构下，换色板必然影响手机端，因此本提案采用「桌面专属令牌作用域」隔离——这也是后续手机端换新视觉时可直接复用的扩展点。
+    若你更希望「全局换肤、手机端顺带一起变」，实现更简单（直接改 <code>theme.dart</code>），但会超出本轮选定的范围，且与 <code>stage_color_test</code> 冲突，需要一并改断言。请在选方向时说明。
+  </div>
+
+  <footer><span>Pinecone · macOS Desktop Redesign Proposal · 提案稿，未落地</span><span>UI Designer / 2026-11-11</span></footer>
+</div>
+
+<script>
+(function(){
+  "use strict";
+  var THEMES = {
+    console:{
+      name:"A · 深空仪表", tone:"精密 · 冷静 · 专注",
+      feature:"深墨蓝底、60 格刻度环、1px 细网格分区、等宽大写标签；无任何投影与渐变。适合长时间盯屏，信息密度最高。",
+      colors:[["背景","#0E1519"],["面板","#162127"],["主文字","#E6EEEB"],["次文字","#93A7A9"],["分隔线","#26363C"],["轨道","#2B3B42"],["主强调","#FF7A45"],["次强调","#6FD3C7"],["第三色","#E8B75D"]],
+      type:[["展示字体","IBM Plex Mono / SF Mono（系统等宽）"],["正文字体","-apple-system / PingFang SC"],["字号阶梯","50 / 20 / 13 / 11（4 档）"],["字重","500 / 400（数字等宽 tabular）"],["圆角","3px（近直角）"],["间距","4 / 8 / 16 / 24"],["分层","面板明度差 + 1px 细线，无投影"],["动效","160ms ease-out-quart；抽屉 300ms"],["计时形态","刻度圆环（conic-gradient + 60 格）"]]
+    },
+    editorial:{
+      name:"B · 清晨纸墨", tone:"克制 · 舒展 · 编辑感",
+      feature:"冷白纸、去卡片去圆环，超大衬线数字时钟占半屏 + 一条 2px 进度线；只靠留白与细规则线分区，单一靛蓝强调色。",
+      colors:[["背景","#F7F8F6"],["面板","#FCFDFB"],["主文字","#161B19"],["次文字","#5A635E"],["分隔线","#DDE2DC"],["轨道","#C9D0C9"],["主强调","#2C5A8B"],["次强调","#4E7A5B"],["第三色","#A87A2B"]],
+      type:[["展示字体","Noto Serif SC / Songti SC（衬线）"],["正文字体","-apple-system / PingFang SC"],["字号阶梯","98 / 20 / 13 / 11（强对比 4 档）"],["字重","400（衬线）；标签 500"],["圆角","0px（全硬边）"],["间距","8 / 16 / 24 / 40（大留白）"],["分层","纯留白 + 1px 规则线，无卡片无投影"],["动效","200ms ease-out；仅透明度与进度线"],["计时形态","超大衬线数字 + 极细水平进度线（无环）"]]
+    },
+    workshop:{
+      name:"C · 暖灰工坊", tone:"扎实 · 有序 · 模块化",
+      feature:"24px 网格纸底、硬边矩形、砖红 / 黄铜语义色；计时环改方形进度框，分区靠描边与色块，浅色但不甜。",
+      colors:[["背景","#ECEBE6"],["面板","#F8F7F3"],["主文字","#262A27"],["次文字","#5C605A"],["分隔线","#C9C7BE"],["轨道","#BDBAAF"],["主强调","#C04B32"],["次强调","#4E7A5B"],["第三色","#9A7420"]],
+      type:[["展示字体","SF Mono / JetBrains Mono（系统等宽）"],["正文字体","-apple-system / PingFang SC"],["字号阶梯","50 / 18 / 13 / 11（4 档）"],["字重","600 / 400，标签大写带字距"],["圆角","2px（硬边）"],["间距","4 / 8 / 16 / 24（4pt 网格）"],["分层","24px 网格底 + 1px 描边，无投影"],["动效","160ms ease-out；状态色块切换"],["计时形态","方形进度框（conic-gradient 方角）"]]
+    }
+  };
+  var STATES = {
+    idle:{time:"50:00",p:"0%",state:"准备开始",hint:"选好任务，按开始进入这一轮",btn:"开始",min:"0",count:"0",phase:"focus"},
+    running:{time:"42:18",p:"84%",state:"专注中",hint:"已专注 42 分钟 · 到点不会自动结束",btn:"暂停",min:"205",count:"4",phase:"focus"},
+    rest:{time:"收工",p:"100%",state:"今日收工",hint:"今日 3 小时 25 分 · 4 个番茄 · 连续 12 天",btn:"继续今日",min:"205",count:"4",phase:"rest"}
+  };
+  var PANELS = {
+    plan:{title:"日程",body:'<div class="dsec"><span class="kicker">8 天排程 · 今天</span>'+
+      '<div class="drow"><span>✓ 线代 880 复盘</span><small>08:30</small></div>'+
+      '<div class="drow"><span>自控 ch4 课后题</span><small>14:00</small></div>'+
+      '<div class="drow"><span>英语阅读 2019 T2</span><small>19:30</small></div>'+
+      '<div class="drow"><span>专业课 第 2 章</span><small>21:00</small></div></div>'+
+      '<div class="dsec"><span class="kicker">导入</span><button class="pill" data-on="true">粘贴计划</button>'+
+      '<span class="dnote">8 天窗口一次落好日期；散文 / 网页计划可交给服务端 AI 解析抽成逐条。</span></div>'},
+    stats:{title:"专注报告",body:'<div class="dsec"><span class="kicker">本周 · 今日 205 / 200 分钟</span>'+
+      '<div class="dbars"><i style="--h:38%"></i><i style="--h:62%"></i><i style="--h:45%"></i><i style="--h:80%"></i><i style="--h:56%"></i><i style="--h:92%"></i><i style="--h:70%"></i></div>'+
+      '<div class="drow"><span>本周番茄</span><small>18 / 20 次</small></div>'+
+      '<div class="drow"><span>连续天数</span><small>12 天</small></div>'+
+      '<div class="drow"><span>本月累计</span><small>42 小时 15 分</small></div></div>'+
+      '<div class="dsec"><span class="kicker">事件进展</span><div class="drow"><span>现控复习</span><small>6 小时 · 进行中</small></div>'+
+      '<div class="drow"><span>880 高数</span><small>11 小时 · 进行中</small></div>'+
+      '<div class="empty">本月还没有可回顾的记录时，这里给一句引导，而不是空白。</div></div>'},
+    settings:{title:"设置",body:'<div class="dsec"><span class="kicker">计时与目标</span>'+
+      '<div class="drow"><span>专注时长</span><input type="number" value="50"></div>'+
+      '<div class="drow"><span>短休 / 吃饭</span><small>10 / 40 分钟</small></div>'+
+      '<div class="drow"><span>今日目标</span><input type="number" value="200"></div></div>'+
+      '<div class="dsec"><span class="kicker">考试倒计时</span><div class="drow"><span>2027 考研初试</span><small>38 天</small></div>'+
+      '<span class="dnote">仅存本机，不进云端净荷。</span></div>'+
+      '<div class="dsec"><span class="kicker">云端同步</span><div class="drow"><span>会话实时同步</span><span class="pill" data-on="true">已开启</span></div>'+
+      '<div class="drow"><span>同步码</span><small>已复制</small></div></div>'}
+  };
+
+  function lum(hex){
+    var c=hex.replace("#","");
+    if(c.length===3){c=c[0]+c[0]+c[1]+c[1]+c[2]+c[2];}
+    var v=[0,2,4].map(function(i){var x=parseInt(c.substr(i,2),16)/255;return x<=0.03928?x/12.92:Math.pow((x+0.055)/1.055,2.4);});
+    return 0.2126*v[0]+0.7152*v[1]+0.0722*v[2];
+  }
+  function contrast(a,b){var x=lum(a),y=lum(b);return (Math.max(x,y)+0.05)/(Math.min(x,y)+0.05);}
+
+  var body=document.body, win=document.getElementById("win"), holder=document.getElementById("holder");
+  var toast=document.getElementById("toast"), toastTimer=null;
+  function showToast(msg){
+    toast.textContent=msg;toast.classList.add("show");
+    clearTimeout(toastTimer);toastTimer=setTimeout(function(){toast.classList.remove("show");},1800);
+  }
+  function setAttr(name,v){body.setAttribute("data-"+name,v);}
+  function syncSegs(groupId,attr,val){
+    var g=document.getElementById(groupId);
+    Array.prototype.forEach.call(g.querySelectorAll(".seg"),function(b){
+      b.setAttribute("aria-pressed", b.getAttribute("data-v")===val?"true":"false");
+    });
+  }
+  function bindSegs(groupId,attr,after){
+    var g=document.getElementById(groupId);
+    g.addEventListener("click",function(e){
+      var b=e.target.closest(".seg");if(!b)return;
+      var v=b.getAttribute("data-v");setAttr(attr,v);syncSegs(groupId,attr,v);
+      if(after)after(v);
+    });
+  }
+
+  function renderThemeTable(){
+    var t=document.getElementById("themeTable");
+    var rows="<tr><th>方向</th><th>调性</th><th>材质与记忆点</th></tr>";
+    Object.keys(THEMES).forEach(function(k){var x=THEMES[k];
+      rows+='<tr><td><b>'+x.name+'</b></td><td>'+x.tone+'</td><td>'+x.feature+'</td></tr>';});
+    t.innerHTML=rows;
+  }
+  function renderTokens(key){
+    var x=THEMES[key];
+    document.getElementById("tokenName").textContent="— "+x.name;
+    var bg=x.colors[0][1];
+    var ct="<tr><th>令牌</th><th>色值</th><th>对底对比度</th><th>判定</th></tr>";
+    x.colors.forEach(function(c,i){
+      var r=contrast(c[1],bg), verdict;
+      if(i===0){verdict='<span class="ok">底色基准</span>';}
+      else if(i===4||i===5){verdict='<span class="ok">非文字 / 图形 ≥3.0</span>';}
+      else if(r>=4.5){verdict='<span class="ok">AA 正文 ✓ '+(r>=7?"AAA":"")+'</span>';}
+      else if(r>=3){verdict='<span class="ok">AA 大字 ✓</span>';}
+      else{verdict='<span class="no">不达标</span>';}
+      ct+='<tr><td>'+c[0]+'</td><td><span class="sw" style="background:'+c[1]+'"></span><code>'+c[1]+'</code></td>'+
+          '<td><code>'+r.toFixed(2)+':1</code></td><td>'+verdict+'</td></tr>';
+    });
+    document.getElementById("colorTable").innerHTML=ct;
+    var tt="<tr><th>类别</th><th>规格</th></tr>";
+    x.type.forEach(function(r){tt+='<tr><td>'+r[0]+'</td><td>'+r[1]+'</td></tr>';});
+    document.getElementById("typeTable").innerHTML=tt;
+  }
+  function renderState(v){
+    var s=STATES[v];
+    win.style.setProperty("--p",s.p);
+    ["clock","digitalClock"].forEach(function(id){document.getElementById(id).textContent=s.time;});
+    ["ringState","digitalState"].forEach(function(id){document.getElementById(id).textContent=s.state;});
+    ["ringHint","digitalHint"].forEach(function(id){document.getElementById(id).textContent=s.hint;});
+    document.getElementById("mainBtn").textContent=s.btn;
+    document.getElementById("todayMin").textContent=s.min;
+    document.getElementById("todayCount").textContent=s.count;
+    Array.prototype.forEach.call(document.querySelectorAll(".phase"),function(b){
+      b.setAttribute("data-on",b.getAttribute("data-phase")===s.phase?"true":"false");});
+  }
+  function renderPanel(v){
+    var d=document.getElementById("drawer");
+    if(v==="none"){
+      d.setAttribute("aria-hidden","true");
+    }else{
+      var p=PANELS[v];
+      document.getElementById("drawerTitle").textContent=p.title;
+      document.getElementById("drawerBody").innerHTML=p.body;
+      d.setAttribute("aria-hidden","false");
+    }
+    Array.prototype.forEach.call(document.querySelectorAll(".nav"),function(b){
+      var target=b.getAttribute("data-panel");
+      b.setAttribute("aria-current",target===v||(v==="none"&&target==="none")?"true":"false");});
+  }
+  function renderSize(v){
+    var w={440:440,500:500,560:560}[v];
+    holder.style.setProperty("--win-w",w+"px");
+  }
+
+  bindSegs("themeSegs","theme",function(v){renderTokens(v);});
+  bindSegs("stateSegs","state",function(v){renderState(v);});
+  bindSegs("panelSegs","panel",function(v){renderPanel(v);});
+  bindSegs("sizeSegs","size",function(v){renderSize(v);});
+
+  Array.prototype.forEach.call(document.querySelectorAll(".nav"),function(b){
+    b.addEventListener("click",function(){
+      var v=b.getAttribute("data-panel");setAttr("panel",v);syncSegs("panelSegs","panel",v);renderPanel(v);
+    });
+  });
+  document.getElementById("drawerClose").addEventListener("click",function(){
+    setAttr("panel","none");syncSegs("panelSegs","panel","none");renderPanel("none");
+  });
+  Array.prototype.forEach.call(document.querySelectorAll("[data-goto]"),function(b){
+    b.addEventListener("click",function(){
+      var v=b.getAttribute("data-goto");setAttr("panel",v);syncSegs("panelSegs","panel",v);renderPanel(v);
+    });
+  });
+  Array.prototype.forEach.call(document.querySelectorAll(".phase"),function(b){
+    b.addEventListener("click",function(){
+      var p=b.getAttribute("data-phase");
+      Array.prototype.forEach.call(document.querySelectorAll(".phase"),function(x){x.setAttribute("data-on","false");});
+      b.setAttribute("data-on","true");
+      var map={focus:"focus",short:"short",meal:"meal",rest:"rest"};
+      if(p==="rest"){setAttr("state","rest");syncSegs("stateSegs","state","rest");renderState("rest");showToast("进入收工仪式");}
+      else if(p==="focus"){/* 保持当前会话，点当前段不重置 */}
+      else{showToast(p==="short"?"起身活动一下":"吃饭，慢慢来");}
+      void map;
+    });
+  });
+  document.getElementById("mainBtn").addEventListener("click",function(){
+    var cur=body.getAttribute("data-state");
+    var next=cur==="idle"?"running":(cur==="running"?"idle":"idle");
+    setAttr("state",next);syncSegs("stateSegs","state",next);renderState(next);
+    showToast(next==="running"?"这一轮已开始 · 到点不会自动结束":"已暂停，时间已冻结");
+    if(cur==="rest"){Array.prototype.forEach.call(document.querySelectorAll(".phase"),function(x){x.setAttribute("data-on",x.getAttribute("data-phase")==="focus"?"true":"false");});}
+  });
+  document.getElementById("doneBtn").addEventListener("click",function(){showToast("已落 1 条记录 · 42 分钟");});
+  document.getElementById("resetBtn").addEventListener("click",function(){
+    setAttr("state","idle");syncSegs("stateSegs","state","idle");renderState("idle");showToast("本轮已重置");
+  });
+  document.getElementById("taskline").addEventListener("click",function(){showToast("选择任务 / 绑定专注事件");});
+  document.getElementById("taskline").addEventListener("keydown",function(e){if(e.key==="Enter"||e.key===" ")showToast("选择任务 / 绑定专注事件");});
+  document.addEventListener("keydown",function(e){
+    if(e.key==="Escape"&&body.getAttribute("data-panel")!=="none"){
+      setAttr("panel","none");syncSegs("panelSegs","panel","none");renderPanel("none");
+    }
+  });
+
+  function applyAll(theme,state,panel,size){
+    setAttr("theme",theme);syncSegs("themeSegs","theme",theme);renderTokens(theme);
+    setAttr("state",state);syncSegs("stateSegs","state",state);renderState(state);
+    setAttr("panel",panel);syncSegs("panelSegs","panel",panel);renderPanel(panel);
+    setAttr("size",size);syncSegs("sizeSegs","size",size);renderSize(size);
+  }
+  // 允许用 #theme=editorial&state=running&panel=stats&size=440 直接打开某一组，
+  // 既方便分享某个方向，也让无头浏览器能逐组验证渲染。
+  var initial={theme:"console",state:"idle",panel:"none",size:"560"};
+  var valid={theme:Object.keys(THEMES),state:Object.keys(STATES),
+             panel:["none"].concat(Object.keys(PANELS)),size:["440","500","560"]};
+  if(location.hash.length>1){
+    location.hash.slice(1).split("&").forEach(function(pair){
+      var kv=pair.split("="),k=kv[0],v=kv[1];
+      if(valid[k]&&valid[k].indexOf(v)>=0)initial[k]=v;
+    });
+  }
+  renderThemeTable();
+  applyAll(initial.theme,initial.state,initial.panel,initial.size);
+})();
+</script>
+</body>
+</html>

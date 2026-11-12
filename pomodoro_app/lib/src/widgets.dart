@@ -600,7 +600,8 @@ class _PhaseSegment extends StatelessWidget {
   }
 }
 
-/// 分区标题：松绿竖条 + 标题字，可选右侧补充内容。
+/// 分区标题（V3）：14px 檀褐短横定界 + 宋体标题 + 可选右侧补充内容。
+/// 旧版是 4×14 松绿竖条 + 粗黑体，与素纸装帧线语言不一致。
 class SectionHeader extends StatelessWidget {
   const SectionHeader({super.key, required this.title, this.trailing});
 
@@ -611,22 +612,17 @@ class SectionHeader extends StatelessWidget {
   Widget build(BuildContext context) => Row(
         children: [
           Container(
-            width: 4,
-            height: 14,
+            width: 14,
+            height: 2,
             decoration: BoxDecoration(
-              color: PineColors.pine,
-              borderRadius: BorderRadius.circular(2),
+              color: PineColors.accent,
+              borderRadius: BorderRadius.circular(PineRadius.seal),
             ),
           ),
           const SizedBox(width: 8),
           Text(
             title,
-            style: const TextStyle(
-              color: PineColors.ink,
-              fontSize: 14,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 0,
-            ),
+            style: PineText.serif(size: PineType.label, weight: FontWeight.w500),
           ),
           const Spacer(),
           if (trailing != null) trailing!,

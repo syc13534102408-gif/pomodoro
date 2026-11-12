@@ -10,6 +10,7 @@ import '../src/notifications.dart';
 import '../src/sheets.dart';
 import '../src/storage.dart';
 import '../src/theme.dart';
+import '../src/ui/ui.dart';
 import '../src/widgets.dart';
 
 class SettingsPage extends StatefulWidget {
@@ -572,11 +573,16 @@ class _SettingsPageState extends State<SettingsPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                // V3 危险区独立淡红框：茜红描边 + 淡敷底，与常规分组卡分开。
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: PineColors.tint(PineColors.focus),
-                    borderRadius: BorderRadius.circular(12),
+                    color: PineColors.tint(PineColors.crimson),
+                    border: Border.all(
+                      color: PineColors.crimson.withAlpha(110),
+                      width: 1,
+                    ),
+                    borderRadius: BorderRadius.circular(PineRadius.control),
                   ),
                   child: const Text(
                     '清空后将删除全部专注记录与统计；事件、今日清单、设置与云端备份不受影响。此操作不可撤销。',
@@ -590,21 +596,25 @@ class _SettingsPageState extends State<SettingsPage> {
                   child: OutlinedButton.icon(
                     onPressed: _clearRecords,
                     icon: const Icon(Icons.delete_outline,
-                        size: 18, color: PineColors.focus),
+                        size: 18, color: PineColors.crimson),
                     label: const Text(
                       '清空全部记录',
                       style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w600,
-                        color: PineColors.focus,
+                        color: PineColors.crimson,
                       ),
                     ),
                     style: OutlinedButton.styleFrom(
-                      foregroundColor: PineColors.focus,
+                      foregroundColor: PineColors.crimson,
                       backgroundColor: Colors.transparent,
                       side:
-                          const BorderSide(color: PineColors.focus, width: 1.5),
-                      shape: const StadiumBorder(),
+                          const BorderSide(color: PineColors.crimson, width: 1.5),
+                      shape: const RoundedRectangleBorder(
+                        borderRadius: BorderRadius.all(
+                          Radius.circular(PineRadius.control),
+                        ),
+                      ),
                     ),
                   ),
                 ),
@@ -654,7 +664,8 @@ class _SettingsPageState extends State<SettingsPage> {
               ],
             ),
           ),
-          BrickSwitch(value: value, onChanged: onChanged),
+          // V3 素纸拨子：取代 iOS 胶囊开关，值与回调完全交给调用方。
+          PaperToggle(value: value, onChanged: onChanged),
         ],
       ),
     );

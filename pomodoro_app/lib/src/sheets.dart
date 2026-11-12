@@ -10,7 +10,7 @@ import 'widgets.dart';
 
 typedef DataChanged = void Function(AppData data);
 
-/// 底部弹窗统一把手：44×4 浅色圆角条。
+/// 底部弹窗统一把手：44×4 装帧线色圆角条（沿用既有尺寸，不重做几何）。
 class _SheetHandle extends StatelessWidget {
   const _SheetHandle();
 
@@ -21,8 +21,8 @@ class _SheetHandle extends StatelessWidget {
           height: 4,
           margin: const EdgeInsets.only(bottom: 14),
           decoration: BoxDecoration(
-            color: PineColors.line,
-            borderRadius: BorderRadius.circular(2),
+            color: PineColors.lineStrong,
+            borderRadius: BorderRadius.circular(PineRadius.seal),
           ),
         ),
       );
@@ -55,15 +55,24 @@ class _SheetScaffold extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             const _SheetHandle(),
+            // 卷首 14px 檀褐短横定界（V3 素纸弹层 anatomy）。
+            Container(
+              width: 14,
+              height: 2,
+              decoration: BoxDecoration(
+                color: PineColors.accent,
+                borderRadius: BorderRadius.circular(PineRadius.seal),
+              ),
+            ),
+            const SizedBox(height: 8),
             Row(
               children: [
                 Expanded(
                   child: Text(
                     title,
-                    style: const TextStyle(
-                      color: PineColors.ink,
-                      fontSize: 17,
-                      fontWeight: FontWeight.w700,
+                    style: PineText.serif(
+                      size: PineType.body,
+                      weight: FontWeight.w500,
                     ),
                   ),
                 ),

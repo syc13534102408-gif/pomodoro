@@ -36,6 +36,25 @@
 - 产物：`outputs/松果-v1.3.10-视觉修正-2026-10-25.apk`（19,708,627 B、versionName 1.3.10、
   versionCode 20）、`outputs/pinecore-macos-2026-10-25.zip`（已装到 /Applications）。
 
+## 2026-11-13 · 视觉核对收尾（对照定稿 S1）
+
+把「未验证」里离线可验的部分做掉：重渲染真实手机专注页与桌面三栏，新增
+`test/preview/desktop_wide_preview.dart`（1120×680），并生成
+`outputs/suzhi-v3-vs-design-s1.png` 与定稿并排对比。对照时抓到并修掉 3 处：
+
+- **36px 定界短横被拉成整卡长线**：`SuzhiCard` 外层 Column 是 `stretch`，
+  直接放 `Container(width:36)` 会被强制撑满；改用 `Align(centerLeft)` 保留 36px。
+- **主行动仍是旧墨底**：`BrickButton` 默认色与首页 `_controls` 显式色改为 `accent` 檀褐实底纸字，
+  与定稿「全屏 3–4 处檀褐」一致。
+- **首页多一张 CountdownCard**：与书眉「距考研 N 日」重复，还把「今日达成条」挤出首屏。
+  移除该卡，倒计时编辑入口移到书眉 `FolioBar.onExamTap`（设置页入口仍在）。
+
+预览脚本同步修了字体注册：改用单 face 的 Arial Unicode.ttf（TTC 注册不稳定）、
+加载 MaterialIcons、覆盖 `Ahem/PineTest` 等默认族。**验收**：`dart analyze` 零告警、
+`flutter test` **244 例全绿**。
+**仍未验证**：安卓/macOS 真机观感与宋体回退；离屏预览里不指定字体族的正文仍会显示方块
+（测试环境限制，组件总览 PNG 用显式 `fontFamily` 已证明中文正常）。
+
 ## 2026-11-12 · 「素纸书房」界面重设计落地（P0–P5，分支 feature/ui-suzhi）
 
 设计权威：`outputs/redesign-v3-2026-11-12/01-claude-studio.html` + `design-spec-v3.md`，

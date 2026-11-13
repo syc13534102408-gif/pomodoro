@@ -22,7 +22,8 @@ void main() {
     }
 
     expect(find.text('准备开始'), findsOneWidget);
-    expect(find.text('今日目标'), findsOneWidget);
+    // V3：达成条与「今日专注」合并为一条，标题含目标信息。
+    expect(find.textContaining('今日专注'), findsWidgets);
     expect(find.text('专注'), findsWidgets);
   });
 

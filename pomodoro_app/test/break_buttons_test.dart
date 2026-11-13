@@ -194,7 +194,7 @@ void main() {
         await tester.pumpAndSettle();
         expect(find.text('今天收工了'), findsOneWidget);
         // 仪式里报今日总账
-        expect(find.text('今日专注'), findsOneWidget);
+        expect(find.textContaining('今日专注'), findsWidgets);
         expect(find.text('连续'), findsOneWidget);
 
         await tester.tap(find.text('再学一会儿'));

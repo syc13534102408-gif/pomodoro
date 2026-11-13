@@ -34,6 +34,10 @@ void main() {
         'monospace',
         'Songti SC',
         'STSong',
+        'Source Han Serif SC',
+        'Noto Serif SC',
+        'PingFang SC',
+        'Hiragino Sans GB',
         'serif',
         'SF Mono',
       ]) {

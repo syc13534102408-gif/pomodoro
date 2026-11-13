@@ -52,7 +52,9 @@ void main() {
     await tester.pump();
 
     expect(find.text('1/2'), findsOneWidget);
-    expect(find.byIcon(Icons.check_circle), findsOneWidget);
+    // V3 素纸：勾选框由圆形 Material 图标改为「纸方块 + 檀褐勾」，
+    // 断言跟着换成纸勾选框里那颗 check_rounded（行为断言不变）。
+    expect(find.byIcon(Icons.check_rounded), findsOneWidget);
   });
 
   testWidgets('未来日期的日程不会出现在今日卡，但能打开日程面板看到分组', (tester) async {

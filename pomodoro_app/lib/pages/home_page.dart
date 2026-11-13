@@ -855,10 +855,13 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     return Row(
       children: [
         Expanded(
-          child: PhaseSwitcher(
-            current: current,
-            minutesFor: (mode) => _data.settings.forMode(mode),
-            onChanged: _switchPhase,
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: PhaseTabs(
+              current: current,
+              minutesFor: (mode) => _data.settings.forMode(mode),
+              onChanged: _switchPhase,
+            ),
           ),
         ),
         const SizedBox(width: 8),
@@ -1042,7 +1045,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    _dateHeader(),
                     // 倒计时已并入书眉（可点编辑），这里不再重复一张卡；
                     // 设置页的「考试名称与日期」入口也仍在。
                     if (_isSuspended()) ...[
@@ -1089,8 +1091,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                         ],
                       ),
                     ),
-                    SizedBox(height: gap),
-                    _cumulative(stats),
                     SizedBox(height: gap),
                     _metrics(stats),
                     SizedBox(height: gap),
@@ -1626,6 +1626,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     final planRows = windowHeight < 640
         ? 2
         : (windowHeight < 720 ? 3 : (windowHeight < 800 ? 4 : 5));
+    final planShown = planItems.take(planRows).toList();
     return Container(
       padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
       decoration: BoxDecoration(
@@ -1693,10 +1694,14 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             )
           else
             AnimatedTodoRows(
-              items: planItems.take(planRows).toList(),
+              items: planShown,
               rowHeight: 26,
-              itemBuilder: (item) =>
-                  _planRow(todayKey, item, fontSize: 12),
+              itemBuilder: (item) => _planRow(
+                todayKey,
+                item,
+                fontSize: 12,
+                index: planShown.indexOf(item),
+              ),
             ),
           if (planItems.length > planRows)
             InkWell(
@@ -1844,63 +1849,36 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   );
 
   /// 手机布局顶部：日期（今日语境）+ 右侧松果小标（纸面风格）。
-  Widget _dateHeader() {
-    const week = ['一', '二', '三', '四', '五', '六', '日'];
-    final now = DateTime.now();
-    return SizedBox(
-      height: 28,
-      child: Row(
-        children: [
-          Text(
-            '${now.month}月${now.day}日 周${week[now.weekday - 1]}',
-            style: const TextStyle(color: PineColors.sub, fontSize: 13),
-          ),
-          const Spacer(),
-          Container(
-            width: 16,
-            height: 16,
-            decoration: const BoxDecoration(
-              color: PineColors.pine,
-              shape: BoxShape.circle,
-            ),
-            child: const Center(
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  color: PineColors.paper,
-                  shape: BoxShape.circle,
-                ),
-                child: SizedBox(width: 6, height: 6),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _taskPicker() {
     final task = _data.selectedTask;
-    return BrickCard(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+    // 定稿 anatomy：主题行是手稿卡内的第一行，不再套一层白卡（卡中卡会脏）。
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
       onTap: () => showTaskSheet(context, data: _data, onChanged: _replace),
-      child: Row(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 2),
+        child: Row(
         children: [
-          _TaskSwatch(color: task.swatch, size: 10),
-          const SizedBox(width: 10),
+          _TaskSwatch(color: task.swatch, size: 8),
+          const SizedBox(width: 8),
           Expanded(
             child: Text(
               task.name,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(color: PineColors.ink, fontSize: 14),
+              style: PineText.serif(
+                size: PineType.body,
+                weight: FontWeight.w600,
+              ),
             ),
           ),
           const SizedBox(width: 6),
           // 手机上也要能开/暂停事件：修前这个入口只在桌面舱的任务行里，
           // 安卓端等于"事件只能看不能动"（2026-11-06 补）。
           _eventChip(),
-          const Icon(Icons.chevron_right, size: 18, color: PineColors.sub),
+          const Icon(Icons.chevron_right, size: 18, color: PineColors.ink3),
         ],
+        ),
       ),
     );
   }
@@ -1920,39 +1898,35 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             ? '直接记录'
             : (view.mode.isFocus ? '完成并开始休息' : '结束休息');
 
+    // 定稿 anatomy：一颗檀褐主行动撑宽 + 两颗笺纸描边图标键。
+    // 旧的「金底完成键」在 V3 里已退役——全屏只允许檀褐一个高饱和色。
     return Row(
       children: [
         Expanded(
-          child:             BrickButton(
-              label: primary,
-              icon: session?.running == true
-                  ? Icons.pause_rounded
-                  : Icons.play_arrow_rounded,
-              // V3：主行动是定稿的檀褐实底纸字（全屏 3–4 处檀褐之一），
-              // 旧版 R2 的墨底已退役；阶段语义交给尺规刻度与 caption。
-              color: PineColors.accent,
-              foregroundColor: PineColors.sheet,
-              onPressed: _toggleRun,
-            ),
+          child: CinnabarButton(
+            label: primary,
+            icon: session?.running == true
+                ? Icons.pause_rounded
+                : Icons.play_arrow_rounded,
+            onPressed: _toggleRun,
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          ),
         ),
         const SizedBox(width: 10),
-        // 「完成 / 直接记录」：金底墨字（R2）。
-        BrickButton(
-          label: '',
+        PaperButton(
+          // 定稿里第二键是带文字的「完成」；confirm 的长语义交给读屏。
+          label: '完成',
           semanticLabel: confirm,
-          icon: Icons.check_rounded,
-          color: PineColors.gold,
-          foregroundColor: PineColors.ink,
           onPressed: _confirm,
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         ),
         const SizedBox(width: 10),
-        BrickButton(
+        PaperButton(
           label: '',
-          semanticLabel: '重置（不记录）',
           icon: Icons.restart_alt_rounded,
-          color: PineColors.line,
-          foregroundColor: PineColors.ink,
+          semanticLabel: '重置（不记录）',
           onPressed: _discard,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         ),
       ],
     );
@@ -2004,49 +1978,33 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   Widget _metrics(StatsView stats) {
     final goal = _data.goalMinutes <= 0 ? 1 : _data.goalMinutes;
     final progress = (stats.todayMinutes / goal).clamp(0.0, 1.0);
+    // 定稿 S1 的「今日达成条」：一条横排，不再用三格 MetricTile。
     return _goalCard(
-      BrickCard(
-        padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-        child: Column(
-          children: [
-            SectionHeader(
-              title: '今日目标',
-              trailing: Text(
-                '${stats.todayMinutes.round()} / ${_data.goalMinutes} 分钟 · ${stats.todayCount} 个番茄',
-                style: brickNumberStyle(fontSize: 11, color: PineColors.sub),
-              ),
-            ),
-            const SizedBox(height: 12),
-            BrickProgress(value: progress),
-            const SizedBox(height: 14),
-            Row(
-              children: [
-                Expanded(
-                  child: MetricTile(
-                    value: formatMinutes(stats.todayMinutes),
-                    label: '今日专注',
-                  ),
-                ),
-                Expanded(
-                  child: MetricTile(
-                    value: formatMinutes(stats.weekMinutes),
-                    label: '本周专注',
-                    accent: PineColors.focus,
-                  ),
-                ),
-                Expanded(
-                  child: MetricTile(
-                    value: '${stats.streak} 天',
-                    label: '连续专注',
-                    accent: PineColors.focus,
-                  ),
-                ),
-              ],
-            ),
-          ],
+      Padding(
+        padding: const EdgeInsets.only(bottom: 2),
+        child: LedgerBar(
+          kicker: '今日专注 · 目标 $goal 分',
+          // 定稿用「人话时长」；番茄口径退到右侧 detail（不丢原有计量）。
+          value: formatHoursMinutes(stats.todayMinutes),
+          percent: '${(progress * 100).round()}%',
+          detail: '已落 ${stats.todayCount} 枚番茄 · 尚差 '
+              '${(goal - stats.todayMinutes).clamp(0, 9999).round()} 分',
+          progress: progress.toDouble(),
+          footLeft: '本周 ${formatMinutes(stats.weekMinutes)} · 连续 ${stats.streak} 天',
+          footRight: '今日落账详单',
+          onDetail: _gotoStats,
         ),
       ),
     );
+  }
+
+  /// 达成条右侧「今日落账详单」：手机切到报告页，桌面打开统计抽屉。
+  void _gotoStats() {
+    if (_desktop) {
+      setState(() => _desktopOverlay = _overlayStats);
+    } else {
+      setState(() => _tab = 1);
+    }
   }
 
   Widget _goalCard(Widget child) {
@@ -2071,6 +2029,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     final items = _data.todos[todayKey] ?? const <TodoItem>[];
     final done = items.where((item) => item.done).length;
     const maxRows = 4;
+    final shown = items.take(maxRows).toList();
     return BrickCard(
       padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
       child: Column(
@@ -2131,10 +2090,14 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
           else
             // 勾选后重排要有中间态：固定行高 + AnimatedPositioned 才滑得动。
             AnimatedTodoRows(
-              items: items.take(maxRows).toList(),
+              items: shown,
               rowHeight: 26,
-              itemBuilder: (item) =>
-                  _planRow(todayKey, item, fontSize: 13),
+              itemBuilder: (item) => _planRow(
+                todayKey,
+                item,
+                fontSize: 13,
+                index: shown.indexOf(item),
+              ),
             ),
           if (_planAdding)
             Padding(
@@ -2219,10 +2182,16 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         });
   }
 
-  Widget _planRow(String dayKey, TodoItem item, {double fontSize = 12}) =>
+  Widget _planRow(
+    String dayKey,
+    TodoItem item, {
+    double fontSize = 12,
+    int index = 0,
+  }) =>
       _PlanLine(
         item: item,
         fontSize: fontSize,
+        index: index,
         desktop: _desktop,
         // 勾选即重排：完成的按勾选顺序浮到顶部（见 toggleTodoDone）。
         onToggle: () => _applyTodos((todos) => {
@@ -2306,6 +2275,7 @@ class _PlanLine extends StatelessWidget {
   const _PlanLine({
     required this.item,
     required this.fontSize,
+    required this.index,
     required this.desktop,
     required this.onToggle,
     required this.onEdit,
@@ -2314,7 +2284,14 @@ class _PlanLine extends StatelessWidget {
 
   final TodoItem item;
   final double fontSize;
+
+  /// 当前显示位置（勾选浮顶后会重排），用于「一、二、三」中文序号。
+  final int index;
   final bool desktop;
+
+  static const List<String> _numerals = <String>[
+    '一', '二', '三', '四', '五', '六', '七', '八', '九', '十',
+  ];
   final VoidCallback onToggle;
   final VoidCallback onEdit;
   final VoidCallback onRemove;
@@ -2338,10 +2315,34 @@ class _PlanLine extends StatelessWidget {
         padding: const EdgeInsets.symmetric(vertical: 4),
         child: Row(
           children: [
-            Icon(
-              item.done ? Icons.check_circle : Icons.radio_button_unchecked,
-              size: 16,
-              color: item.done ? PineColors.pine : PineColors.faint,
+            // 稿纸序号：一、二、三……（定稿 S1「今日课业批注」的语言）
+            SizedBox(
+              width: 22,
+              child: Text(
+                '${index < _numerals.length ? _numerals[index] : '${index + 1}'}、',
+                style: PineText.serif(
+                  size: PineType.caption,
+                  color: item.done ? PineColors.ink3 : PineColors.ink2,
+                ),
+              ),
+            ),
+            // 纸勾选框：1px 定界线方框，勾上后檀褐淡敷 + 檀褐勾。
+            Container(
+              width: 15,
+              height: 15,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: item.done ? PineColors.accentSoft : PineColors.sheet,
+                border: Border.all(
+                  color: item.done ? PineColors.accent : PineColors.lineStrong,
+                  width: 1.2,
+                ),
+                borderRadius: BorderRadius.circular(PineRadius.seal),
+              ),
+              child: item.done
+                  ? const Icon(Icons.check_rounded,
+                      size: 11, color: PineColors.accent)
+                  : null,
             ),
             const SizedBox(width: 8),
             Expanded(
@@ -2349,10 +2350,12 @@ class _PlanLine extends StatelessWidget {
                 item.text,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: fontSize,
-                  color: item.done ? PineColors.sub : PineColors.ink,
+                style: PineText.sans(
+                  size: fontSize,
+                  color: item.done ? PineColors.ink3 : PineColors.ink,
+                ).copyWith(
                   decoration: item.done ? TextDecoration.lineThrough : null,
+                  decorationColor: PineColors.accent,
                 ),
               ),
             ),

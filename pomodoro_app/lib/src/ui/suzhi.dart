@@ -5,6 +5,7 @@
 //        字号只取 `PineType` 六档；只做表现层，不持有任何业务状态。
 import 'package:flutter/material.dart';
 
+import '../models.dart';
 import '../theme.dart';
 
 /// 素纸卡片：1px 裁切线 + 顶部 36×2.5 檀褐定界 + 轻纸边影。
@@ -330,8 +331,7 @@ class RuledScale extends StatelessWidget {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                for (var i = 0; i < _ticks; i++)
-                  Expanded(child: _tick(index: i, done: done)),
+                for (var i = 0; i < _ticks; i++) _tick(index: i, done: done),
               ],
             ),
           ),
@@ -360,14 +360,20 @@ class RuledScale extends StatelessWidget {
     } else {
       color = PineColors.inkFaint; // 空刻度
     }
-    return Align(
-      alignment: Alignment.bottomCenter,
-      child: Container(
-        width: isTen ? 3 : 2,
-        height: height,
-        decoration: BoxDecoration(
-          color: color,
-          borderRadius: BorderRadius.circular(1),
+    // 定稿是「界格块」：每格占满 1fr 并留 1.2px 纸缝，5/10 分钟档加高。
+    // 早前用固定 2–3px 宽会渲染成细线，像波形而不是尺规（2026-11-13 修正）。
+    return Expanded(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 1.2),
+        child: Align(
+          alignment: Alignment.bottomCenter,
+          child: Container(
+            height: height,
+            decoration: BoxDecoration(
+              color: color,
+              borderRadius: BorderRadius.circular(1),
+            ),
+          ),
         ),
       ),
     );
@@ -641,12 +647,16 @@ class CinnabarButton extends StatelessWidget {
     required this.label,
     this.onPressed,
     this.icon,
+    this.semanticLabel,
     this.padding = const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
   });
 
   final String label;
   final VoidCallback? onPressed;
   final IconData? icon;
+
+  /// 图标按钮（label 为空）的可访问性文案，读屏与测试靠它定位。
+  final String? semanticLabel;
   final EdgeInsetsGeometry padding;
 
   @override
@@ -654,7 +664,10 @@ class CinnabarButton extends StatelessWidget {
     final enabled = onPressed != null;
     final bg = enabled ? PineColors.accent : PineColors.lineStrong;
     final fg = enabled ? PineColors.sheet : PineColors.ink3;
-    return GestureDetector(
+    return Semantics(
+      label: semanticLabel,
+      button: true,
+      child: GestureDetector(
       onTap: onPressed,
       child: Container(
         padding: padding,
@@ -675,6 +688,7 @@ class CinnabarButton extends StatelessWidget {
           ],
         ),
       ),
+      ),
     );
   }
 }
@@ -687,6 +701,7 @@ class PaperButton extends StatelessWidget {
     this.onPressed,
     this.icon,
     this.selected = false,
+    this.semanticLabel,
     this.padding = const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
   });
 
@@ -694,11 +709,17 @@ class PaperButton extends StatelessWidget {
   final VoidCallback? onPressed;
   final IconData? icon;
   final bool selected;
+
+  /// 图标按钮（label 为空）的可访问性文案。
+  final String? semanticLabel;
   final EdgeInsetsGeometry padding;
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
+    return Semantics(
+      label: semanticLabel,
+      button: true,
+      child: GestureDetector(
       onTap: onPressed,
       child: Container(
         padding: padding,
@@ -728,6 +749,7 @@ class PaperButton extends StatelessWidget {
             ),
           ],
         ),
+      ),
       ),
     );
   }
@@ -1149,6 +1171,90 @@ class SealCalendar extends StatelessWidget {
       crossAxisSpacing: 3,
       childAspectRatio: 1.35,
       children: cells,
+    );
+  }
+}
+
+/// 阶段段选（定稿 anatomy）：宋体字 + 分钟小字 + 选中项底部 2px 檀褐短横。
+/// 语义与 [PhaseSwitcher] 完全一致（`current` 为 null = 今日已收工，全不选中），
+/// 只换视觉载体：不再用胶囊底块。
+class PhaseTabs extends StatelessWidget {
+  const PhaseTabs({
+    super.key,
+    required this.current,
+    required this.minutesFor,
+    required this.onChanged,
+  });
+
+  /// 当前阶段；null = 已收工，三段全部留白（刻意的，不在收工态高亮「专注」）。
+  final SessionMode? current;
+  final int Function(SessionMode mode) minutesFor;
+  final ValueChanged<SessionMode> onChanged;
+
+  static String shortLabel(SessionMode mode) => switch (mode) {
+        SessionMode.focus => '专注',
+        SessionMode.shortBreak => '短休',
+        SessionMode.longBreak => '吃饭',
+      };
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: <Widget>[
+        for (var i = 0; i < SessionMode.values.length; i++) ...<Widget>[
+          if (i > 0) const SizedBox(width: 20),
+          _tab(SessionMode.values[i]),
+        ],
+      ],
+    );
+  }
+
+  Widget _tab(SessionMode mode) {
+    final selected = mode == current;
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => onChanged(mode),
+      child: Padding(
+        padding: const EdgeInsets.only(top: 3, bottom: 2),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.baseline,
+              textBaseline: TextBaseline.alphabetic,
+              children: <Widget>[
+                Text(
+                  shortLabel(mode),
+                  style: PineText.serif(
+                    size: PineType.body,
+                    weight: selected ? FontWeight.w600 : FontWeight.w500,
+                    color: selected ? PineColors.ink : PineColors.ink3,
+                  ),
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  '${minutesFor(mode)}',
+                  style: PineText.mono(
+                    size: PineType.caption,
+                    color: selected ? PineColors.ink2 : PineColors.ink3,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Container(
+              width: 16,
+              height: 2,
+              decoration: BoxDecoration(
+                color: selected ? PineColors.accent : const Color(0x00000000),
+                borderRadius: BorderRadius.circular(PineRadius.seal),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

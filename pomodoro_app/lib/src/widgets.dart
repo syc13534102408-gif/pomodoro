@@ -995,6 +995,20 @@ String formatHoursMinutes(double minutes) {
   return '$h 小时 $m 分钟';
 }
 
+/// 紧凑时长：`185h16m` / `6h40m` / `42m`。
+///
+/// 侧栏、列表这类窄容器里用它 —— `185 小时 16 分钟` 那种全称会把一行撑爆，
+/// 单位重复两次也不好扫读。
+String formatCompactMinutes(double minutes) {
+  final total = minutes.round();
+  if (total <= 0) return '0m';
+  final h = total ~/ 60;
+  final m = total % 60;
+  if (h == 0) return '${m}m';
+  if (m == 0) return '${h}h';
+  return '${h}h${m.toString().padLeft(2, '0')}m';
+}
+
 /// 「大数字 + 小单位」的富文本：单位按 [unitScale] 缩小（默认 0.62）。
 ///
 /// 单位是文字而非图案——2026-10-01 结论见 CHANGELOG：这个尺寸下图案做不好看。

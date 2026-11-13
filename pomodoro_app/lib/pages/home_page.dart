@@ -1226,6 +1226,15 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             children: [
               Text('素纸书房', style: PineText.serif(size: PineType.body)),
               const Spacer(),
+              Container(
+                width: 5,
+                height: 5,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: _mirrorEnabled ? PineColors.celadon : PineColors.ink3,
+                ),
+              ),
+              const SizedBox(width: 4),
               Text(
                 '${now.month}/${now.day} 周${week[now.weekday - 1]}',
                 style: PineText.mono(
@@ -1236,12 +1245,33 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
           const SizedBox(height: 14),
           // 定稿 D1 的左栏主行动：一颗檀褐按钮（这里是「选择任务」，
           // 因为「新建任务」在任务面板里完成，桌面端不必再开一个入口）。
-          CinnabarButton(
-            label: '选择任务',
-            icon: Icons.swap_horiz_rounded,
-            onPressed: () =>
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () =>
                 showTaskSheet(context, data: _data, onChanged: _replace),
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+            child: Container(
+              height: 36,
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              decoration: BoxDecoration(
+                color: PineColors.accent,
+                borderRadius: BorderRadius.circular(PineRadius.control),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.swap_horiz_rounded,
+                      size: 15, color: PineColors.sheet),
+                  const SizedBox(width: 8),
+                  Text(
+                    '选择任务',
+                    style: PineText.serif(
+                      size: PineType.meta,
+                      weight: FontWeight.w600,
+                      color: PineColors.sheet,
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
           const SizedBox(height: 16),
           Text('书房卷目',
@@ -1291,7 +1321,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                       ),
                     ),
                     Text(
-                      formatHoursMinutes(shown[i].value),
+                      formatCompactMinutes(shown[i].value),
                       style: PineText.mono(
                           size: PineType.caption, color: PineColors.ink3),
                     ),
@@ -1340,7 +1370,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                   ),
                 const SizedBox(height: 4),
                 Text(
-                  '历史总计 ${formatHoursMinutes(stats.totalMinutes)} · 连续 ${stats.streak} 日',
+                  '历史 ${formatCompactMinutes(stats.totalMinutes)} · 连续 ${stats.streak} 日',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style:

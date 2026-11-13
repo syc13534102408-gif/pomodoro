@@ -42,7 +42,8 @@ void main() {
 
       // 三栏内容都在，且是素纸组件（不是旧版单列圆环舱）。
       expect(find.text('素纸书房'), findsOneWidget);
-      expect(find.text('日课笺'), findsOneWidget);
+      // 中栏标题按定稿 D1 改为「今日日课与落账手记」。
+      expect(find.textContaining('日课'), findsWidgets);
       expect(find.byType(RuledScale), findsWidgets);
       expect(find.byType(PaperComposer), findsOneWidget);
       // 440×600 路径依赖的功能节点在宽屏同样保留。

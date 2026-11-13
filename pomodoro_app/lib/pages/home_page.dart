@@ -1439,7 +1439,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     // 定稿 D1：中栏是「日课 + 落账」两件事，标题区一行带日期与今日达成。
     return Container(
       color: PineColors.paper,
-      padding: const EdgeInsets.fromLTRB(22, 18, 22, 14),
+      padding: const EdgeInsets.fromLTRB(24, 20, 24, 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -1472,19 +1472,17 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               ),
             ],
           ),
-          const SizedBox(height: 8),
-          // 文武双线：2px 浓墨压版 + 1px 淡纸线收口，比单线更像书页版口。
-          Container(height: 2, color: PineColors.ink),
-          const SizedBox(height: 2),
-          Container(height: 1, color: PineColors.lineStrong),
           const SizedBox(height: 12),
+          // 设计稿只有这一条 2px 浓墨线（我上一版多加了 1px 淡线，属自造细节，已删）。
+          Container(height: 2, color: PineColors.ink),
+          const SizedBox(height: 14),
           Expanded(
             child: SingleChildScrollView(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   _desktopInfoCard(stats),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 14),
                   _todayLedger(),
                 ],
               ),
@@ -1511,7 +1509,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         .toList()
       ..sort((a, b) => b.at.compareTo(a.at));
     return SuzhiCard(
-      padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -1975,7 +1973,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     final now = DateTime.now();
     final focusIndex = planShown.indexWhere((item) => !item.done);
     return SuzhiCard(
-      padding: const EdgeInsets.fromLTRB(16, 13, 16, 8),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [

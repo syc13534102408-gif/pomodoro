@@ -679,13 +679,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   Future<void> _confirm() async {
     final now = DateTime.now();
     final hadRecord = _data.records.length;
-    final session = _data.activeSession;
-    // 这一轮是不是专注：只有专注轮次才需要事后选主题。
-    final focusRound =
-        session != null ? session.mode.isFocus : _data.idleMode.isFocus;
     var next = TimerEngine.advance(_data, now);
     next = TimerEngine.syncMinutes(next, now);
-    String? recordId;
 
     if (next.activeSession == null) {
       if (!next.idleMode.isFocus) return;
@@ -698,9 +693,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       );
       // 与 engine.complete 一致：自动休息固定短休（2026-11-07 起）。
       next = TimerEngine.start(next, SessionMode.shortBreak, now);
-      recordId = next.records.isEmpty ? null : next.records.first.id;
     } else {
-      recordId = next.activeSession!.recordId;
       next = TimerEngine.complete(next, now);
     }
     unawaited(Notifier.cancel());
@@ -711,42 +704,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     // 完成专注（写入了记录）后自动上传，让网页端尽快看到。
     unawaited(_autoSync.afterFocus(context, next));
 
-    // 记完再选主题（2026-11-11）：开始前不必先决定这一步属于谁。
-    if (focusRound && recordId != null) {
-      await _assignTopic(recordId);
-    }
-  }
-
-  /// 完成后的主题归属：默认上次用过的主题，选完写回记录（含事件归属）。
-  Future<void> _assignTopic(String recordId) async {
-    if (!mounted) return;
-    FocusRecord? record;
-    for (final item in _data.records) {
-      if (item.id == recordId) {
-        record = item;
-        break;
-      }
-    }
-    if (record == null) return;
-    final picked = await showTopicSheet(
-      context,
-      data: _data,
-      timeLabel: '${formatHoursMinutes(record.minutes)} · 刚刚完成',
-    );
-    if (picked == null || !mounted) return;
-    var next = TimerEngine.updateRecord(_data, recordId, taskName: picked.name);
-    final index = _data.tasks.indexWhere((task) => task.id == picked.id);
-    if (index >= 0) next = next.copyWith(selectedIndex: index);
-    // 该主题若有进行中的事件，这条记录自动归入（与开始计时时的口径一致）。
-    String? eventId;
-    for (final event in _data.events) {
-      if (event.isRunning && event.taskName == picked.name) {
-        eventId = event.id;
-        break;
-      }
-    }
-    next = TimerEngine.setRecordEvent(next, recordId, eventId);
-    _replace(next);
+    // 任务（主体）在**开始前**就定了：`TimerEngine.start` 已经把 selectedTask
+    // 写进这条记录，所以完成后不再追问「记到哪个」——那一步只会打断落账。
+    // 想改归属就进记录详情改（既有能力，未动）。
   }
 
   void _pulseGoalCard() {
@@ -1000,7 +960,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   }
 
   /// 手机布局 · 专注页（V3 素纸书房）：
-  /// 书眉 48 → 铭文 34 → 手稿页卡（主题 / 64px 活字读数 / 比例尺 / 内嵌今日课业）
+  /// 书眉 48 → 铭文 34 → 手稿页卡（任务 / 64px 活字读数 / 比例尺 / 内嵌今日课业）
   /// → 达成条 → 底部笺纸 Composer（阶段段选 + 三键）→ 书签栏（在 `_page`）。
   ///
   /// 只重排 widget 树：所有既有功能节点（`_taskPicker` / `_planCard` / `_phaseRow` /
@@ -1292,13 +1252,13 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               ),
             ],
           ),
-          // 事件徽标只出现在右侧手稿画布的主题行（`_taskPicker`），侧栏不再重复一份：
+          // 事件徽标只出现在右侧手稿画布的任务行（`_taskPicker`），侧栏不再重复一份：
           // 两处同时渲染会让「暂停事件仍可点开」的 findsOneWidget 断言拿到 2 个。
           const SizedBox(height: 18),
-          Text('专注主题卷宗',
+          Text('专注任务',
               style: PineText.serif(size: PineType.label, color: PineColors.ink2)),
           const SizedBox(height: 6),
-          Text('按主题累计 · 八日排程',
+          Text('按任务累计 · 八日排程',
               style: PineText.sans(size: PineType.caption, color: PineColors.ink3)),
           const Spacer(),
           Text(
@@ -1974,7 +1934,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   /// 手机布局顶部：日期（今日语境）+ 右侧松果小标（纸面风格）。
   Widget _taskPicker() {
     final task = _data.selectedTask;
-    // 定稿 anatomy：主题行是手稿卡内的第一行，不再套一层白卡（卡中卡会脏）。
+    // 定稿 anatomy：任务行是手稿卡内的第一行，不再套一层白卡（卡中卡会脏）。
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: () => showTaskSheet(context, data: _data, onChanged: _replace),
@@ -1999,7 +1959,19 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
           // 手机上也要能开/暂停事件：修前这个入口只在桌面舱的任务行里，
           // 安卓端等于"事件只能看不能动"（2026-11-06 补）。
           _eventChip(),
-          const Icon(Icons.chevron_right, size: 18, color: PineColors.ink3),
+          // 桌面有宽度：把「这里能换任务」说出来，别只靠一个箭头。
+          // 任务在开始前就该定好（开始时即写进记录），所以入口要显眼。
+          if (_desktop) ...[
+            const SizedBox(width: 4),
+            Text(
+              '更换',
+              style: PineText.serif(
+                  size: PineType.caption, color: PineColors.ink3),
+            ),
+            const SizedBox(width: 2),
+            const Icon(Icons.chevron_right, size: 14, color: PineColors.ink3),
+          ] else
+            const Icon(Icons.chevron_right, size: 18, color: PineColors.ink3),
         ],
         ),
       ),

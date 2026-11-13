@@ -836,13 +836,7 @@ class _MonthlyReviewState extends State<_MonthlyReview> {
       byTask[record.taskName] = (byTask[record.taskName] ?? 0) + record.minutes;
     }
     // 格内数字 = 当日番茄当量（按当日总分钟换算，非记录条数）。
-    final dayCounts = [
-      for (final m in dayValues) pomodoroEquiv(m),
-    ];
     final monthName = '${target.year}年${target.month}月';
-    final tasks = byTask.entries.toList()
-      ..sort((a, b) => b.value.compareTo(a.value));
-    final taskPeak = tasks.isEmpty ? 1.0 : tasks.first.value;
 
     final isCurrentMonth = _monthOffset == 0;
     return BrickCard(
@@ -934,41 +928,30 @@ class _MonthlyReviewState extends State<_MonthlyReview> {
               ),
             ],
           ),
-          const SizedBox(height: 10),
-          // 抽屉/宽窗里 7 列会被拉到 60pt+ 一格，限宽居中后格子回到 40 上下。
+          const SizedBox(height: 12),
+          // 全页只留一张日历：旧的 7 列自绘月历与独立「钤印日历」是同一件事，
+          // 并存看着乱。合并成「指标 + 翻月 + 钤印历」一块，翻月箭头同时管两者
+          //（历史月回看保留）；按科目构成交给上面的近七日水墨谱，不再重复。
           Center(
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 380),
-              child: _MonthGrid(
-                year: target.year,
-                month: target.month,
-                dayValues: dayValues,
-                dayCounts: dayCounts,
-                todayDay: isCurrentMonth ? statNow.day : null,
+              child: SealCalendar(
+                daysInMonth: daysInMonth,
+                firstWeekday: DateTime(target.year, target.month, 1).weekday,
+                dayMinutes: <int, double>{
+                  for (var d = 1; d <= daysInMonth; d++) d: dayValues[d - 1],
+                },
+                today: isCurrentMonth ? statNow.day : -1,
               ),
             ),
           ),
-          if (tasks.isNotEmpty) ...[
-            const SizedBox(height: 18),
-            Text(
-              '$monthName 按事件',
-              style: const TextStyle(color: PineColors.sub, fontSize: 11),
-            ),
+          if (minutes <= 0) ...[
             const SizedBox(height: 10),
-            for (final entry in tasks) ...[
-              _TaskBar(
-                name: entry.key,
-                minutes: entry.value,
-                max: taskPeak,
-                color: _colorFor(entry.key),
+            const Center(
+              child: Text(
+                '本月还没有专注记录',
+                style: TextStyle(color: PineColors.sub, fontSize: 12),
               ),
-              const SizedBox(height: 10),
-            ],
-          ] else ...[
-            const SizedBox(height: 14),
-            const Text(
-              '本月还没有专注记录',
-              style: TextStyle(color: PineColors.sub, fontSize: 12),
             ),
           ],
         ],
@@ -976,209 +959,10 @@ class _MonthlyReviewState extends State<_MonthlyReview> {
     );
   }
 
-  Color _colorFor(String taskName) {
-    for (final task in widget.data.tasks) {
-      if (task.name == taskName) return task.swatch;
-    }
-    return PineColors.sub;
-  }
 }
 
 /// 月历打卡格：7 列（周一为第一列），每月首日按实际星期对齐；
 /// 底色 = 当日专注分钟（松绿色阶），格内数字 = 当日番茄数，今日带松绿描边。
-class _MonthGrid extends StatelessWidget {
-  const _MonthGrid({
-    required this.year,
-    required this.month,
-    required this.dayValues,
-    required this.dayCounts,
-    required this.todayDay,
-  });
-
-  final int year;
-  final int month;
-  final List<double> dayValues;
-  final List<int> dayCounts;
-
-  /// 今日的日号；回看历史月份时为 null（不标"今"）。
-  final int? todayDay;
-
-  static const List<String> _week = ['一', '二', '三', '四', '五', '六', '日'];
-
-  /// V3 檀褐离散色阶（4 档）：一律由令牌派生，页面不再出现十六进制色值。
-  /// 档间明度差拉开到人眼可辨，最深档配纸白字。
-  static final List<Color> _ramp = <Color>[
-    PineColors.accentSoft, // 1 档 · 淡敷（有记录）
-    PineColors.accent.withAlpha(140), // 2 档
-    PineColors.accent, // 3 档 · 檀褐
-    PineColors.accentDeep, // 4 档 · 深笔（配纸白字）
-  ];
-
-  /// 时长 → 档位（0 = 无记录）。桶宽大致对齐 25/50 分钟番茄节奏，
-  /// 让「1 档≈1 个番茄」这类直觉成立。
-  int _step(double minutes) {
-    if (minutes <= 0) return 0;
-    if (minutes <= 45) return 1;
-    if (minutes <= 135) return 2;
-    if (minutes <= 240) return 3;
-    return 4;
-  }
-
-  Color _level(double minutes) {
-    final s = _step(minutes);
-    return s == 0 ? Colors.transparent : _ramp[s - 1];
-  }
-
-  /// 深档（3、4 档，底接近/深于松绿）用白字 + 纸白描边；
-  /// 浅档与空档用墨字 + 松绿描边，保证今日标记在两种底上都可读。
-  bool _deep(double minutes) => _step(minutes) >= 3;
-
-  @override
-  Widget build(BuildContext context) {
-    final firstWeekday = DateTime(year, month, 1).weekday; // 1..7（周一起）
-    final daysInMonth = DateTime(year, month + 1, 0).day;
-
-    Widget cell(int? day) {
-      if (day == null) {
-        return const SizedBox(height: 30);
-      }
-      final minutes = dayValues[day - 1];
-      final count = dayCounts[day - 1];
-      final isToday = day == todayDay;
-      return Container(
-        height: 30,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: _level(minutes),
-          borderRadius: BorderRadius.circular(7),
-          border: isToday
-              ? Border.all(
-                  color: _deep(minutes) ? PineColors.card : PineColors.pine,
-                  width: 1.5,
-                )
-              : null,
-        ),
-        child: Text(
-          '$count',
-          style: TextStyle(
-            fontFamily: 'monospace',
-            fontSize: 11,
-            fontWeight: isToday ? FontWeight.w700 : FontWeight.w500,
-            color: _deep(minutes)
-                ? PineColors.card
-                : (count > 0 ? PineColors.ink : PineColors.sub),
-            fontFeatures: kNumericFont,
-          ),
-        ),
-      );
-    }
-
-    final cells = <Widget>[
-      for (var i = 1; i < firstWeekday; i++) cell(null),
-      for (var day = 1; day <= daysInMonth; day++) cell(day),
-    ];
-    while (cells.length % 7 != 0) {
-      cells.add(const SizedBox(height: 30));
-    }
-
-    final rows = <Widget>[];
-    for (var start = 0; start < cells.length; start += 7) {
-      rows.add(Row(
-        children: [
-          for (final c in cells.skip(start).take(7)) ...[
-            Expanded(
-                child: Padding(padding: const EdgeInsets.all(1.5), child: c)),
-          ],
-        ],
-      ));
-    }
-
-    return Column(
-      children: [
-        Row(
-          children: [
-            const Spacer(),
-            for (var i = 0; i < _ramp.length; i++)
-              Container(
-                width: 11,
-                height: 11,
-                margin: EdgeInsets.only(left: i == 0 ? 0 : 4),
-                decoration: BoxDecoration(
-                  color: _ramp[i],
-                  borderRadius: BorderRadius.circular(3),
-                ),
-              ),
-            const SizedBox(width: 6),
-            const Text(
-              '时长少 → 多',
-              style: TextStyle(color: PineColors.sub, fontSize: 10),
-            ),
-          ],
-        ),
-        const SizedBox(height: 6),
-        Row(
-          children: [
-            for (final w in _week)
-              Expanded(
-                child: Center(
-                  child: Text(
-                    w,
-                    style: const TextStyle(color: PineColors.sub, fontSize: 10),
-                  ),
-                ),
-              ),
-          ],
-        ),
-        const SizedBox(height: 2),
-        ...rows,
-      ],
-    );
-  }
-}
-
-class _TaskBar extends StatelessWidget {
-  const _TaskBar({
-    required this.name,
-    required this.minutes,
-    required this.max,
-    required this.color,
-  });
-
-  final String name;
-  final double minutes;
-  final double max;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    final ratio = max <= 0 ? 0.0 : (minutes / max).clamp(0.0, 1.0);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Expanded(
-              child: Text(
-                name,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(color: PineColors.ink, fontSize: 13),
-              ),
-            ),
-            const SizedBox(width: 8),
-            MinutesText(
-              minutes,
-              style: brickNumberStyle(fontSize: 12, color: PineColors.sub),
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        BrickProgress(value: ratio, color: color),
-      ],
-    );
-  }
-}
-
-
 /// 月切换箭头按钮（‹ ›）：enabled=false 时降为浅色不可点。
 class _MonthArrow extends StatelessWidget {
   const _MonthArrow({

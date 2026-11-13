@@ -1239,7 +1239,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         SizedBox(
           key: const ValueKey('study-canvas'),
           width: 420,
-          child: _studyCanvas(session, displayView, resting),
+          child: _studyCanvas(session, displayView, resting, stats),
         ),
       ],
     );
@@ -1262,15 +1262,11 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
           const SizedBox(height: 18),
           Text('八日排程',
               style: PineText.serif(size: PineType.label, color: PineColors.ink2)),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 6,
-            runSpacing: 6,
-            children: [
-              for (var i = 7; i >= 0; i--)
-                _dateSeal(now.subtract(Duration(days: i)), today: i == 0),
-            ],
-          ),
+          const SizedBox(height: 6),
+          // 竖排目录行：周几 + 月/日 + 有记录的小点；今日整行檀褐。
+          // 原来是 8 个 42×26 方块，像表格按钮，和下面的卷宗列表也不是一套语言。
+          for (var i = 7; i >= 0; i--)
+            _dateRow(now.subtract(Duration(days: i)), today: i == 0),
           const SizedBox(height: 18),
           Text('卷宗',
               style: PineText.serif(size: PineType.label, color: PineColors.ink2)),
@@ -1319,24 +1315,56 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     );
   }
 
-  Widget _dateSeal(DateTime date, {required bool today}) {
+  /// 八日排程的一行：`周三 11/6 ····· ●`。今日整行檀褐、字反白；
+  /// 右侧小点＝当天有记录（≥50 分钟用实心，不足用淡敷）。
+  Widget _dateRow(DateTime date, {required bool today}) {
+    const week = ['一', '二', '三', '四', '五', '六', '日'];
+    final key = ymdOf(dayStart(date));
+    final minutes = _data.records
+        .where((r) => r.counted && r.dayKey == key)
+        .fold<double>(0, (sum, r) => sum + r.minutes);
     return Container(
-      width: 42,
-      height: 26,
-      alignment: Alignment.center,
+      height: 27,
+      margin: const EdgeInsets.only(bottom: 1),
+      padding: const EdgeInsets.symmetric(horizontal: 8),
       decoration: BoxDecoration(
-        color: today ? PineColors.accent : PineColors.sheet,
-        border: Border.all(
-          color: today ? PineColors.accentDeep : PineColors.lineStrong,
-        ),
+        color: today ? PineColors.accent : Colors.transparent,
         borderRadius: BorderRadius.circular(PineRadius.seal),
       ),
-      child: Text(
-        '${date.month}/${date.day}',
-        style: PineText.mono(
-          size: PineType.caption,
-          color: today ? PineColors.sheet : PineColors.ink2,
-        ),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 30,
+            child: Text(
+              today ? '今日' : '周${week[date.weekday - 1]}',
+              style: PineText.serif(
+                size: PineType.meta,
+                color: today ? PineColors.sheet : PineColors.ink3,
+              ),
+            ),
+          ),
+          Text(
+            '${date.month}/${date.day}',
+            style: PineText.mono(
+              size: PineType.caption,
+              color: today ? PineColors.sheet : PineColors.ink2,
+            ),
+          ),
+          const Spacer(),
+          if (minutes > 0)
+            Container(
+              width: 5,
+              height: 5,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: today
+                    ? PineColors.sheet
+                    : (minutes >= 50
+                        ? PineColors.accent
+                        : PineColors.accentSoft),
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -1369,8 +1397,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 children: [
                   _desktopInfoCard(stats),
                   const SizedBox(height: 10),
-                  _cumulative(stats),
-                  const SizedBox(height: 10),
+                  // 累计不在这里重复：左栏底部已经是同一组数（第 N 日 · 连续 N 日）。
                   _recent(),
                 ],
               ),
@@ -1382,7 +1409,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             sealText: '今日收工',
             onSeal: resting ? _resumeToday : _openRestCeremony,
             phases: _phaseRow(),
-            actions: _controls(session, view, suspended: _data.activeSession),
+            actions: const SizedBox.shrink(),
           ),
         ],
       ),
@@ -1393,17 +1420,32 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     ActiveSession? session,
     SessionView view,
     bool resting,
+    StatsView stats,
   ) {
+    final todayKey = ymdOf(dayStart(DateTime.now()));
+    final plan = _data.todos[todayKey] ?? const <TodoItem>[];
+    final pending = plan.where((item) => !item.done).toList();
+    final goal = _data.goalMinutes <= 0 ? 1 : _data.goalMinutes;
+    final ratio = (stats.todayMinutes / goal).clamp(0.0, 1.0);
+    final primary =
+        session == null ? '开始' : (session.running ? '暂停' : '继续');
     return Container(
       color: PineColors.paper,
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 18),
       child: SizedBox.expand(
-        child: SuzhiCard(
-          child: Column(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            // SuzhiCard 的 Column 是 mainAxisSize.min：直接塞 Spacer 会拿到无界高度
+            // （RenderFlex unbounded 断言）。显式给内容一个高度，主控组才能贴底。
+            final inner = (constraints.maxHeight - 44).clamp(280.0, 2000.0);
+            return SuzhiCard(
+          child: SizedBox(
+            height: inner,
+            child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               _taskPicker(),
-              const SizedBox(height: 20),
+              const SizedBox(height: 16),
               PaperClockDigits(
                 timeText: resting ? '收工' : view.clockText,
                 caption: _caption(session, view),
@@ -1413,29 +1455,109 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                     : null,
                 overtime: !resting && view.targetReached,
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 18),
               RuledScale(
                 progress: resting ? 1 : view.progress,
                 targetMinutes: view.plannedSeconds ~/ 60,
                 meta: '尺规进度 · 已历 ${view.elapsedSeconds ~/ 60} 分',
               ),
               const SizedBox(height: 14),
+              // 今日番茄序列：一格一番，已完成实心、进行中描边。
+              Row(
+                children: [
+                  Text(
+                    '今日 ${stats.todayCount} 番',
+                    style: PineText.serif(
+                        size: PineType.meta, color: PineColors.ink2),
+                  ),
+                  const SizedBox(width: 10),
+                  for (var i = 0; i < 6; i++)
+                    Container(
+                      width: 9,
+                      height: 9,
+                      margin: const EdgeInsets.only(right: 4),
+                      decoration: BoxDecoration(
+                        color: i < stats.todayCount
+                            ? PineColors.accent
+                            : (i == stats.todayCount
+                                ? PineColors.accentSoft
+                                : Colors.transparent),
+                        border: Border.all(
+                          color: i <= stats.todayCount
+                              ? PineColors.accent
+                              : PineColors.lineStrong,
+                          width: 1,
+                        ),
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  const Spacer(),
+                  Text(
+                    '${(ratio * 100).round()}%',
+                    style: PineText.mono(
+                        size: PineType.caption, color: PineColors.accent),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Text(
+                pending.isEmpty
+                    ? '今日课业已清空 · 可以直接开工'
+                    : '今日还剩 ${pending.length} 条课业 · 满 ${view.plannedSeconds ~/ 60} 分记一番',
+                style: PineText.serif(
+                    size: PineType.caption, color: PineColors.ink3),
+              ),
+              const Spacer(),
+              // 主控三键（定稿 D1：主行动在专注舱内，中栏 Composer 只留阶段段选）
               Row(
                 children: [
                   Expanded(
+                    flex: 3,
                     child: CinnabarButton(
-                      label: '完成',
-                      onPressed: () => _confirm(),
+                      label: primary,
+                      icon: session?.running == true
+                          ? Icons.pause_rounded
+                          : Icons.play_arrow_rounded,
+                      onPressed: _toggleRun,
+                      padding:
+                          const EdgeInsets.symmetric(horizontal: 12, vertical: 13),
                     ),
                   ),
                   const SizedBox(width: 8),
                   Expanded(
-                    child: PaperButton(label: '重置', onPressed: _discard),
+                    flex: 2,
+                    child: PaperButton(
+                      label: '完成',
+                      semanticLabel: '完成并落账',
+                      onPressed: _confirm,
+                      padding:
+                          const EdgeInsets.symmetric(horizontal: 8, vertical: 13),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  PaperButton(
+                    label: '',
+                    icon: Icons.restart_alt_rounded,
+                    semanticLabel: '重置（不记录）',
+                    onPressed: _discard,
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
                   ),
                 ],
               ),
+              const SizedBox(height: 8),
+              Center(
+                child: Text(
+                  'Space 启停 · R 重置 · Esc 关闭抽屉',
+                  style: PineText.mono(
+                      size: PineType.caption, color: PineColors.ink3),
+                ),
+              ),
             ],
           ),
+          ),
+            );
+          },
         ),
       ),
     );
@@ -1930,49 +2052,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         ),
       ],
-    );
-  }
-
-  /// 全部历史累计：只增不减的那三个数，紧贴主按钮下方。
-  Widget _cumulative(StatsView stats) {
-    if (stats.totalMinutes < 1) return const SizedBox.shrink();
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-      decoration: BoxDecoration(
-        color: PineColors.paper,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: PineColors.line, width: 1),
-      ),
-      child: Row(
-        children: [
-          const Text(
-            '累计',
-            style: TextStyle(
-              fontSize: 11,
-              color: PineColors.sub,
-              letterSpacing: .06,
-            ),
-          ),
-          const SizedBox(width: 8),
-          Text(
-            formatHoursMinutes(stats.totalMinutes),
-            style: const TextStyle(
-              fontSize: 14,
-              color: PineColors.ink,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const Spacer(),
-          Text(
-            '第 ${stats.totalDays} 天 · ${stats.totalTomatoes} 番茄',
-            style: const TextStyle(
-              fontSize: 10.5,
-              color: PineColors.sub,
-              letterSpacing: .02,
-            ),
-          ),
-        ],
-      ),
     );
   }
 

@@ -1429,16 +1429,24 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                   style: PineText.serif(size: 22, weight: FontWeight.w600),
                 ),
               ),
-              Text(
-                '今日已修 ${formatHoursMinutes(stats.todayMinutes)} ($pct%)',
-                style: PineText.serif(
-                    size: PineType.meta, color: PineColors.ink2),
+              const SizedBox(width: 10),
+              // 定稿：两个描边胶囊 —— 今日达成用檀褐，收工用纸灰。
+              _OutlinePill(
+                text: '今日 ${formatHoursMinutes(stats.todayMinutes)} · $pct%',
+                accent: true,
+              ),
+              const SizedBox(width: 6),
+              _OutlinePill(
+                text: resting ? '继续今日' : '今日收工',
+                onTap: resting ? _resumeToday : _openRestCeremony,
               ),
             ],
           ),
           const SizedBox(height: 8),
-          // 定稿用一条 2px 浓墨横线压住标题区，比卡片堆叠干净得多。
+          // 文武双线：2px 浓墨压版 + 1px 淡纸线收口，比单线更像书页版口。
           Container(height: 2, color: PineColors.ink),
+          const SizedBox(height: 2),
+          Container(height: 1, color: PineColors.lineStrong),
           const SizedBox(height: 12),
           Expanded(
             child: SingleChildScrollView(
@@ -1482,7 +1490,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               Text(
                 '今日已落账记录（${items.length} 条）',
                 style: PineText.serif(
-                    size: PineType.label, color: PineColors.ink2),
+                    size: PineType.body, weight: FontWeight.w600),
               ),
               const Spacer(),
               GestureDetector(
@@ -1507,38 +1515,44 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               ),
             )
           else
-            for (var i = 0; i < items.length && i < 4; i++)
-              Container(
-                padding: const EdgeInsets.symmetric(vertical: 6),
-                decoration: const BoxDecoration(
-                  border: Border(
-                      bottom: BorderSide(color: PineColors.line, width: 1)),
-                ),
+            for (var i = 0; i < items.length && i < 4; i++) ...[
+              if (i > 0) const DashedRule(),
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 9),
                 child: Row(
                   children: [
                     Text(
                       '${items[i].at.hour.toString().padLeft(2, '0')}:'
                       '${items[i].at.minute.toString().padLeft(2, '0')}',
                       style: PineText.mono(
-                          size: PineType.caption, color: PineColors.ink2),
+                        size: PineType.body,
+                        color: PineColors.ink,
+                      ).copyWith(fontWeight: FontWeight.w700),
                     ),
-                    const SizedBox(width: 10),
+                    Text(
+                      ' · ',
+                      style: PineText.serif(
+                          size: PineType.body, color: PineColors.ink3),
+                    ),
                     Expanded(
                       child: Text(
                         items[i].taskName,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: PineText.serif(size: PineType.meta),
+                        style: PineText.serif(size: PineType.body),
                       ),
                     ),
                     Text(
                       formatHoursMinutes(items[i].minutes),
-                      style: PineText.mono(
-                          size: PineType.caption, color: PineColors.ink2),
+                      style: PineText.serif(
+                        size: PineType.body,
+                        color: PineColors.ink2,
+                      ),
                     ),
                   ],
                 ),
               ),
+            ],
           if (items.length > 4)
             Padding(
               padding: const EdgeInsets.only(top: 6),
@@ -1920,129 +1934,201 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   /// 「最近完成」整块移到统计抽屉：主窗只回答两件事——接下来做什么、今天做了多少。
   /// 这样日程从 1 行入口变成 3 行可勾清单，而总高度反而略降（最近完成块曾占 2 行 + 表头）。
   Widget _desktopInfoCard(StatsView stats) {
-    final goal = _data.goalMinutes <= 0 ? 1 : _data.goalMinutes;
-    final todayRatio = (stats.todayMinutes / goal).clamp(0.0, 1.0);
     final todayKey = ymdOf(dayStart(DateTime.now()));
     final planItems = _data.todos[todayKey] ?? const <TodoItem>[];
-    final planDone = planItems.where((item) => item.done).length;
-    // 日程行数按窗高分档：440×600 → 2、500×640 → 3、560×720 → 4、≥800 → 5
-    // （超出折叠成「还有 N 条 ›」）。默认窗 560×760 落在 4 条档。
     final windowHeight = MediaQuery.sizeOf(context).height;
+    final dense = MediaQuery.sizeOf(context).width < 720;
     final planRows = windowHeight < 640
         ? 2
         : (windowHeight < 720 ? 3 : (windowHeight < 800 ? 4 : 5));
     final planShown = planItems.take(planRows).toList();
-    return Container(
-      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-      decoration: BoxDecoration(
-        color: PineColors.card,
-        borderRadius: BorderRadius.circular(Paper.cardRadius),
-        boxShadow: Paper.shadow,
-      ),
+    final now = DateTime.now();
+    final focusIndex = planShown.indexWhere((item) => !item.done);
+    return SuzhiCard(
+      padding: const EdgeInsets.fromLTRB(16, 13, 16, 8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Row(
             children: [
-              const Text(
-                '今日日程',
-                style: TextStyle(
-                    color: PineColors.ink,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600),
-              ),
-              const Spacer(),
-              if (planItems.isNotEmpty)
-                Text(
-                  '$planDone/${planItems.length}',
-                  style: const TextStyle(color: PineColors.sub, fontSize: 11),
+              Expanded(
+                child: Text(
+                  '今日课业排程（${now.month}月${now.day}日）',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: PineText.serif(
+                      size: PineType.body, weight: FontWeight.w600),
                 ),
-              const SizedBox(width: 2),
-              InkWell(
-                borderRadius: BorderRadius.circular(99),
+              ),
+              const SizedBox(width: 8),
+              // 窄窗（400 出头）放不下长文案，退成「全部 ›」——
+              // 两者打开的是同一个日程面板，长文案只是把能力说全。
+              GestureDetector(
                 onTap: _openPlanSheet,
-                child: const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                  child: Text(
-                    '全部 ›',
-                    style: TextStyle(color: PineColors.sub, fontSize: 11),
-                  ),
+                child: Text(
+                  MediaQuery.sizeOf(context).width >= 720
+                      ? '批量导入 / 展开八日 ›'
+                      : '全部 ›',
+                  style: PineText.serif(
+                      size: PineType.meta, color: PineColors.ink2),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 4),
+          SizedBox(height: dense ? 6 : 10),
           if (planItems.isEmpty)
             InkWell(
-              borderRadius: BorderRadius.circular(8),
-              onTap: _openPlanSheet,
-              child: const Padding(
-                padding: EdgeInsets.symmetric(vertical: 8),
+              onTap: () => _openPlanSheet(),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 12),
                 child: Text(
                   '今天还没安排 · 点这里排（支持粘贴导入）',
-                  style: TextStyle(color: PineColors.sub, fontSize: 11),
+                  style: PineText.serif(
+                      size: PineType.meta, color: PineColors.ink3),
                 ),
               ),
             )
           else
-            AnimatedTodoRows(
-              items: planShown,
-              rowHeight: 26,
-              itemBuilder: (item) => _planRow(
+            for (var i = 0; i < planShown.length; i++) ...[
+              if (i > 0) const DashedRule(),
+              _desktopTodoRow(
                 todayKey,
-                item,
-                fontSize: 12,
-                index: planShown.indexOf(item),
-              ),
-            ),
-          if (planItems.length > planRows)
-            InkWell(
-              borderRadius: BorderRadius.circular(8),
-              onTap: _openPlanSheet,
-              child: Padding(
-                padding: const EdgeInsets.only(top: 2),
-                child: Text(
-                  '还有 ${planItems.length - planRows} 条 ›',
-                  style:
-                      const TextStyle(color: PineColors.pine, fontSize: 11),
-                ),
-              ),
-            ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Text(
-                '今日 ${stats.todayMinutes.round()} / ${_data.goalMinutes} 分钟',
-                style: const TextStyle(color: PineColors.sub, fontSize: 10),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Container(
-                  height: 6,
-                  decoration: BoxDecoration(
-                    color: PineColors.track,
-                    borderRadius: BorderRadius.circular(99),
-                  ),
-                  child: FractionallySizedBox(
-                    alignment: Alignment.centerLeft,
-                    widthFactor: todayRatio,
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: PineColors.pine,
-                        borderRadius: BorderRadius.circular(99),
-                      ),
-                    ),
-                  ),
-                ),
+                planShown[i],
+                index: i,
+                focused: i == focusIndex,
+                dense: dense,
               ),
             ],
-          ),
+          if (planItems.length > planRows) ...[
+            const DashedRule(),
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: GestureDetector(
+                onTap: _openPlanSheet,
+                child: Text(
+                  '还有 ${planItems.length - planRows} 条 ›',
+                  style: PineText.serif(
+                      size: PineType.meta, color: PineColors.ink2),
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );
   }
 
-  /// 抽屉容器：右侧圆角 + 投影；内嵌统计/设置整页（各自 AppBar 兼作抽屉头）。
+  /// 桌面端待办行（定稿排版）：`一、` 衬线序号 + 纸勾选框 + 两行文本 + 右侧标记。
+  Widget _desktopTodoRow(
+    String dayKey,
+    TodoItem item, {
+    required int index,
+    required bool focused,
+    bool dense = false,
+  }) {
+    const numerals = <String>['一', '二', '三', '四', '五', '六', '七', '八'];
+    final numeral = index < numerals.length ? numerals[index] : '${index + 1}';
+    return InkWell(
+      onTap: () => _applyTodos((todos) => {
+            ...todos,
+            dayKey: toggleTodoDone(todos[dayKey] ?? const <TodoItem>[], item.id),
+          }),
+      onLongPress: _desktop ? null : () => _editPlanItem(dayKey, item),
+      onSecondaryTapDown: _desktop
+          ? (details) => showPlanItemMenu(
+                context,
+                details.globalPosition,
+                onEdit: () => _editPlanItem(dayKey, item),
+                onRemove: () => _removePlanItem(dayKey, item),
+              )
+          : null,
+      child: Padding(
+        padding: EdgeInsets.symmetric(vertical: dense ? 2 : 9),
+        child: Row(
+          crossAxisAlignment:
+              dense ? CrossAxisAlignment.center : CrossAxisAlignment.start,
+          children: [
+            SizedBox(
+              width: dense ? 28 : 34,
+              child: Text(
+                '$numeral、',
+                style: PineText.serif(
+                  size: dense ? PineType.meta : PineType.body,
+                  color: item.done ? PineColors.ink3 : PineColors.ink2,
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.only(top: 2),
+              child: Container(
+                width: dense ? 14 : 17,
+                height: dense ? 14 : 17,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: item.done ? PineColors.accentSoft : PineColors.sheet,
+                  border: Border.all(
+                    color:
+                        item.done ? PineColors.accent : PineColors.lineStrong,
+                    width: 1.3,
+                  ),
+                  borderRadius: BorderRadius.circular(PineRadius.seal),
+                ),
+                child: item.done
+                    ? const Icon(Icons.check_rounded,
+                        size: 12, color: PineColors.accent)
+                    : null,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                item.text,
+                maxLines: dense ? 1 : 2,
+                overflow: TextOverflow.ellipsis,
+                style: PineText.sans(
+                  size: dense ? PineType.meta : PineType.body,
+                  color: item.done ? PineColors.ink3 : PineColors.ink,
+                ).copyWith(
+                  height: 1.45,
+                  decoration: item.done ? TextDecoration.lineThrough : null,
+                  decorationColor: PineColors.accent,
+                ),
+              ),
+            ),
+            if (focused) ...[
+              const SizedBox(width: 8),
+              Padding(
+                padding: const EdgeInsets.only(top: 2),
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: PineColors.accent, width: 1),
+                    borderRadius: BorderRadius.circular(PineRadius.seal),
+                  ),
+                  child: Text(
+                    '右页研读中',
+                    style: PineText.serif(
+                        size: PineType.caption, color: PineColors.accent),
+                  ),
+                ),
+              ),
+            ],
+            // 铅笔常显且可点（批量改内容时不用先悬停/右键）。
+            GestureDetector(
+              onTap: () => _editPlanItem(dayKey, item),
+              child: Padding(
+                padding: const EdgeInsets.only(left: 6, top: 2),
+                child: Icon(Icons.edit_outlined,
+                    size: dense ? 12 : 14, color: PineColors.ink3),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _desktopDrawer({required bool wide}) {
     final width =
         (MediaQuery.sizeOf(context).width - 16).clamp(300.0, 356.0).toDouble();
@@ -3254,4 +3340,79 @@ class _PineconePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_PineconePainter old) => old.growth != growth;
+}
+
+/// 稿纸虚线分隔：待办行与落账行之间用它，比实线更像手写批注栏。
+class DashedRule extends StatelessWidget {
+  const DashedRule({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 1,
+      child: CustomPaint(painter: _DashedPainter(PineColors.line)),
+    );
+  }
+}
+
+class _DashedPainter extends CustomPainter {
+  _DashedPainter(this.color);
+
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = 1;
+    const dash = 4.0;
+    const gap = 3.0;
+    var x = 0.0;
+    while (x < size.width) {
+      canvas.drawLine(Offset(x, 0), Offset(x + dash, 0), paint);
+      x += dash + gap;
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _DashedPainter old) => old.color != color;
+}
+
+/// 描边胶囊小按钮（定稿标题行右侧那两颗）。
+class _OutlinePill extends StatelessWidget {
+  const _OutlinePill({
+    required this.text,
+    this.accent = false,
+    this.onTap,
+  });
+
+  final String text;
+  final bool accent;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: accent ? PineColors.accentSoft : PineColors.sheet,
+          border: Border.all(
+            color: accent ? PineColors.accent : PineColors.lineStrong,
+            width: 1,
+          ),
+          borderRadius: BorderRadius.circular(999),
+        ),
+        child: Text(
+          text,
+          style: PineText.serif(
+            size: PineType.meta,
+            color: accent ? PineColors.accent : PineColors.ink2,
+          ),
+        ),
+      ),
+    );
+  }
 }

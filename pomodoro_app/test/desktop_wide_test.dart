@@ -47,7 +47,7 @@ void main() {
       expect(find.byType(RuledScale), findsWidgets);
       expect(find.byType(PaperComposer), findsOneWidget);
       // 440×600 路径依赖的功能节点在宽屏同样保留。
-      expect(find.text('今日日程'), findsOneWidget);
+      expect(find.textContaining('今日课业排程'), findsOneWidget);
       expect(tester.takeException(), isNull);
     } finally {
       debugDefaultTargetPlatformOverride = null;
@@ -70,7 +70,7 @@ void main() {
 
       expect(find.byKey(const ValueKey('study-sidebar')), findsNothing);
       expect(find.byKey(const ValueKey('study-canvas')), findsNothing);
-      expect(find.text('今日日程'), findsOneWidget);
+      expect(find.textContaining('今日课业排程'), findsOneWidget);
       expect(tester.takeException(), isNull);
     } finally {
       debugDefaultTargetPlatformOverride = null;

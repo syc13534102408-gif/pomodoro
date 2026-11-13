@@ -78,7 +78,7 @@ void main() {
         (tester) async {
       try {
         await _pumpDesktop(tester, width: size.width, height: size.height);
-        expect(find.text('今日日程'), findsOneWidget);
+        expect(find.textContaining('今日课业排程'), findsOneWidget);
         // 「最近完成」已搬进统计抽屉，主窗不该再出现。
         expect(find.text('最近完成'), findsNothing);
         expect(tester.takeException(), isNull);

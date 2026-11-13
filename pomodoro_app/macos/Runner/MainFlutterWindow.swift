@@ -40,22 +40,22 @@ class MainFlutterWindow: NSWindow, NSMenuDelegate {
   override func awakeFromNib() {
     let flutterViewController = FlutterViewController()
     self.contentViewController = flutterViewController
-    // 方向 B「专注舱」：默认 560×760，最小 440×600（2026-10-25 定）。
-    // 560 宽 = 版心 452 + 双侧 30 呼吸（再宽只是多一圈空白纸面）；
-    // 760 高 = 4 条今日日程 + 满尺寸 244 环 + 约 15pt 余量，恰好"一屏看完今天"。
-    // 桌面布局为单舱 + 右滑抽屉（统计/设置）；窗口拖宽只留白、内容不拉伸。
+    // V3 素纸「三栏书斋」：默认 1020×760，最小 440×600。
+    // 1020 宽刚好跨过 720 断点，打开即「楮皮目录栏 / 日课笺中栏 / 专注手稿画布」三栏；
+    // 760 高沿用旧预算（4 条今日日程 + 64px 活字读数 + 尺规 + 控制组）。
+    // 窄于 720 仍收成单列专注舱（440×600 最小窗的垂直预算断言依赖该路径）。
     self.isRestorable = false
     // 关窗后窗口对象必须存活：菜单栏计时依赖窗口持有的 FlutterEngine 与通道，
     // 若随窗口一起释放，倒计时和菜单动作都会失效。
     self.isReleasedWhenClosed = false
-    self.setContentSize(NSSize(width: 560, height: 760))
+    self.setContentSize(NSSize(width: 1020, height: 760))
     self.minSize = NSSize(width: 440, height: 600)
     self.center()
     // 记住用户拖过的尺寸：有历史 frame 就用历史的，首次启动才用默认值并居中。
-    if !self.setFrameUsingName("PineMainWindowFrame") {
+    if !self.setFrameUsingName("PineMainWindowFrameV3") {
       self.setFrame(self.frame, display: true)
     }
-    _ = self.setFrameAutosaveName("PineMainWindowFrame")
+    _ = self.setFrameAutosaveName("PineMainWindowFrameV3")
 
     RegisterGeneratedPlugins(registry: flutterViewController)
 

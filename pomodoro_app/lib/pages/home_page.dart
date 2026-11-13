@@ -1174,7 +1174,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                         offset: Offset(48 * (1 - value), 0),
                         child: child,
                       ),
-                      child: _desktopDrawer(),
+                      child: _desktopDrawer(wide: wide),
                     ),
                   ),
                 ],
@@ -1751,7 +1751,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   }
 
   /// 抽屉容器：右侧圆角 + 投影；内嵌统计/设置整页（各自 AppBar 兼作抽屉头）。
-  Widget _desktopDrawer() {
+  Widget _desktopDrawer({required bool wide}) {
     final width =
         (MediaQuery.sizeOf(context).width - 16).clamp(300.0, 356.0).toDouble();
     final page = _desktopOverlay == _overlayPlan
@@ -1786,8 +1786,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       ),
       // 三只抽屉开关浮在窗口右上角（必须压在最上层才关得掉），
       // 这里让出 48pt 给它们：否则抽屉里的「导入」按钮会被正好盖住（2026-11-03 反馈）。
+      // 宽窗三栏不渲染那三只，就不必再让位（否则报告页标题被空推 48pt）。
       child: Padding(
-        padding: const EdgeInsets.only(top: 48),
+        padding: EdgeInsets.only(top: wide ? 0 : 48),
         child: page,
       ),
     );

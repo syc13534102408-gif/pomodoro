@@ -72,10 +72,6 @@ class _StatsPageState extends State<StatsPage> {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(20, 6, 20, 24),
         children: [
-          // 统计页是长列表：新增定稿区块必须排在「本月回顾」之后，否则默认视口
-          // 下它还没被构建，widget_test 的空态/有数据两条路径都会拿不到文本。
-          _MonthlyReview(data: data),
-          const SizedBox(height: 14),
           // ── V3 定稿：藏书票累计碑（口径＝全部历史）────────────────────
           ExLibrisCard(
             child: Column(
@@ -109,6 +105,10 @@ class _StatsPageState extends State<StatsPage> {
               ],
             ),
           ),
+          const SizedBox(height: 14),
+          // 翻月回看（原「本月回顾」）：排在藏书票之后、七日谱之前，
+          // 仍落在首屏视口内，widget_test 的两条路径照旧能拿到「本月回顾」。
+          _MonthlyReview(data: data),
           const SizedBox(height: 14),
           // ── V3 定稿：近七日水墨时长谱（口径＝本周 7 天，按真实任务名堆叠）──
           SuzhiCard(
@@ -935,12 +935,18 @@ class _MonthlyReviewState extends State<_MonthlyReview> {
             ],
           ),
           const SizedBox(height: 10),
-          _MonthGrid(
-            year: target.year,
-            month: target.month,
-            dayValues: dayValues,
-            dayCounts: dayCounts,
-            todayDay: isCurrentMonth ? statNow.day : null,
+          // 抽屉/宽窗里 7 列会被拉到 60pt+ 一格，限宽居中后格子回到 40 上下。
+          Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 380),
+              child: _MonthGrid(
+                year: target.year,
+                month: target.month,
+                dayValues: dayValues,
+                dayCounts: dayCounts,
+                todayDay: isCurrentMonth ? statNow.day : null,
+              ),
+            ),
           ),
           if (tasks.isNotEmpty) ...[
             const SizedBox(height: 18),

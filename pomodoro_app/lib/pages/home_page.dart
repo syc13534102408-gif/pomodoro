@@ -1044,6 +1044,13 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                             progress: resting ? 1 : view.progress,
                             targetMinutes: view.plannedSeconds ~/ 60,
                             meta: '尺规进度 · 已历 ${view.elapsedSeconds ~/ 60} 分',
+                            accent: resting
+                                ? PineColors.ink3
+                                : (view.mode.isFocus
+                                    ? PineColors.accent
+                                    : (view.mode == SessionMode.shortBreak
+                                        ? PineColors.celadon
+                                        : PineColors.ochre)),
                           ),
                           const SizedBox(height: 12),
                           // 今日课业批注就地内嵌手稿页卡，不再另起一张卡。
@@ -1606,6 +1613,16 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   ) {
     // 按定稿 D1 重排：卷首行 → CURRENT SUBJECT & TOPIC → 大读数 → 计划行 → 尺规 → 主控贴底。
     final task = _data.selectedTask;
+    // 阶段色：专注=檀褐、短休=青瓷、吃饭=赭石。方印/大字/尺规三处同色，
+    // 扫一眼就知道现在是哪一种（旧版只有一行 11px 小字，等于没有）。
+    final phaseColor = view.mode.isFocus
+        ? PineColors.accent
+        : (view.mode == SessionMode.shortBreak
+            ? PineColors.celadon
+            : PineColors.ochre);
+    final phaseName = view.mode.isFocus
+        ? '专注中'
+        : (view.mode == SessionMode.shortBreak ? '短休中' : '吃饭中');
     final todayKey = ymdOf(dayStart(DateTime.now()));
     final plan = _data.todos[todayKey] ?? const <TodoItem>[];
     final pendingIndex = plan.indexWhere((item) => !item.done);
@@ -1633,9 +1650,13 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                               size: PineType.meta, color: PineColors.ink2)),
                       const Spacer(),
                       SectionSeal(
-                          text: resting
-                              ? '今日已收工'
-                              : (session?.running == true ? '专注中' : '待开始')),
+                        text: resting
+                            ? '今日已收工'
+                            : (session?.running == true
+                                ? phaseName
+                                : '待开始 · $phaseName'),
+                        color: resting ? PineColors.ink3 : phaseColor,
+                      ),
                     ],
                   ),
                   const SizedBox(height: 10),
@@ -1695,7 +1716,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                             weight: FontWeight.w500,
                             color: (!resting && view.targetReached)
                                 ? PineColors.ochre
-                                : PineColors.ink,
+                                : (resting ? PineColors.ink : phaseColor),
                           ).copyWith(
                             height: 0.92,
                             letterSpacing: -0.03,
@@ -1738,7 +1759,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                   RuledScale(
                     progress: resting ? 1 : view.progress,
                     targetMinutes: view.plannedSeconds ~/ 60,
-                    meta: '尺规进度 · ${view.plannedSeconds ~/ 60} 分钟一番',
+                    meta: '$phaseName · ${view.plannedSeconds ~/ 60} 分钟一番',
+                    accent: resting ? PineColors.ink3 : phaseColor,
                   ),
                   const Spacer(flex: 3),
                   Row(

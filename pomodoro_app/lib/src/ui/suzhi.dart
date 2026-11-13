@@ -79,7 +79,7 @@ class SectionSeal extends StatelessWidget {
     final seal = Container(
       padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
       decoration: BoxDecoration(
-        color: PineColors.accentSoft,
+        color: Color.alphaBlend(c.withAlpha(30), PineColors.sheet),
         border: Border.all(color: c, width: 1.5),
         borderRadius: BorderRadius.circular(PineRadius.seal + 1),
       ),
@@ -232,6 +232,7 @@ class PaperClockDigits extends StatelessWidget {
     this.totalText,
     this.note,
     this.overtime = false,
+    this.color,
   });
 
   final String timeText;
@@ -239,6 +240,9 @@ class PaperClockDigits extends StatelessWidget {
   final String? totalText;
   final String? note;
   final bool overtime;
+
+  /// 大字颜色：专注=檀褐、短休=青瓷、吃饭=赭石；不传＝浓墨。
+  final Color? color;
 
   @override
   Widget build(BuildContext context) {
@@ -257,7 +261,9 @@ class PaperClockDigits extends StatelessWidget {
                 overflow: TextOverflow.fade,
                 style: PineText.serif(
                   size: PineType.clock,
-                  color: overtime ? PineColors.ochre : PineColors.ink,
+                  color: overtime
+                      ? PineColors.ochre
+                      : (color ?? PineColors.ink),
                   weight: FontWeight.w500,
                   letterSpacing: -0.025,
                   features: kNumericFont,
@@ -276,7 +282,12 @@ class PaperClockDigits extends StatelessWidget {
         const SizedBox(height: 2),
         Text(
           caption,
-          style: PineText.serif(size: PineType.label, color: PineColors.ink2),
+          style: PineText.serif(
+            size: PineType.label,
+            color: color == null
+                ? PineColors.ink2
+                : Color.alphaBlend(color!.withAlpha(210), PineColors.ink),
+          ),
         ),
         if (note != null) ...[
           const SizedBox(height: 2),
@@ -295,12 +306,17 @@ class RuledScale extends StatelessWidget {
     required this.progress,
     this.targetMinutes = 50,
     this.meta,
+    this.accent,
   });
 
   /// 0..1，超时会被夹到 1（超时态由 [PaperClockDigits] 的 `+MM:SS` 表达）。
   final double progress;
   final int targetMinutes;
   final String? meta;
+
+  /// 已历刻度的颜色：专注=檀褐、短休=青瓷、吃饭=赭石。
+  /// 不传就用主强调色（兼容旧调用）。
+  final Color? accent;
 
   static const int _ticks = 25;
   static const List<String> _axis = <String>[
@@ -356,7 +372,7 @@ class RuledScale extends StatelessWidget {
     if (index == done) {
       color = PineColors.ink; // 当前游标
     } else if (index < done) {
-      color = PineColors.accent; // 已历
+      color = accent ?? PineColors.accent; // 已历
     } else {
       color = PineColors.inkFaint; // 空刻度
     }

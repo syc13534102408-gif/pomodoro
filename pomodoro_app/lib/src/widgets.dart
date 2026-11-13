@@ -156,8 +156,9 @@ class BrickButton extends StatelessWidget {
     this.onPressed,
     this.icon,
     this.trailing,
-    this.color = PineColors.ink,
-    this.foregroundColor = PineColors.card,
+    // V3：未显式指定色的主行动按钮统一走檀褐实底（旧版 R2 是墨底）。
+    this.color = PineColors.accent,
+    this.foregroundColor = PineColors.sheet,
     this.height = 46,
     this.expand = true,
     this.padding = const EdgeInsets.symmetric(horizontal: 18),

@@ -1025,6 +1025,12 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               examText: examText,
               syncText: _mirrorEnabled ? '已同步' : '本地',
               onMenu: _openPlanSheet,
+              // 倒计时的编辑入口移到书眉：首页不再单独放一张 CountdownCard，
+              // 否则「今日达成条」会被挤出首屏（定稿 S1 对比，2026-11-13）。
+              onExamTap: _data.countdown.enabled
+                  ? () => showCountdownSheet(context,
+                      data: _data, onChanged: _replace)
+                  : null,
             ),
             InscriptionRow(
               totalText: '全部历史累计 ${formatHoursMinutes(stats.totalMinutes)}',
@@ -1037,15 +1043,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     _dateHeader(),
-                    if (_data.countdown.enabled) ...[
-                      SizedBox(height: compact ? 8 : 10),
-                      CountdownCard(
-                        countdown: _data.countdown,
-                        now: now,
-                        onTap: () => showCountdownSheet(context,
-                            data: _data, onChanged: _replace),
-                      ),
-                    ],
+                    // 倒计时已并入书眉（可点编辑），这里不再重复一张卡；
+                    // 设置页的「考试名称与日期」入口也仍在。
                     if (_isSuspended()) ...[
                       SizedBox(height: gap),
                       _suspendBanner(),
@@ -1924,15 +1923,17 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     return Row(
       children: [
         Expanded(
-          child: BrickButton(
-            label: primary,
-            icon: session?.running == true
-                ? Icons.pause_rounded
-                : Icons.play_arrow_rounded,
-            // R2：主行动一律墨底纸字；阶段语义交给色条/caption/进度。
-            color: PineColors.ink,
-            onPressed: _toggleRun,
-          ),
+          child:             BrickButton(
+              label: primary,
+              icon: session?.running == true
+                  ? Icons.pause_rounded
+                  : Icons.play_arrow_rounded,
+              // V3：主行动是定稿的檀褐实底纸字（全屏 3–4 处檀褐之一），
+              // 旧版 R2 的墨底已退役；阶段语义交给尺规刻度与 caption。
+              color: PineColors.accent,
+              foregroundColor: PineColors.sheet,
+              onPressed: _toggleRun,
+            ),
         ),
         const SizedBox(width: 10),
         // 「完成 / 直接记录」：金底墨字（R2）。

@@ -40,12 +40,17 @@ class SuzhiCard extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           if (showRule) ...[
-            Container(
-              width: 36,
-              height: 2.5,
-              decoration: BoxDecoration(
-                color: PineColors.accent,
-                borderRadius: BorderRadius.circular(PineRadius.seal),
+            // 外层 Column 是 stretch：直接放 Container(width:36) 会被强制拉成
+            // 整卡宽的长线，必须用 Align 让短横保留 36px（2026-11-13 预览发现）。
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Container(
+                width: 36,
+                height: 2.5,
+                decoration: BoxDecoration(
+                  color: PineColors.accent,
+                  borderRadius: BorderRadius.circular(PineRadius.seal),
+                ),
               ),
             ),
             const SizedBox(height: 10),
@@ -100,12 +105,16 @@ class FolioBar extends StatelessWidget {
     this.examText,
     this.syncText,
     this.onMenu,
+    this.onExamTap,
   });
 
   final String dateText;
   final String? examText;
   final String? syncText;
   final VoidCallback? onMenu;
+
+  /// 点书眉上的倒计时可进编辑面板（首页不再单独放一张倒计时卡）。
+  final VoidCallback? onExamTap;
 
   @override
   Widget build(BuildContext context) {
@@ -147,11 +156,15 @@ class FolioBar extends StatelessWidget {
             Container(width: 1, height: 11, color: PineColors.lineStrong),
             const SizedBox(width: 10),
             Flexible(
-              child: Text(
-                examText!,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: PineText.sans(size: PineType.meta, color: PineColors.ink2),
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: onExamTap,
+                child: Text(
+                  examText!,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: PineText.sans(size: PineType.meta, color: PineColors.ink2),
+                ),
               ),
             ),
           ],

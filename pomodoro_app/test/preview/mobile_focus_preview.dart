@@ -19,14 +19,36 @@ import 'package:pomodoro_app/src/theme.dart';
 
 void main() {
   testWidgets('渲染手机专注页预览', (tester) async {
-    final file = File('/System/Library/Fonts/Hiragino Sans GB.ttc');
+    // 用 TTF 而不是 Hiragino Sans GB.ttc：TTC 集合在这个 FontLoader 用法下
+    // 注册不稳定，预览里中文会一片方块。Arial Unicode 是单 face，实测全正常。
+    final file = File('/System/Library/Fonts/Supplemental/Arial Unicode.ttf');
     if (file.existsSync()) {
       final bytes = file.readAsBytesSync();
-      for (final family in <String>['Roboto', 'FlutterTest', 'monospace']) {
+      // V3 素纸令牌把标题/计时指向 'Songti SC'、时间戳指向 'SF Mono'；
+      // 测试环境没有这些字体，全部注册到系统中文，否则预览里中文是方块。
+      for (final family in <String>[
+        'Roboto',
+        'FlutterTest',
+        'Ahem', // flutter_test 的默认族：不覆盖它，无 fontFamily 的正文全是方块
+        'PineTest',
+        'monospace',
+        'Songti SC',
+        'STSong',
+        'serif',
+        'SF Mono',
+      ]) {
         final loader = FontLoader(family)
           ..addFont(Future.value(ByteData.view(Uint8List.fromList(bytes).buffer)));
         await loader.load();
       }
+    }
+    // 图标也要注册：否则 Menu / 播放 / 勾选等 MaterialIcons 全渲染成空方框。
+    final icons = File('/Users/shuyichen/Documents/Codex/2026-08-13/pinecone/tools/flutter/bin/cache/artifacts/material_fonts/MaterialIcons-Regular.otf');
+    if (icons.existsSync()) {
+      final loader = FontLoader('MaterialIcons')
+        ..addFont(Future.value(
+            ByteData.view(Uint8List.fromList(icons.readAsBytesSync()).buffer)));
+      await loader.load();
     }
     debugDefaultTargetPlatformOverride = TargetPlatform.android;
     tester.view.devicePixelRatio = 2.0;

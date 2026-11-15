@@ -49,7 +49,7 @@ final class FloatingTimerPanel: NSPanel {
   // 进度模式内容。
   private let tideView = TideCapsuleView()
 
-  private var effectView = NSVisualEffectView()
+  private var effectView = NSView()
 
   private var lastPhase: String?
   private var lastTime: String?
@@ -109,17 +109,18 @@ final class FloatingTimerPanel: NSPanel {
 
     let root = PineDragView(frame: NSRect(origin: .zero, size: initialSize))
     root.onClick = { [weak self] in self?.onClick?() }
-    let effect = NSVisualEffectView(frame: root.bounds)
+    // V3 素纸：不再用深色 HUD 毛玻璃，改成和主界面同一张「纸卡」——
+    // 纸面底 #FFFEFA + 1px 定界线 #D0C8BA + 10pt 书页切角（不是半高胶囊）。
+    let effect = NSView(frame: root.bounds)
     effect.autoresizingMask = [.width, .height]
-    effect.material = .hudWindow
-    effect.blendingMode = .behindWindow
-    effect.state = .active
     effect.wantsLayer = true
-    // 胶囊：圆角取半高；1px 白色细边让它在浅色壁纸上也有轮廓。
-    effect.layer?.cornerRadius = initialSize.height / 2
+    effect.layer?.backgroundColor = NSColor(
+      srgbRed: 1.0, green: 0.9961, blue: 0.9804, alpha: 1.0).cgColor
+    effect.layer?.cornerRadius = 10
     effect.layer?.masksToBounds = true
     effect.layer?.borderWidth = 1
-    effect.layer?.borderColor = NSColor.white.withAlphaComponent(0.08).cgColor
+    effect.layer?.borderColor = NSColor(
+      srgbRed: 0.8157, green: 0.7843, blue: 0.7294, alpha: 1.0).cgColor
     root.addSubview(effect)
     effectView = effect
     contentView = root
@@ -127,18 +128,20 @@ final class FloatingTimerPanel: NSPanel {
     // 数字模式（V3 信息型）：阶段色点 + 阶段短标签 + 右对齐大数字 + 底部细进度。
     dotView.wantsLayer = true
     dotView.layer?.cornerRadius = 4
-    dotView.layer?.backgroundColor =
-      NSColor.white.withAlphaComponent(0.5).cgColor
+    dotView.layer?.backgroundColor = NSColor(
+      srgbRed: 0.5216, green: 0.4980, blue: 0.4706, alpha: 1.0).cgColor
 
     phaseLabel.font = .systemFont(ofSize: 10.5, weight: .semibold)
-    phaseLabel.textColor = NSColor.white.withAlphaComponent(0.72)
+    phaseLabel.textColor = NSColor(
+      srgbRed: 0.5216, green: 0.4980, blue: 0.4706, alpha: 1.0)
     phaseLabel.lineBreakMode = .byTruncatingTail
     // 不做弹性拉伸：宽度由内容实测决定（fitWidth），保证左右留白恒等。
     phaseLabel.setContentHuggingPriority(.required, for: .horizontal)
     phaseLabel.setContentCompressionResistancePriority(.required, for: .horizontal)
 
     timeLabel.font = .monospacedDigitSystemFont(ofSize: 22, weight: .semibold)
-    timeLabel.textColor = .white
+    timeLabel.textColor = NSColor(
+      srgbRed: 0.1333, green: 0.1137, blue: 0.0980, alpha: 1.0)
     timeLabel.alignment = .right
     timeLabel.setContentHuggingPriority(.defaultHigh, for: .horizontal)
     timeLabel.setContentCompressionResistancePriority(.required, for: .horizontal)
@@ -192,7 +195,7 @@ final class FloatingTimerPanel: NSPanel {
       setFrame(next, display: true, animate: animated && isVisible)
     }
     // 圆角恒取半高：两模式高度不同，必须随尺寸刷新。
-    effectView.layer?.cornerRadius = frame.height / 2
+    effectView.layer?.cornerRadius = 10
   }
 
   /// 内容实测宽度 → 窗口随文字伸缩，左右留白恒等 16/16、右缘锚定。
@@ -431,7 +434,7 @@ private final class PineProgressView: NSView {
 
   override func draw(_ dirtyRect: NSRect) {
     let radius = bounds.height / 2
-    NSColor.white.withAlphaComponent(0.18).setFill()
+    NSColor(srgbRed: 0.8157, green: 0.7843, blue: 0.7294, alpha: 0.55).setFill()
     NSBezierPath(roundedRect: bounds, xRadius: radius, yRadius: radius).fill()
     var filled = bounds
     filled.size.width = max(bounds.height, bounds.width * CGFloat(min(max(fraction, 0), 1)))
@@ -518,8 +521,11 @@ final class TideCapsuleView: NSView {
     // 槽 10% / 前滩 20%：前滩必须比干槽更亮才是「打湿的水痕」。
     // （设计稿里前滩给的是 10%、比槽 12% 还暗，叠在 HUD 底色上两者差不到 2/255，
     //   等于白画——落地时把两者的明暗关系反过来。）
-    trackLayer.fillColor = NSColor.white.withAlphaComponent(0.10).cgColor
-    shallowLayer.fillColor = NSColor.white.withAlphaComponent(0.20).cgColor
+    // 素纸底上的槽与前滩：白透明度在浅纸上等于隐形，改用纸线色阶。
+    trackLayer.fillColor = NSColor(
+      srgbRed: 0.8157, green: 0.7843, blue: 0.7294, alpha: 0.30).cgColor
+    shallowLayer.fillColor = NSColor(
+      srgbRed: 0.8157, green: 0.7843, blue: 0.7294, alpha: 0.55).cgColor
     liquidLayer.fillColor = tint.cgColor
     // 泡沫痕：白 32% 叠在满潮（金）之上 ≈ #E6C382，比底色亮一档但仍是金系，
     // 读作「潮水漫过留下的泡沫痕」而不是另起一种颜色。

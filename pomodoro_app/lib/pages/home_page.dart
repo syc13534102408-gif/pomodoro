@@ -1427,7 +1427,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               const SizedBox(width: 10),
               // 定稿：两个描边胶囊 —— 今日达成用檀褐，收工用纸灰。
               _OutlinePill(
-                text: '今日 ${formatHoursMinutes(stats.todayMinutes)} · $pct%',
+                text: '今日 ${formatCompactMinutes(stats.todayMinutes)} · $pct%',
                 accent: true,
               ),
               const SizedBox(width: 6),

@@ -106,10 +106,6 @@ class _StatsPageState extends State<StatsPage> {
             ),
           ),
           const SizedBox(height: 14),
-          // 翻月回看（原「本月回顾」）：排在藏书票之后、七日谱之前，
-          // 仍落在首屏视口内，widget_test 的两条路径照旧能拿到「本月回顾」。
-          _MonthlyReview(data: data),
-          const SizedBox(height: 14),
           // ── V3 定稿：近七日水墨时长谱（口径＝本周 7 天，按真实任务名堆叠）──
           SuzhiCard(
             child: Column(
@@ -127,6 +123,10 @@ class _StatsPageState extends State<StatsPage> {
               ],
             ),
           ),
+          const SizedBox(height: 14),
+          // 层级：累计（只增不减）→ 趋势（近 7 天）→ 月历（翻月回看）→ 构成 → 明细。
+          // 月历原来夹在「累计」和「趋势」之间，层级跳跃，现在压到趋势之后。
+          _MonthlyReview(data: data),
           const SizedBox(height: 14),
           // ── V3 定稿：钤印日历（口径＝本自然月打卡）────────────────────
           SuzhiCard(

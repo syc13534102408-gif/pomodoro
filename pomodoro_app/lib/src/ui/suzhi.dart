@@ -315,20 +315,22 @@ class RuledScale extends StatelessWidget {
   final String? meta;
 
   /// 已历刻度的颜色：专注=檀褐、短休=青瓷、吃饭=赭石。
-  /// 不传就用主强调色（兼容旧调用）。
   final Color? accent;
 
-  static const int _ticks = 25;
-  static const List<String> _axis = <String>[
-    '00m', '10m', '20m', '30m', '40m', '50m',
-  ];
+  /// 轴标步长：≤60 分钟每 10 分钟一个，更长的番每 15/30 分钟一个。
+  int get _step => targetMinutes <= 60
+      ? 10
+      : (targetMinutes <= 90 ? 15 : 30);
 
   @override
   Widget build(BuildContext context) {
     final p = progress.clamp(0.0, 1.0);
-    final done = (p * _ticks).floor().clamp(0, _ticks);
+    final color = accent ?? PineColors.accent;
+    final labels = <int>[
+      for (var m = 0; m <= targetMinutes; m += _step) m,
+    ];
     return Container(
-      padding: const EdgeInsets.fromLTRB(10, 9, 10, 8),
+      padding: const EdgeInsets.fromLTRB(12, 9, 12, 7),
       decoration: BoxDecoration(
         color: PineColors.sunken,
         borderRadius: BorderRadius.circular(PineRadius.control),
@@ -338,62 +340,141 @@ class RuledScale extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (meta != null) ...[
-            Text(meta!, style: PineText.sans(size: PineType.caption, color: PineColors.ink2)),
-            const SizedBox(height: 6),
-          ],
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  meta ?? '尺规进度',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: PineText.sans(
+                      size: PineType.caption, color: PineColors.ink2),
+                ),
+              ),
+              Text(
+                '${(p * 100).round()}%',
+                style: PineText.mono(
+                    size: PineType.caption, color: color),
+              ),
+            ],
+          ),
+          const SizedBox(height: 7),
+          // 尺面：基线 + 细刻度 + 已历实带 + 游标，交给一个 painter 画，
+          // 比堆 25 个 Container 更稳（也不会有 1.2px 缝带来的"柱状图"错觉）。
           SizedBox(
-            height: 24,
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                for (var i = 0; i < _ticks; i++) _tick(index: i, done: done),
-              ],
+            height: 26,
+            child: CustomPaint(
+              painter: _RulerPainter(
+                progress: p,
+                targetMinutes: targetMinutes,
+                step: _step,
+                accent: color,
+                base: PineColors.inkFaint,
+                cursor: PineColors.ink,
+                axis: PineColors.lineStrong,
+              ),
             ),
           ),
           const SizedBox(height: 4),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              for (final label in _axis)
-                Text(label, style: PineText.mono(size: PineType.caption, color: PineColors.ink3)),
+              for (final m in labels)
+                Text(
+                  m == targetMinutes ? '${m}m' : '$m',
+                  style: PineText.mono(
+                      size: PineType.caption, color: PineColors.ink3),
+                ),
             ],
           ),
         ],
       ),
     );
   }
+}
 
-  Widget _tick({required int index, required int done}) {
-    final isTen = index % 5 == 0;
-    final isFive = index % 5 == 4;
-    final height = isTen ? 20.0 : (isFive ? 14.0 : 9.0);
-    final Color color;
-    if (index == done) {
-      color = PineColors.ink; // 当前游标
-    } else if (index < done) {
-      color = accent ?? PineColors.accent; // 已历
-    } else {
-      color = PineColors.inkFaint; // 空刻度
-    }
-    // 定稿是「界格块」：每格占满 1fr 并留 1.2px 纸缝，5/10 分钟档加高。
-    // 早前用固定 2–3px 宽会渲染成细线，像波形而不是尺规（2026-11-13 修正）。
-    return Expanded(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 1.2),
-        child: Align(
-          alignment: Alignment.bottomCenter,
-          child: Container(
-            height: height,
-            decoration: BoxDecoration(
-              color: color,
-              borderRadius: BorderRadius.circular(1),
-            ),
-          ),
+/// 尺面绘制：0 处为左端，targetMinutes 处为右端。
+///
+/// 语言刻意做成"尺子"而不是"柱状图"：
+/// 细刻度（每 2 分钟）+ 每 10 分钟加长 + 一条已历实带 + 一枚游标。
+class _RulerPainter extends CustomPainter {
+  _RulerPainter({
+    required this.progress,
+    required this.targetMinutes,
+    required this.step,
+    required this.accent,
+    required this.base,
+    required this.cursor,
+    required this.axis,
+  });
+
+  final double progress;
+  final int targetMinutes;
+  final int step;
+  final Color accent;
+  final Color base;
+  final Color cursor;
+  final Color axis;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final w = size.width;
+    final h = size.height;
+    final baselineY = h - 1;
+    final total = targetMinutes <= 0 ? 1 : targetMinutes;
+
+    // 1) 基线
+    canvas.drawRect(
+      Rect.fromLTWH(0, baselineY, w, 1),
+      Paint()..color = axis,
+    );
+
+    // 2) 细刻度：每 2 分钟一根；每 10 分钟加长一档
+    final minorCount = (total / 2).ceil();
+    for (var i = 0; i <= minorCount; i++) {
+      final minute = i * 2;
+      if (minute > total) break;
+      final x = (minute / total) * w;
+      final isMajor = minute % step == 0;
+      final isHalf = minute % 10 == 0;
+      final tickH = isMajor ? 13.0 : (isHalf ? 9.0 : 5.0);
+      final passed = minute / total <= progress;
+      canvas.drawRect(
+        Rect.fromLTWH(
+          (x - 0.75).clamp(0.0, w - 1),
+          baselineY - tickH,
+          1.5,
+          tickH,
         ),
-      ),
+        Paint()
+          ..color = passed ? accent : base
+          ..style = PaintingStyle.fill,
+      );
+    }
+
+    // 3) 已历实带：贴着基线的 2.5pt 檀褐带，长度 = 进度
+    final filled = w * progress.clamp(0.0, 1.0);
+    if (filled > 0) {
+      canvas.drawRect(
+        Rect.fromLTWH(0, baselineY - 2.5, filled, 2.5),
+        Paint()..color = accent,
+      );
+    }
+
+    // 4) 游标：当前分钟处一枚全高标记（浓墨 + 上下各探出 1pt）
+    final cx = (w * progress.clamp(0.0, 1.0)).clamp(0.0, w);
+    canvas.drawRect(
+      Rect.fromLTWH((cx - 1.25).clamp(0.0, w - 2.5), 0, 2.5, baselineY),
+      Paint()..color = cursor,
     );
   }
+
+  @override
+  bool shouldRepaint(covariant _RulerPainter old) =>
+      old.progress != progress ||
+      old.targetMinutes != targetMinutes ||
+      old.step != step ||
+      old.accent != accent;
 }
 
 /// 稿纸批注的一行数据（只含展示所需，不持有业务状态）。

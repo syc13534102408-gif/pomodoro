@@ -1305,35 +1305,12 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             )
           else
             for (var i = 0; i < shown.length; i++)
-              Container(
-                height: 26,
-                padding: const EdgeInsets.symmetric(horizontal: 8),
-                decoration: BoxDecoration(
-                  color: i == 0 ? PineColors.accentSoft : Colors.transparent,
-                  borderRadius: BorderRadius.circular(PineRadius.seal),
-                ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        shown[i].key,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: PineText.serif(
-                          size: PineType.meta,
-                          weight:
-                              i == 0 ? FontWeight.w600 : FontWeight.w400,
-                          color: i == 0 ? PineColors.ink : PineColors.ink2,
-                        ),
-                      ),
-                    ),
-                    Text(
-                      formatCompactMinutes(shown[i].value),
-                      style: PineText.mono(
-                          size: PineType.caption, color: PineColors.ink3),
-                    ),
-                  ],
-                ),
+              _HoverRow(
+                onTap: () => _selectTaskByName(shown[i].key),
+                height: 27,
+                selected: i == 0,
+                label: shown[i].key,
+                trailing: formatCompactMinutes(shown[i].value),
               ),
           const Spacer(),
           // 底部考研卡（定稿 D1）：距考 / 尚余天数 / 历史总计。
@@ -1391,45 +1368,26 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     );
   }
 
+  /// 按任务名切换当前任务（左栏「常驻任务」点一下即切换）。
+  void _selectTaskByName(String name) {
+    final index = _data.tasks.indexWhere((task) => task.name == name);
+    if (index < 0) return;
+    _replace(_data.copyWith(selectedIndex: index));
+  }
+
   /// 左栏卷目一行：当前项加粗并带左侧短横，其余可点开抽屉。
   Widget _navRow(String label, int? overlay, {bool current = false}) {
     final active = current || (overlay != null && _desktopOverlay == overlay);
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
+    return _HoverRow(
+      enabled: overlay != null,
       onTap: overlay == null
           ? null
           : () => setState(() => _desktopOverlay = overlay),
-      child: Container(
-        height: 27,
-        padding: const EdgeInsets.symmetric(horizontal: 8),
-        margin: const EdgeInsets.only(bottom: 1),
-        decoration: BoxDecoration(
-          color: active ? PineColors.paper : Colors.transparent,
-          borderRadius: BorderRadius.circular(PineRadius.seal),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 2,
-              height: 10,
-              color: active ? PineColors.accent : Colors.transparent,
-            ),
-            const SizedBox(width: 7),
-            Expanded(
-              child: Text(
-                label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: PineText.serif(
-                  size: PineType.meta,
-                  weight: active ? FontWeight.w600 : FontWeight.w400,
-                  color: active ? PineColors.ink : PineColors.ink2,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
+      height: 27,
+      selected: active,
+      leadingRule: true,
+      label: label,
+      trailing: overlay == null ? null : '›',
     );
   }
 
@@ -3460,6 +3418,109 @@ class _OutlinePill extends StatelessWidget {
           style: PineText.serif(
             size: PineType.meta,
             color: accent ? PineColors.accent : PineColors.ink2,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 左栏行：桌面端统一的行交互 —— 悬停浮起、按下轻微下沉、选中白底 + 左侧檀褐短横。
+///
+/// 之前左栏全是裸 Container：鼠标移上去毫无反应，用户不知道哪几行可以点。
+class _HoverRow extends StatefulWidget {
+  const _HoverRow({
+    required this.label,
+    required this.height,
+    this.trailing,
+    this.onTap,
+    this.selected = false,
+    this.leadingRule = false,
+    this.enabled = true,
+  });
+
+  final String label;
+  final double height;
+  final String? trailing;
+  final VoidCallback? onTap;
+  final bool selected;
+  final bool leadingRule;
+  final bool enabled;
+
+  @override
+  State<_HoverRow> createState() => _HoverRowState();
+}
+
+class _HoverRowState extends State<_HoverRow> {
+  bool _hover = false;
+  bool _down = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final clickable = widget.enabled && widget.onTap != null;
+    final bg = widget.selected
+        ? PineColors.paper
+        : (_hover && clickable ? PineColors.paper.withAlpha(140) : null);
+    return MouseRegion(
+      cursor: clickable ? SystemMouseCursors.click : MouseCursor.defer,
+      onEnter: (_) => setState(() => _hover = true),
+      onExit: (_) => setState(() {
+        _hover = false;
+        _down = false;
+      }),
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTapDown: clickable ? (_) => setState(() => _down = true) : null,
+        onTapCancel: clickable ? () => setState(() => _down = false) : null,
+        onTapUp: clickable ? (_) => setState(() => _down = false) : null,
+        onTap: widget.onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 120),
+          curve: Curves.easeOut,
+          height: widget.height,
+          margin: const EdgeInsets.only(bottom: 1),
+          padding: EdgeInsets.only(
+            left: widget.leadingRule ? 8 : 10,
+            right: 8,
+          ),
+          transform: Matrix4.translationValues(0, _down ? 1 : 0, 0),
+          decoration: BoxDecoration(
+            color: bg,
+            borderRadius: BorderRadius.circular(PineRadius.seal),
+          ),
+          child: Row(
+            children: [
+              if (widget.leadingRule) ...[
+                Container(
+                  width: 2,
+                  height: 10,
+                  color: widget.selected
+                      ? PineColors.accent
+                      : Colors.transparent,
+                ),
+                const SizedBox(width: 7),
+              ],
+              Expanded(
+                child: Text(
+                  widget.label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: PineText.serif(
+                    size: PineType.meta,
+                    weight: widget.selected ? FontWeight.w600 : FontWeight.w400,
+                    color: widget.selected
+                        ? PineColors.ink
+                        : PineColors.ink2,
+                  ),
+                ),
+              ),
+              if (widget.trailing != null)
+                Text(
+                  widget.trailing!,
+                  style: PineText.mono(
+                      size: PineType.caption, color: PineColors.ink3),
+                ),
+            ],
           ),
         ),
       ),

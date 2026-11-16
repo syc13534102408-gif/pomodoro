@@ -1106,10 +1106,19 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               children: [
                 Positioned.fill(
                   child: wide
-                      ? _desktopThreeColumn(session, view)
+                      ? (_desktopOverlay == _overlayStats
+                          // 报告整页化（2026-11-16 定稿）：阅读任务不该塞进 356pt 抽屉，
+                          // 直接吃掉中栏 + 右栏，左栏目录仍在，Esc / 「返回」退出。
+                          ? StatsPage(
+                              data: _data,
+                              onChanged: _replace,
+                              onBack: _desktopCloseOverlay,
+                            )
+                          : _desktopThreeColumn(session, view))
                       : _desktopCabin(session, view),
                 ),
-                if (_desktopOverlay != _overlayNone) ...[
+                if (_desktopOverlay != _overlayNone &&
+                    !(wide && _desktopOverlay == _overlayStats)) ...[
                   // 遮罩：浓墨 18%，点任意处关闭（160ms 淡入）。
                   Positioned.fill(
                     child: TweenAnimationBuilder<double>(
@@ -1164,6 +1173,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                           which: _overlayStats,
                           icon: Icons.bar_chart_rounded,
                           tooltip: '统计',
+                          pushPage: true,
                         ),
                         const SizedBox(width: 8),
                         _desktopOverlayButton(
@@ -1430,8 +1440,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               ),
               const SizedBox(width: 10),
               // 定稿：两个描边胶囊 —— 今日达成用檀褐，收工用纸灰。
+              // 1100 窗宽下中栏只有 444，胶囊再带「今日」就会把标题挤成省略号。
               _OutlinePill(
-                text: '今日 ${formatCompactMinutes(stats.todayMinutes)} · $pct%',
+                text: '${formatCompactMinutes(stats.todayMinutes)} · $pct%',
                 accent: true,
               ),
               const SizedBox(width: 6),
@@ -1797,6 +1808,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     required int which,
     required IconData icon,
     required String tooltip,
+    bool pushPage = false,
   }) {
     final on = _desktopOverlay == which;
     return Tooltip(
@@ -1809,9 +1821,22 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         child: InkWell(
           customBorder:
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-          onTap: () => setState(
-            () => _desktopOverlay = on ? _overlayNone : which,
-          ),
+          onTap: () {
+            // 报告是整页（阅读任务），窄窗也按整页推入，不走抽屉。
+            if (pushPage) {
+              if (!on) {
+                Navigator.of(context).push(MaterialPageRoute<void>(
+                  builder: (_) => StatsPage(
+                    data: _data,
+                    onChanged: _replace,
+                    onBack: () => Navigator.of(context).maybePop(),
+                  ),
+                ));
+              }
+              return;
+            }
+            setState(() => _desktopOverlay = on ? _overlayNone : which);
+          },
           child: SizedBox(
             width: 34,
             height: 34,
@@ -2150,14 +2175,13 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   Widget _desktopDrawer({required bool wide}) {
     final width =
         (MediaQuery.sizeOf(context).width - 16).clamp(300.0, 356.0).toDouble();
+    // 报告已改为整页（见 _buildDesktop 的 Stack），抽屉只剩日程与设置。
     final page = _desktopOverlay == _overlayPlan
         ? Padding(
-            // 横向内边距与统计/设置页对齐；顶部留给抽屉外的按钮带（见外层 Padding）。
+            // 横向内边距与设置页对齐；顶部留给抽屉外的按钮带（见外层 Padding）。
             padding: const EdgeInsets.fromLTRB(18, 0, 18, 16),
             child: PlanPanel(data: _data, onApply: _applyTodos),
           )
-        : _desktopOverlay == _overlayStats
-        ? StatsPage(data: _data, onChanged: _replace)
         : SettingsPage(
             data: _data,
             onChanged: _replace,

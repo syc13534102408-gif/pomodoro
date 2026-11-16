@@ -127,8 +127,8 @@ class PineButton extends StatelessWidget {
                       shape: RoundedRectangleBorder(
                           borderRadius:
                               BorderRadius.circular(PineRadius.settled)),
-                      textStyle: PineText.sans(
-                          size: PineType.body, weight: FontWeight.w600)),
+                      textStyle: Theme.of(context).textTheme.labelLarge!.merge(
+                          PineText.sans(size: PineType.body, weight: FontWeight.w600))),
                   child: loading
                       ? SizedBox(
                           width: PineSize.stateGraphic,

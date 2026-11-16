@@ -24,6 +24,7 @@ class StatsPage extends StatefulWidget {
     required this.data,
     required this.onChanged,
     this.onBack,
+    this.onOpenLedger,
   });
 
   final AppData data;
@@ -31,6 +32,7 @@ class StatsPage extends StatefulWidget {
 
   /// 非空时书眉左侧出现「←」：手机端是返回上一页，桌面整页是退回日课。
   final VoidCallback? onBack;
+  final VoidCallback? onOpenLedger;
 
   @override
   State<StatsPage> createState() => _StatsPageState();
@@ -52,7 +54,16 @@ class _StatsPageState extends State<StatsPage> {
     // 翻月、补记、事件行都要 Material 才能响应水波，所以在这里兜一层。
     return Material(
       color: PineColors.paper,
-      child: wide ? _wide(context, model) : _narrow(context, model),
+      child: Column(children: [
+        if (widget.onOpenLedger != null)
+          Align(
+              alignment: Alignment.centerRight,
+              child: TextButton.icon(
+                  onPressed: widget.onOpenLedger,
+                  icon: const Icon(Icons.list_alt),
+                  label: const Text('台账 · 全部记录'))),
+        Expanded(child: wide ? _wide(context, model) : _narrow(context, model)),
+      ]),
     );
   }
 

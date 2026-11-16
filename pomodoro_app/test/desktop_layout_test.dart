@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:pomodoro_app/main.dart';
 import 'package:pomodoro_app/pages/stats_page.dart';
+import 'package:pomodoro_app/pages/ledger_page.dart';
 import 'package:pomodoro_app/src/models.dart';
 import 'package:pomodoro_app/src/sheets.dart';
 import 'package:pomodoro_app/src/widgets.dart';
@@ -149,7 +150,7 @@ void main() {
     expect(find.text('＋ 补记'), findsOneWidget);
     await tester.tap(find.text('＋ 补记'));
     await tester.pumpAndSettle();
-    expect(find.text('补记已完成事件'), findsOneWidget);
+    expect(find.text('补记记录'), findsOneWidget);
   });
 
   testWidgets('桌面点「全部 ›」打开的是右侧抽屉（不是底部弹层）', (tester) async {
@@ -200,6 +201,27 @@ void main() {
     }
   });
 
+
+  testWidgets('500×640 可从报告进入真实台账并切换日程、返回当下', (tester) async {
+    try {
+      await _pumpDesktop(tester, width:500,height:640);
+      await tester.tap(find.byIcon(Icons.bar_chart_rounded).first);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('台账 · 全部记录'));
+      await tester.pumpAndSettle();
+      expect(find.byType(LedgerPage),findsOneWidget);
+      expect(find.text('全部记录'),findsOneWidget);
+      await tester.tap(find.text('日程').first);
+      await tester.pumpAndSettle();
+      expect(find.byType(PlanPanel),findsOneWidget);
+      expect(find.text('日程条目 1'),findsOneWidget);
+      await tester.tap(find.text('当下'));
+      await tester.pumpAndSettle();
+      expect(find.byType(LedgerPage),findsNothing);
+      expect(find.textContaining('今日课业排程'),findsOneWidget);
+      expect(tester.takeException(),isNull);
+    } finally { _restore(tester); }
+  });
 
   testWidgets('抽屉里的「导入」按钮不能被右上角抽屉开关盖住', (tester) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.macOS;

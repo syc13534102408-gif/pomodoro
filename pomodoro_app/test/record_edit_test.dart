@@ -125,26 +125,29 @@ void main() {
     // 面板出现，且两条记录都在（首页只列 3 条，这里是全部）
     expect(find.text('全部记录'), findsOneWidget);
     expect(find.textContaining('2 条 · 合计'), findsOneWidget);
-    expect(find.textContaining('9/27'), findsWidgets, reason: '按统计日分组的小标题');
-    expect(find.text('高数'), findsOneWidget);
+    expect(find.textContaining('2026-09-27'), findsWidgets, reason: '按统计日分组的小标题');
+    expect(find.descendant(of: find.byKey(ValueKey('record-$originalId')), matching: find.text('高数')), findsOneWidget);
+    await tester.scrollUntilVisible(find.text('英语'), 120,
+        scrollable: find.byType(Scrollable).last);
     expect(find.text('英语'), findsOneWidget);
 
     // 进详情
-    await tester.tap(find.text('高数'));
+    await tester.ensureVisible(find.byKey(ValueKey('record-$originalId')));
+    await tester.tap(find.byKey(ValueKey('record-$originalId')));
     await tester.pumpAndSettle();
     expect(find.text('记录详情'), findsOneWidget);
-    expect(find.text('修改这条记录'), findsOneWidget);
+    expect(find.text('编辑记录'), findsOneWidget);
     expect(find.text('删除这条记录'), findsOneWidget);
 
     // 修改 → 改时长 → 保存
-    await tester.tap(find.text('修改这条记录'));
+    await tester.tap(find.text('编辑记录'));
     await tester.pumpAndSettle();
-    expect(find.text('专注时长'), findsOneWidget);
+    expect(find.text('时长'), findsOneWidget);
     await tester.enterText(find.byType(TextField).first, '60');
 
     // 一并把这条记录归入事件：点开下拉 → 选事件
-    expect(find.text('归入专注事件'), findsOneWidget, reason: '对话框应有归属选择');
-    // 对话框现在有两个下拉（所属任务 + 归入专注事件），事件是后加的那个。
+    expect(find.text('归属事件'), findsOneWidget, reason: '对话框应有归属选择');
+    // 对话框现在有两个下拉（归属任务 + 归属事件），事件是后加的那个。
     await tester.tap(find.byType(DropdownButtonFormField<String>).last);
     await tester.pumpAndSettle();
     await tester.tap(find.textContaining('第六章').last);

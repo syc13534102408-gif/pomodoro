@@ -20,6 +20,7 @@ import '../src/storage.dart';
 import '../src/theme.dart';
 import '../src/ui/ui.dart';
 import '../src/widgets.dart';
+import 'ledger_page.dart';
 import 'settings_page.dart';
 import 'stats_page.dart';
 
@@ -63,6 +64,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   static const _overlayPlan = 3;
   // 0=无抽屉 1=统计 2=设置 3=日程（方向 B 专注舱）
   int _desktopOverlay = _overlayNone;
+  bool _ledgerOpen = false;
 
   /// 手机端底部导航当前 Tab（专注 / 报告 / 设置，D1）。
   int _tab = 0;
@@ -940,7 +942,11 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
           index: _tab,
           children: [
             _timerTab(),
-            StatsPage(data: _data, onChanged: _replace),
+            LedgerPage(
+              data: _data,
+              onChanged: _replace,
+              onComplete: _confirm,
+              onReturnToPresent: () => setState(() => _tab = 0)),
             SettingsPage(
               data: _data,
               onChanged: _replace,
@@ -953,7 +959,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       // 定稿书签栏 40px：选中项顶部 2px 檀褐短线，取代 iOS 胶囊式底栏。
       bottomNavigationBar: PaperTabs(
         index: _tab,
-        labels: const ['专注书房', '专注报告', '偏好设置'],
+        labels: const ['专注书房', '台账', '偏好设置'],
         onChanged: (index) => setState(() => _tab = index),
       ),
     );
@@ -1086,6 +1092,13 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   // 设置整页，与安卓同源数据与组件，页面后续改动自动同步。拖宽只留白，不拉伸。
 
   Widget _buildDesktop(BuildContext context) {
+    if (_ledgerOpen) {
+      return LedgerPage(
+          data: _data,
+          onChanged: _replace,
+          onComplete: _confirm,
+          onReturnToPresent: () => setState(() => _ledgerOpen = false));
+    }
     final now = DateTime.now();
     final session = _displaySession;
     final view = _displayView(now);
@@ -1113,6 +1126,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                               data: _data,
                               onChanged: _replace,
                               onBack: _desktopCloseOverlay,
+                              onOpenLedger: () => setState(() => _ledgerOpen = true),
                             )
                           : _desktopThreeColumn(session, view))
                       : _desktopCabin(session, view),
@@ -1298,6 +1312,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                   letterSpacing: 2)),
           const SizedBox(height: 4),
           _navRow('专注书房', null, current: true),
+          TextButton(
+              onPressed: () => setState(() => _ledgerOpen = true),
+              child: const Text('台账 · 记录与日程')),
           _navRow('专注报告与印谱', _overlayStats),
           _navRow('八日课业排程', _overlayPlan),
           _navRow('书房规制设置', _overlaySettings),
@@ -1830,6 +1847,10 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                     data: _data,
                     onChanged: _replace,
                     onBack: () => Navigator.of(context).maybePop(),
+                    onOpenLedger: () {
+                      Navigator.of(context).pop();
+                      setState(() => _ledgerOpen = true);
+                    },
                   ),
                 ));
               }

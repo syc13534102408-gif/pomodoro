@@ -97,11 +97,11 @@ void main() {
     await tester.tap(find.text('打开记录'));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('修改这条记录'));
+    await tester.tap(find.text('编辑记录'));
     await tester.pumpAndSettle();
 
     // 任务下拉：选「自控」
-    await tester.tap(find.text('所属任务'));
+    await tester.tap(find.text('归属任务'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('自控').last);
     await tester.pumpAndSettle();

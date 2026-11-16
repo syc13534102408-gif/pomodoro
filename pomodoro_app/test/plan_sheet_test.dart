@@ -113,7 +113,7 @@ void main() {
         findsNothing);
 
     // 默认落点仍是今天。
-    expect(find.descendant(of: panel, matching: find.textContaining('还没有安排')),
+    expect(find.descendant(of: panel, matching: find.textContaining('这一天没有待办')),
         findsOneWidget);
 
     await tester.tap(find.descendant(of: panel, matching: find.text(md(2))));
@@ -138,6 +138,7 @@ void main() {
     await _pumpHome(
       tester,
       AppData(todos: {
+        key(0): [TodoItem(text: '今日安排')],
         for (var back = 1; back <= 20; back++)
           key(back): [TodoItem(text: '往期 $back')],
       }),
@@ -174,6 +175,7 @@ void main() {
     await _pumpHome(
       tester,
       AppData(todos: {
+        key(0): [TodoItem(text: '今日安排')],
         for (var i = 1; i <= 12; i++) key(i): [TodoItem(text: 'D+$i')],
       }),
       size: const Size(500, 2200),
@@ -192,7 +194,8 @@ void main() {
       kind: PointerDeviceKind.mouse,
     );
     for (var i = 0; i < 8; i++) {
-      await gesture.moveBy(const Offset(-80, 0));
+      // 日期格加宽以完整容纳正文档日期，相应增加拖动距离。
+      await gesture.moveBy(const Offset(-120, 0));
       await tester.pump();
     }
     await gesture.up();

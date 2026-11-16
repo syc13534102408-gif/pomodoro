@@ -1,6 +1,8 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
+import '../pages/ledger_page.dart';
+import 'records_view.dart';
 import 'engine.dart';
 import 'models.dart';
 import 'plan_import.dart';
@@ -567,8 +569,6 @@ class _TodoRow extends StatelessWidget {
     required this.onToggle,
     required this.onRemove,
     this.onFocus,
-    this.onEdit,
-    this.onMenu,
   });
 
   final TodoItem item;
@@ -578,20 +578,12 @@ class _TodoRow extends StatelessWidget {
   /// 长按「设为专注事件」。日程面板不提供该动作（会给每条待办建一个任务），传 null 即可。
   final VoidCallback? onFocus;
 
-  /// 长按「编辑内容」。日程面板传这个；两者都给时长按优先编辑。
-  final VoidCallback? onEdit;
-
-  /// 桌面右键菜单（编辑/删除）。传入后鼠标右击该行会弹菜单。
-  final void Function(Offset globalPosition)? onMenu;
-
   @override
   Widget build(BuildContext context) {
     final row = PinePressable(
       onTap: null,
-      onLongPress: onEdit ?? onFocus,
-      semanticLabel: onEdit == null
-          ? '设为专注事件 ${item.text}'
-          : '编辑或长按修改：${item.text}',
+      onLongPress: onFocus,
+      semanticLabel: '设为专注事件 ${item.text}',
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
         decoration: BoxDecoration(
@@ -619,25 +611,81 @@ class _TodoRow extends StatelessWidget {
                 ),
               ),
             ),
-            // 常显的编辑按钮（2026-10-26 反馈：批量改内容时右键/长按太繁复）。
-            if (onEdit != null)
-              _GhostIcon(
-                  icon: Icons.edit_outlined, label: '编辑内容', onTap: onEdit!),
             _GhostIcon(
-                icon: Icons.delete_outline, label: '删除待办', onTap: onRemove),
+              icon: Icons.delete_outline,
+              label: '删除待办',
+              onTap: onRemove,
+            ),
             const SizedBox(width: 6),
           ],
         ),
       ),
     );
-    final withMenu = onMenu == null
-        ? row
-        : GestureDetector(
-            behavior: HitTestBehavior.translucent,
-            onSecondaryTapDown: (details) => onMenu!(details.globalPosition),
-            child: row,
-          );
-    return withMenu;
+    return row;
+  }
+}
+
+/// 日程事实行：消费沉淀表面，保留既有编辑、删除与勾选入口。
+class _ScheduleRow extends StatelessWidget {
+  const _ScheduleRow({
+    required this.item,
+    required this.onToggle,
+    required this.onRemove,
+    required this.onEdit,
+    required this.onMenu,
+  });
+  final TodoItem item;
+  final VoidCallback onToggle, onRemove, onEdit;
+  final void Function(Offset) onMenu;
+  @override
+  Widget build(BuildContext context) {
+    final palette = PinePalette.of(context);
+    return GestureDetector(
+      onSecondaryTapDown: (details) => onMenu(details.globalPosition),
+      child: PinePressable(
+        onTap: null,
+        onLongPress: onEdit,
+        semanticLabel: '编辑或长按修改：${item.text}',
+        child: SettledVariantSurface(
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+          child: Row(
+            children: [
+              SizedBox(
+                width: 48,
+                height: 48,
+                child: Checkbox(value: item.done, onChanged: (_) => onToggle()),
+              ),
+              Expanded(
+                child: Text(
+                  item.text,
+                  style:
+                      PineText.sans(
+                        height: PineLineHeight.body,
+                        color: item.done
+                            ? palette.textSecondary
+                            : palette.textPrimary,
+                      ).copyWith(
+                        decoration: item.done
+                            ? TextDecoration.lineThrough
+                            : null,
+                      ),
+                ),
+              ),
+              IconButton(
+                tooltip: '编辑内容',
+                onPressed: onEdit,
+                icon: const Icon(Icons.edit_outlined, size: 18),
+              ),
+              IconButton(
+                tooltip: '删除待办',
+                onPressed: onRemove,
+                icon: const Icon(Icons.delete_outline, size: 18),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
 
@@ -785,9 +833,9 @@ class _PlanPanelState extends State<PlanPanel> {
   final _stripScroll = ScrollController();
   late String _selectedKey = _todayKey;
 
-  /// 日期格宽与格间距，必须与 [_dateStrip] 里的 `width: 64` / `SizedBox(width: 8)`
+  /// 日期格宽与格间距，必须与 [_dateStrip] 里的 `width: _chipWidth` / `SizedBox(width: 8)`
   /// 一致——自动滚动按它们算每格的左边界。
-  static const double _chipWidth = 64;
+  static const double _chipWidth = 96;
   static const double _chipGap = 8;
 
   /// 上一次同步过滚动位置时的「选中日 + 日期条格数」。
@@ -812,6 +860,17 @@ class _PlanPanelState extends State<PlanPanel> {
   }
 
   @override
+  void didUpdateWidget(covariant PlanPanel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!identical(oldWidget.data.todos, widget.data.todos)) {
+      _todos = {
+        for (final entry in widget.data.todos.entries)
+          entry.key: List<TodoItem>.of(entry.value),
+      };
+    }
+  }
+
+  @override
   void dispose() {
     _controller.dispose();
     _stripScroll.dispose();
@@ -823,13 +882,13 @@ class _PlanPanelState extends State<PlanPanel> {
     widget.onApply(transform);
   }
 
-  /// 日期条内容：今天常驻 + **所有有内容的日子（过去、将来的都算）**。
+  /// 日期条只展示所有有内容的日子，空的今天也不补入。
   /// 空档期（比如只排了周五周六）不会出现一排空格子。
   ///
   /// 2026-11-06 起不再过滤 `key < 今天`：回看往期日程是刚需（核对这周到底
   /// 落了哪些），而"只有今天及以后"是当初误把日期条当"待办"而非"日历"。
   List<String> get _dayKeys {
-    final keys = <String>{_todayKey};
+    final keys = <String>{};
     for (final entry in _todos.entries) {
       if (entry.value.isEmpty) continue;
       keys.add(entry.key);
@@ -862,7 +921,7 @@ class _PlanPanelState extends State<PlanPanel> {
       // 已完整可见就不动：否则用户点一下右边刚露头的格子，整条会突然平移。
       if (left >= viewStart && right <= viewEnd) return;
       final target = (left - 56).clamp(0.0, position.maxScrollExtent);
-      if (!_stripJumpedOnce) {
+      if (!_stripJumpedOnce || MediaQuery.disableAnimationsOf(context)) {
         // 首次落位直接跳：有几十天往期时，从最老一天"滑"到今天会是 220ms 的拖影。
         _stripJumpedOnce = true;
         position.jumpTo(target);
@@ -870,50 +929,58 @@ class _PlanPanelState extends State<PlanPanel> {
       }
       _stripScroll.animateTo(
         target,
-        duration: const Duration(milliseconds: 220),
+        duration: PineMotion.standard,
         curve: Curves.easeOutCubic,
       );
     });
   }
 
   /// 勾选即重排：完成的按勾选顺序浮到顶部（见 toggleTodoDone）。
-  void _toggle(String dayKey, TodoItem item) => _apply((todos) => {
-        ...todos,
-        dayKey: toggleTodoDone(todos[dayKey] ?? const <TodoItem>[], item.id),
-      });
+  void _toggle(String dayKey, TodoItem item) => _apply(
+    (todos) => {
+      ...todos,
+      dayKey: toggleTodoDone(todos[dayKey] ?? const <TodoItem>[], item.id),
+    },
+  );
 
-  void _remove(String dayKey, TodoItem item) => _apply((todos) => {
-        ...todos,
-        dayKey: [
-          for (final entry in todos[dayKey] ?? const <TodoItem>[])
-            if (entry.id != item.id) entry,
-        ],
-      });
+  void _remove(String dayKey, TodoItem item) => _apply(
+    (todos) => {
+      ...todos,
+      dayKey: [
+        for (final entry in todos[dayKey] ?? const <TodoItem>[])
+          if (entry.id != item.id) entry,
+      ],
+    },
+  );
 
   /// 长按编辑：只改文本，id/勾选状态/所属日期都不动。
   Future<void> _editItem(String dayKey, TodoItem item) async {
     final text = await showTodoEditDialog(context, initialText: item.text);
     if (text == null || text.isEmpty) return;
-    _apply((todos) => {
-          ...todos,
-          dayKey: [
-            for (final entry in todos[dayKey] ?? const <TodoItem>[])
-              entry.id == item.id ? entry.copyWith(text: text) : entry,
-          ],
-        });
+    _apply(
+      (todos) => {
+        ...todos,
+        dayKey: [
+          for (final entry in todos[dayKey] ?? const <TodoItem>[])
+            entry.id == item.id ? entry.copyWith(text: text) : entry,
+        ],
+      },
+    );
   }
 
   void _addToSelected() {
     final text = _controller.text.trim();
     if (text.isEmpty) return;
     _controller.clear();
-    _apply((todos) => {
-          ...todos,
-          _selectedKey: [
-            ...todos[_selectedKey] ?? const <TodoItem>[],
-            TodoItem(text: text),
-          ],
-        });
+    _apply(
+      (todos) => {
+        ...todos,
+        _selectedKey: [
+          ...todos[_selectedKey] ?? const <TodoItem>[],
+          TodoItem(text: text),
+        ],
+      },
+    );
   }
 
   Future<void> _openImport() async {
@@ -933,8 +1000,10 @@ class _PlanPanelState extends State<PlanPanel> {
     if (!mounted) return;
     ScaffoldMessenger.maybeOf(context)?.showSnackBar(
       SnackBar(
-        content: Text('已导入 ${merged.added} 条'
-            '${merged.duplicated == 0 ? '' : '（跳过 ${merged.duplicated} 条重复）'}'),
+        content: Text(
+          '已导入 ${merged.added} 条'
+          '${merged.duplicated == 0 ? '' : '（跳过 ${merged.duplicated} 条重复）'}',
+        ),
         behavior: SnackBarBehavior.floating,
       ),
     );
@@ -942,195 +1011,211 @@ class _PlanPanelState extends State<PlanPanel> {
 
   @override
   Widget build(BuildContext context) {
-    final keys = _dayKeys;
-    if (!keys.contains(_selectedKey)) _selectedKey = _todayKey;
-    _syncStripToSelected(keys);
-    final items = _todos[_selectedKey] ?? const <TodoItem>[];
-    final totalItems =
-        _todos.values.fold<int>(0, (sum, list) => sum + list.length);
-    final doneItems = _todos.values.fold<int>(
-        0, (sum, list) => sum + list.where((item) => item.done).length);
-    final scheduledDays =
-        _todos.values.where((list) => list.isNotEmpty).length;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        if (widget.showTitle)
-          Row(
-            children: [
-              const Text('日程',
-                  style: TextStyle(
-                      color: PineColors.ink,
-                      fontSize: 17,
-                      fontWeight: FontWeight.w700)),
-              const Spacer(),
-              PineButton(
-                label: '导入',
-                icon: Icons.file_upload_outlined,
-                expand: false,
-                height: 34,
-                color: PineColors.card,
-                foregroundColor: PineColors.pine,
-                onPressed: _openImport,
-              ),
-            ],
-          ),
-        if (widget.showTitle) const SizedBox(height: 10),
-        _dateStrip(keys),
-        const SizedBox(height: 8),
-        Expanded(
-          child: items.isEmpty
-              ? _emptyDay()
-              : ListView(
-                  padding: EdgeInsets.zero,
-                  children: [
-                    SettledTodoRows(
-                      items: items,
-                      rowHeight: 54,
-                      itemBuilder: (item) => Padding(
-                        padding: const EdgeInsets.only(bottom: 6),
-                        child: _TodoRow(
-                          item: item,
-                          onToggle: () => _toggle(_selectedKey, item),
-                          onRemove: () => _remove(_selectedKey, item),
-                          onEdit: () => _editItem(_selectedKey, item),
-                          onMenu: (position) => showPlanItemMenu(
-                            context,
-                            position,
-                            onEdit: () => _editItem(_selectedKey, item),
-                            onRemove: () => _remove(_selectedKey, item),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final palette = PinePalette.of(context);
+        final desktop =
+            Theme.of(context).platform == TargetPlatform.macOS ||
+            Theme.of(context).platform == TargetPlatform.windows ||
+            Theme.of(context).platform == TargetPlatform.linux;
+        final rowMinimum = desktop ? 56.0 : 64.0;
+        // 长文本增加行高，不以省略号或缩字号换取固定高度。
+        final textWidth = (constraints.maxWidth - 154).clamp(80.0, 800.0);
+        final rowHeight = (_todos[_selectedKey] ?? const <TodoItem>[])
+            .fold<double>(rowMinimum, (height, item) {
+              final painter = TextPainter(
+                text: TextSpan(
+                  text: item.text,
+                  style: PineText.sans(height: PineLineHeight.body),
                 ),
-        ),
-        const SizedBox(height: 6),
-        Row(
+                textDirection: Directionality.of(context),
+              )..layout(maxWidth: textWidth);
+              final needed = painter.height + 24;
+              return needed > height ? needed : height;
+            });
+        final keys = _dayKeys;
+        if (!keys.contains(_selectedKey)) _selectedKey = _todayKey;
+        _syncStripToSelected(keys);
+        final items = _todos[_selectedKey] ?? const <TodoItem>[];
+        final totalItems = _todos.values.fold<int>(
+          0,
+          (sum, list) => sum + list.length,
+        );
+        final doneItems = _todos.values.fold<int>(
+          0,
+          (sum, list) => sum + list.where((item) => item.done).length,
+        );
+        final scheduledDays = _todos.values
+            .where((list) => list.isNotEmpty)
+            .length;
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Expanded(
-              child: TextField(
-                controller: _controller,
-                style: const TextStyle(fontSize: 13),
-                decoration: InputDecoration(
-                  hintText: '加到 ${_shortLabel(_selectedKey)}',
-                  isDense: true,
-                ),
-                onSubmitted: (_) => _addToSelected(),
-              ),
-            ),
-            const SizedBox(width: 8),
-            PineButton(
-              label: '添加',
-              icon: Icons.add,
-              expand: false,
-              height: 40,
-              color: PineColors.ink,
-              onPressed: _addToSelected,
-            ),
-          ],
-        ),
-        const SizedBox(height: 6),
-        Text(
-          '已排 $scheduledDays 天 · 共 $totalItems 条 · 完成 $doneItems 条',
-          style: const TextStyle(color: PineColors.sub, fontSize: 11),
-        ),
-      ],
-    );
-  }
-
-  /// 日期条：每格 = 日期 + 星期 + 当天进度（done/total）。
-  ///
-  /// 外面那层 [ScrollConfiguration] 是给桌面端的：Flutter 默认的 `dragDevices`
-  /// **不含鼠标**，所以 macOS 上点头拖不动这根条（只能两指滑），手感上"这栏不能拖"。
-  /// 放开鼠标后：按住拖动 / 甩一下都能翻，手机端仍走 touch，行为不变。
-  Widget _dateStrip(List<String> keys) {
-    return SizedBox(
-      // 66 = 三行（日期/星期/进度，12+10+10 号字）+ 上下 6 内边距，留 2pt 余量。
-      height: 66,
-      child: ScrollConfiguration(
-        behavior: const _DragAllScrollBehavior(),
-        child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        controller: _stripScroll,
-        padding: EdgeInsets.zero,
-        itemCount: keys.length,
-        separatorBuilder: (_, __) => const SizedBox(width: _chipGap),
-        itemBuilder: (context, index) {
-          final key = keys[index];
-          final day = DateTime.tryParse(key) ?? _now;
-          final list = _todos[key] ?? const <TodoItem>[];
-          final done = list.where((item) => item.done).length;
-          final selected = key == _selectedKey;
-          final isToday = key == _todayKey;
-          // 往期日子整体降一档灰：今天仍是深墨色，扫一眼就能分清"这条是历史"。
-          final isPast = key.compareTo(_todayKey) < 0;
-          return GestureDetector(
-            onTap: () => setState(() => _selectedKey = key),
-            child: Container(
-              width: _chipWidth,
-              padding: const EdgeInsets.symmetric(vertical: 6),
-              decoration: BoxDecoration(
-                color: selected ? PineColors.tint(PineColors.pine) : PineColors.card,
-                borderRadius: BorderRadius.circular(Paper.chipRadius),
-                border: Border.all(
-                    color: selected ? PineColors.pine : PineColors.line),
-              ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
+            if (widget.showTitle)
+              Row(
                 children: [
                   Text(
-                    isToday ? '今天' : '${day.month}/${day.day}',
-                    style: TextStyle(
-                      color: selected
-                          ? PineColors.pine
-                          : (isPast ? PineColors.sub : PineColors.ink),
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
+                    '日程',
+                    style: PineText.sans(
+                      size: PineType.body,
+                      color: palette.textPrimary,
                     ),
                   ),
-                  const SizedBox(height: 2),
-                  Text(
-                    '周${'一二三四五六日'[day.weekday - 1]}',
-                    style:
-                        const TextStyle(color: PineColors.sub, fontSize: 10),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    list.isEmpty ? '—' : '$done/${list.length}',
-                    style: TextStyle(
-                      color: list.isEmpty
-                          ? PineColors.faint
-                          : (selected
-                              ? PineColors.pine
-                              : (isPast ? PineColors.faint : PineColors.sub)),
-                      fontSize: 10,
-                    ),
+                  const Spacer(),
+                  PineButton(
+                    label: '导入',
+                    icon: Icons.file_upload_outlined,
+                    expand: false,
+                    height: desktop ? 32 : 48,
+                    color: palette.surface,
+                    foregroundColor: palette.textPrimary,
+                    onPressed: _openImport,
                   ),
                 ],
               ),
+            if (widget.showTitle) const SizedBox(height: 10),
+            _dateStrip(keys),
+            const SizedBox(height: 8),
+            Text(
+              '所选日期：$_selectedKey',
+              style: PineText.sans(
+                size: PineType.auxiliary,
+                color: palette.textSecondary,
+              ),
             ),
-          );
-        },
+            const SizedBox(height: 8),
+            Expanded(
+              child: items.isEmpty
+                  ? _emptyDay()
+                  : ListView(
+                      padding: EdgeInsets.zero,
+                      children: [
+                        SettledTodoRows(
+                          items: items,
+                          rowHeight: rowHeight + 6,
+                          itemBuilder: (item) => Padding(
+                            padding: const EdgeInsets.only(bottom: 6),
+                            child: _ScheduleRow(
+                              item: item,
+                              onToggle: () => _toggle(_selectedKey, item),
+                              onRemove: () => _remove(_selectedKey, item),
+                              onEdit: () => _editItem(_selectedKey, item),
+                              onMenu: (position) => showPlanItemMenu(
+                                context,
+                                position,
+                                onEdit: () => _editItem(_selectedKey, item),
+                                onRemove: () => _remove(_selectedKey, item),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+            ),
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _controller,
+                    style: PineText.sans(color: palette.textPrimary),
+                    decoration: InputDecoration(
+                      hintText: '加到 ${_shortLabel(_selectedKey)}',
+                      isDense: true,
+                    ),
+                    onSubmitted: (_) => _addToSelected(),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                PineButton(
+                  label: '添加',
+                  icon: Icons.add,
+                  expand: false,
+                  height: desktop ? 44 : 52,
+                  color: palette.textPrimary,
+                  onPressed: _addToSelected,
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Text(
+              '已排 $scheduledDays 天 · 共 $totalItems 条 · 完成 $doneItems 条',
+              style: PineText.sans(
+                size: PineType.auxiliary,
+                color: palette.textAuxiliary,
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  /// 日期序列仅有内容日期；键盘、触摸及鼠标均可选择。
+  Widget _dateStrip(List<String> keys) {
+    final palette = PinePalette.of(context);
+    final desktop =
+        Theme.of(context).platform == TargetPlatform.macOS ||
+        Theme.of(context).platform == TargetPlatform.windows ||
+        Theme.of(context).platform == TargetPlatform.linux;
+    return SizedBox(
+      height: desktop ? 56 : 64,
+      child: ScrollConfiguration(
+        behavior: const _DragAllScrollBehavior(),
+        child: ListView.separated(
+          scrollDirection: Axis.horizontal,
+          controller: _stripScroll,
+          itemCount: keys.length,
+          padding: EdgeInsets.zero,
+          separatorBuilder: (_, __) => const SizedBox(width: _chipGap),
+          itemBuilder: (context, index) {
+            final key = keys[index];
+            final list = _todos[key]!;
+            final selected = key == _selectedKey;
+            return SizedBox(
+              width: _chipWidth,
+              child: PinePressable(
+                onTap: () => setState(() => _selectedKey = key),
+                semanticLabel: '选择日期 $key',
+                child: SettledVariantSurface(
+                  padding: EdgeInsets.zero,
+                  borderColor: selected ? palette.textPrimary : palette.divider,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        _shortLabel(key),
+                        style: PineText.sans(color: palette.textPrimary),
+                      ),
+                      Text(
+                        '${list.where((item) => item.done).length}/${list.length}',
+                        style: PineText.sans(
+                          size: PineType.auxiliary,
+                          color: palette.textAuxiliary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
         ),
       ),
     );
   }
 
-  Widget _emptyDay() {
-    return Align(
-      alignment: Alignment.topLeft,
-      child: Padding(
-        padding: const EdgeInsets.only(top: 8),
-        child: Text(
-          '${_shortLabel(_selectedKey)} 还没有安排 · 在下面加一条，或点「导入」粘贴一堆。',
-          style: const TextStyle(color: PineColors.sub, fontSize: 12),
-        ),
+  Widget _emptyDay() => Align(
+    alignment: Alignment.topLeft,
+    child: Padding(
+      padding: const EdgeInsets.only(top: PineSpacing.section),
+      child: Text(
+        _dayKeys.isEmpty ? '还没有日程' : '这一天没有待办',
+        style: PineText.sans(color: PinePalette.of(context).textSecondary),
       ),
-    );
-  }
+    ),
+  );
 
   String _shortLabel(String key) {
     final day = DateTime.tryParse(key);
@@ -1349,538 +1434,43 @@ class _PlanImportDialogState extends State<_PlanImportDialog> {
   }
 }
 
-/// 补记已完成事件。
-Future<void> showManualSheet(
-  BuildContext context, {
-  required AppData data,
+/// 补记与记录编辑消费同一沉淀表单；不改变引擎或持久化规则。
+Future<void> showManualSheet(BuildContext context, {
+  required AppData data, required DataChanged onChanged,
+}) => showModalBottomSheet(context: context, isScrollControlled: true,
+  builder: (context) => SafeArea(child: SizedBox(
+    height: MediaQuery.sizeOf(context).height * .9,
+    child: RecordEditor(data: data, onSaved: (next) { onChanged(next); Navigator.pop(context); }))));
+
+Future<void> showRecordDetailSheet(BuildContext context, {
+  required AppData data, required FocusRecord record, required Color color,
   required DataChanged onChanged,
-}) {
-  return showModalBottomSheet(
-    context: context,
-    isScrollControlled: true,
-    backgroundColor: PineColors.paper,
-    builder: (context) => _ManualSheet(data: data, onChanged: onChanged),
-  );
-}
-
-class _ManualSheet extends StatefulWidget {
-  const _ManualSheet({required this.data, required this.onChanged});
-
-  final AppData data;
-  final DataChanged onChanged;
-
-  @override
-  State<_ManualSheet> createState() => _ManualSheetState();
-}
-
-class _ManualSheetState extends State<_ManualSheet> {
-  final _minutes = TextEditingController();
-  late String _taskName;
-  late DateTime _at;
-
-  @override
-  void initState() {
-    super.initState();
-    _minutes.text = widget.data.settings.focus.toString();
-    _taskName = widget.data.selectedTask.name;
-    _at = DateTime.now();
-  }
-
-  @override
-  void dispose() {
-    _minutes.dispose();
-    super.dispose();
-  }
-
-  Future<void> _pickTime() async {
-    final time = await showTimePicker(
-      context: context,
-      initialTime: TimeOfDay.fromDateTime(_at),
-    );
-    if (time == null) return;
-    setState(() {
-      _at = DateTime(_at.year, _at.month, _at.day, time.hour, time.minute);
-    });
-  }
-
-  /// 补记过去某天：只选日期，时刻沿用当前已选时间。
-  /// 归属日由 addManual 的 dateKey(at) 自动决定（凌晨 3 点分界生效）。
-  Future<void> _pickDate() async {
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: _at.isAfter(today) ? today : _at,
-      firstDate: today.subtract(const Duration(days: 365)),
-      lastDate: today,
-    );
-    if (picked == null) return;
-    setState(() {
-      _at =
-          DateTime(picked.year, picked.month, picked.day, _at.hour, _at.minute);
-    });
-  }
-
-  void _save() {
-    final minutes = double.tryParse(_minutes.text);
-    if (minutes == null || minutes <= 0) return;
-    final next = TimerEngine.addManual(
-      widget.data,
-      taskName: _taskName,
-      minutes: minutes,
-      at: _at,
-    );
-    widget.onChanged(next);
-    Navigator.pop(context);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final tasks = widget.data.tasks;
-    return _SheetScaffold(
-      title: '补记已完成事件',
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          DropdownButtonFormField<String>(
-            initialValue: _taskName,
-            decoration: const InputDecoration(labelText: '任务', isDense: true),
-            items: [
-              for (final task in tasks)
-                DropdownMenuItem<String>(
-                  value: task.name,
-                  child: Text(task.name),
-                ),
-            ],
-            onChanged: (value) {
-              if (value != null) setState(() => _taskName = value);
-            },
-          ),
-          const SizedBox(height: 14),
-          TextField(
-            controller: _minutes,
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            style: pineNumberStyle(fontSize: 14),
-            decoration: const InputDecoration(
-                labelText: '专注时长', suffixText: '分钟', isDense: true),
-          ),
-          const SizedBox(height: 14),
-          Row(
-            children: [
-              Expanded(
-                child: PineButton(
-                  label:
-                      '${_at.month}/${_at.day}（${_at.year == DateTime.now().year ? '' : '${_at.year}/'}${_weekdayLabel(_at)}）',
-                  icon: Icons.event,
-                  color: PineColors.card,
-                  foregroundColor: PineColors.ink,
-                  onPressed: _pickDate,
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: PineButton(
-                  label:
-                      '完成时间 ${_at.hour.toString().padLeft(2, '0')}:${_at.minute.toString().padLeft(2, '0')}',
-                  icon: Icons.schedule,
-                  color: PineColors.card,
-                  foregroundColor: PineColors.ink,
-                  onPressed: _pickTime,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          PineButton(
-            label: '添加完成记录',
-            onPressed: _save,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// 状态徽章（记录详情用）。
-Color _badgeColor(RecordStatus status) {
-  switch (status) {
-    case RecordStatus.completed:
-    case RecordStatus.manual:
-      return PineColors.tint(PineColors.pine);
-    case RecordStatus.paused:
-      return PineColors.tint(PineColors.gold);
-    case RecordStatus.interrupted:
-      return PineColors.tint(PineColors.faint);
-    case RecordStatus.inProgress:
-      return PineColors.tint(PineColors.focus);
-  }
-}
-
-/// 记录详情：只读展示一条专注记录（D2），可删除。
-Future<void> showRecordDetailSheet(
-  BuildContext context, {
-  required AppData data,
-  required FocusRecord record,
-  required Color color,
-  required DataChanged onChanged,
-}) {
-  return showModalBottomSheet(
-    context: context,
-    isScrollControlled: true,
-    backgroundColor: PineColors.paper,
-    builder: (context) => _RecordDetailSheet(
-      data: data,
-      record: record,
-      color: color,
-      onChanged: onChanged,
-    ),
-  );
-}
-
-class _RecordDetailSheet extends StatelessWidget {
-  const _RecordDetailSheet({
-    required this.data,
-    required this.record,
-    required this.color,
-    required this.onChanged,
-  });
-
-  final AppData data;
-  final FocusRecord record;
-  final Color color;
-  final DataChanged onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    final at = record.at.toLocal();
-    return _SheetScaffold(
-      title: '记录详情',
-      trailing: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
-        decoration: BoxDecoration(
-          color: _badgeColor(record.status),
-          borderRadius: BorderRadius.circular(999),
-        ),
-        child: Text(
-          record.status.label,
-          style: const TextStyle(
-            color: PineColors.ink,
-            fontSize: 11,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _DetailRow(
-            label: '专注事件',
-            child: Row(
-              children: [
-                Container(
-                  width: 10,
-                  height: 10,
-                  decoration:
-                      BoxDecoration(color: color, shape: BoxShape.circle),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    record.taskName,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                        color: PineColors.ink,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          _DetailRow(
-            label: '时长',
-            child: DurationText(record.minutes,
-                style: pineNumberStyle(fontSize: 14)),
-          ),
-          _DetailRow(
-            label: '完成于',
-            child: Text(
-              '${at.month}月${at.day}日 ${at.hour.toString().padLeft(2, '0')}:${at.minute.toString().padLeft(2, '0')}',
-              style: pineNumberStyle(fontSize: 13),
-            ),
-          ),
-          const SizedBox(height: 16),
-          SizedBox(
-            height: 46,
-            child: PineButton(
-              label: '修改这条记录',
-              onPressed: () => _edit(context),
-            ),
-          ),
-          const SizedBox(height: 10),
-          SizedBox(
-            height: 46,
-            child: OutlinedButton.icon(
-              onPressed: () => _delete(context),
-              icon: const Icon(Icons.delete_outline,
-                  size: 18, color: PineColors.focus),
-              label: const Text(
-                '删除这条记录',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: PineColors.focus,
-                ),
-              ),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: PineColors.focus,
-                backgroundColor: Colors.transparent,
-                side: const BorderSide(color: PineColors.focus, width: 1.5),
-                shape: const StadiumBorder(),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// 修改这条记录：时长 + 完成时刻。保存时重算归属日（与补记面板共用同一套选择器）。
-  Future<void> _edit(BuildContext context) async {
-    final rounded = record.minutes == record.minutes.roundToDouble()
-        ? record.minutes.toStringAsFixed(0)
-        : record.minutes.toStringAsFixed(1);
-    final controller = TextEditingController(text: rounded);
-    var at = record.at;
-    // '' = 不属于任何事件（下拉 value 不能为 null，否则显示的是 hint 而不是选中项）
-    // 所属任务（2026-11-02）：记录可以是"记错任务"的，之前只能改时长/时刻，
-    // 「高数」改成「自控」这种需求无处可改。
-    var taskName = record.taskName;
-    final taskNames = <String>{
-      for (final task in data.tasks) task.name,
-      record.taskName,
-    }.toList()
-      ..sort();
-
-    var eventId = record.eventId ?? '';
-    // 事件按任务过滤：跨任务的错误归属本来就不该出现，下拉里只给同任务的事件。
-    Map<String, String> eventOptionsFor(String forTask) {
-      final options = <String, String>{'': '不属于任何事件'};
-      for (final event in data.events) {
-        if (event.taskName != forTask) continue;
-        options[event.id] = event.statusLabel.isEmpty
-            ? event.name
-            : '${event.name} · ${event.statusLabel}';
-      }
-      return options;
-    }
-    final saved = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (dialogContext, setDialogState) {
-          String two(int value) => value.toString().padLeft(2, '0');
-          return AlertDialog(
-            title: const Text('修改这条记录', style: TextStyle(fontSize: 15)),
-            // 固定宽度：AlertDialog 按内在宽度测量，而 stretch/Expanded 需要有界宽度，
-            // 两者相遇会触发 hasSize 布局断言。
-            content: SizedBox(
-              width: 300,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  TextField(
-                    controller: controller,
-                    autofocus: true,
-                    keyboardType:
-                        const TextInputType.numberWithOptions(decimal: true),
-                    style: pineNumberStyle(fontSize: 14),
-                    decoration: const InputDecoration(
-                        labelText: '专注时长', suffixText: '分钟', isDense: true),
-                  ),
-                  const SizedBox(height: 14),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: PineButton(
-                          label:
-                              '${at.month}/${at.day}（${at.year == DateTime.now().year ? '' : '${at.year}/'}${_weekdayLabel(at)}）',
-                          icon: Icons.event,
-                          color: PineColors.card,
-                          foregroundColor: PineColors.ink,
-                          onPressed: () async {
-                            final picked = await showDatePicker(
-                              context: dialogContext,
-                              initialDate: at,
-                              firstDate: DateTime(2020),
-                              lastDate:
-                                  DateTime.now().add(const Duration(days: 1)),
-                            );
-                            if (picked != null) {
-                              setDialogState(() => at = DateTime(
-                                  picked.year,
-                                  picked.month,
-                                  picked.day,
-                                  at.hour,
-                                  at.minute));
-                            }
-                          },
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: PineButton(
-                          label: '${two(at.hour)}:${two(at.minute)}',
-                          icon: Icons.schedule,
-                          color: PineColors.card,
-                          foregroundColor: PineColors.ink,
-                          onPressed: () async {
-                            final picked = await showTimePicker(
-                              context: dialogContext,
-                              initialTime: TimeOfDay.fromDateTime(at),
-                            );
-                            if (picked != null) {
-                              setDialogState(() => at = DateTime(
-                                  at.year,
-                                  at.month,
-                                  at.day,
-                                  picked.hour,
-                                  picked.minute));
-                            }
-                          },
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 14),
-                  // 所属任务：改这里会重置下方事件选择（跨任务的事件不允许保留）。
-                  DropdownButtonFormField<String>(
-                    initialValue: taskNames.contains(taskName) ? taskName : null,
-                    isDense: true,
-                    decoration: const InputDecoration(
-                        labelText: '所属任务', isDense: true),
-                    items: [
-                      for (final name in taskNames)
-                        DropdownMenuItem<String>(
-                          value: name,
-                          child: Text(name,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(fontSize: 13)),
-                        ),
-                    ],
-                    onChanged: (value) => setDialogState(() {
-                      if (value == null || value == taskName) return;
-                      taskName = value;
-                      eventId = ''; // 换任务 → 事件必须重选，避免任务与事件对不上
-                    }),
-                  ),
-                  const SizedBox(height: 14),
-                  // 归入哪条专注事件：把漏归 / 悬空的记录接回正确事件（数据修复入口）
-                  Builder(builder: (context) {
-                    final eventOptions = eventOptionsFor(taskName);
-                    if (!eventOptions.containsKey(eventId)) {
-                      // 旧数据可能残留指向已删除事件、或别的任务事件的 id：
-                      // 补一个可显示的项，避免下拉断言失败，同时提示它不匹配。
-                      eventOptions[eventId] = '（与当前任务不匹配的旧事件）';
-                    }
-                    return DropdownButtonFormField<String>(
-                      // key 随任务/选择变化，强制重建，否则 initialValue 不会跟着刷新
-                      key: ValueKey<String>('event-$taskName-$eventId'),
-                      initialValue: eventId,
-                      isDense: true,
-                      decoration: const InputDecoration(
-                          labelText: '归入专注事件', isDense: true),
-                      items: [
-                        for (final entry in eventOptions.entries)
-                          DropdownMenuItem<String>(
-                            value: entry.key,
-                            child: Text(
-                              entry.value,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(fontSize: 13),
-                            ),
-                          ),
-                      ],
-                      onChanged: (value) =>
-                          setDialogState(() => eventId = value ?? ''),
-                    );
-                  }),
-                ],
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(dialogContext, false),
-                child: const Text('取消'),
-              ),
-              TextButton(
-                onPressed: () => Navigator.pop(dialogContext, true),
-                child: const Text('保存'),
-              ),
-            ],
-          );
-        },
-      ),
-    );
-    if (saved != true) return;
-    final minutes = double.tryParse(controller.text.trim());
-    if (minutes == null || minutes < 0) return;
-    var next = TimerEngine.updateRecord(
-      data,
-      record.id,
-      minutes: minutes,
-      at: at,
-      taskName: taskName,
-    );
-    next = TimerEngine.setRecordEvent(
-        next, record.id, eventId.isEmpty ? null : eventId);
-    onChanged(next);
-    if (context.mounted) Navigator.pop(context);
-  }
-
-  Future<void> _delete(BuildContext context) async {
-    final confirmed = await _confirmDanger(
-      context,
-      title: '删除这条记录？',
-      message: '「${record.taskName}」${formatMinutes(record.minutes)} 会从统计中移除。',
-      confirmLabel: '删除',
-    );
-    if (!confirmed) return;
-    final next = data.copyWith(
-      records: data.records.where((item) => item.id != record.id).toList(),
-    );
-    onChanged(next);
-    if (context.mounted) Navigator.pop(context);
-  }
-}
-
-class _DetailRow extends StatelessWidget {
-  const _DetailRow({required this.label, required this.child});
-
-  final String label;
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 9),
-        child: Row(
-          children: [
-            SizedBox(
-              width: 72,
-              child: Text(
-                label,
-                style: const TextStyle(color: PineColors.sub, fontSize: 13),
-              ),
-            ),
-            Expanded(child: child),
-          ],
-        ),
-      );
-}
+}) => showModalBottomSheet(context: context, isScrollControlled: true,
+  builder: (context) => SafeArea(child: SingleChildScrollView(
+    padding: const EdgeInsets.all(PineSpacing.section), child: Column(
+      mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text('记录详情', style: PineText.aggregate(color: PinePalette.of(context).textPrimary)),
+        const SizedBox(height: PineSpacing.section),
+        RecordFactTile(data: data, record: record),
+        const SizedBox(height: PineSpacing.section),
+        PineButton(label: '编辑记录', onPressed: () async {
+          final next = await showDialog<AppData>(context: context,
+            builder: (dialogContext) => Dialog(child: SizedBox(width: 480,
+              child: RecordEditor(data: data, record: record,
+                onSaved: (next) => Navigator.pop(dialogContext, next)))));
+          if (next != null) { onChanged(next); if (context.mounted) Navigator.pop(context); }
+        }),
+        const SizedBox(height: PineSpacing.near),
+        OutlinedButton.icon(icon: const Icon(Icons.delete_outline), label: const Text('删除这条记录'),
+          onPressed: () async {
+            final confirmed = await _confirmDanger(context, title: '删除这条记录？',
+              message: '「${record.taskName}」${formatHoursMinutes(record.minutes)} 会从统计中移除。', confirmLabel: '删除');
+            if (!confirmed) return;
+            onChanged(data.copyWith(records: data.records.where((r) => r.id != record.id).toList()));
+            if (context.mounted) Navigator.pop(context);
+          }),
+      ]))));
 
 /// 考试倒计时设置：名称 + 目标日期。本地偏好，不参与云同步。
 Future<void> showCountdownSheet(
@@ -2914,152 +2504,27 @@ Future<void> _eventTileActions(
   apply(TimerEngine.deleteEvent(data, event.id));
 }
 
-/// 日期上的星期标签（补记/修改记录与全部记录清单共用）。
-String _weekdayLabel(DateTime d) {
-  const week = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
-  return week[d.weekday - 1];
-}
-
-/// 估算记录清单高度（每行约 34），超过 [maxHeight] 就封顶、由内部 ListView 滚动。
-double _listHeight(List<Widget> tiles, double maxHeight) {
-  final estimate = tiles.length * 34.0;
-  return estimate > maxHeight ? maxHeight : estimate;
-}
-
-/// 全部专注记录（首页「最近完成 → 全部 ›」的入口）。
-///
-/// 与首页只列最近 3 条不同：这里列出**所有计入统计的记录**，按统计日倒序分组，
-/// 可滚动（记录量级上百条）；点条目录进记录详情，可修改或删除。
+/// 全量记录入口使用真实台账页；保留原入口签名供尚未迁移页面消费。
 Future<void> showAllRecordsSheet(
   BuildContext context, {
   required AppData data,
   required Color Function(String taskName) colorFor,
   required DataChanged onChanged,
-}) {
-  return showModalBottomSheet(
-    context: context,
-    isScrollControlled: true,
-    backgroundColor: PineColors.paper,
-    builder: (sheetContext) {
-      var current = data;
-      return StatefulBuilder(
-        builder: (sheetContext, setSheetState) {
-          final items = current.records.where((r) => r.counted).toList()
-            ..sort((a, b) => b.at.compareTo(a.at));
-          void apply(AppData next) {
-            onChanged(next);
-            setSheetState(() => current = next);
-          }
-
-          final tiles = <Widget>[];
-          String? lastDay;
-          for (final record in items) {
-            if (record.dayKey != lastDay) {
-              lastDay = record.dayKey;
-              final day = DateTime.parse(record.dayKey);
-              tiles.add(Padding(
-                padding:
-                    EdgeInsets.only(top: tiles.isEmpty ? 2 : 14, bottom: 4),
-                child: Text(
-                  '${day.month}/${day.day} ${_weekdayLabel(day)}',
-                  style: const TextStyle(color: PineColors.sub, fontSize: 11),
-                ),
-              ));
-            }
-            tiles.add(
-                _recordTile(sheetContext, current, record, colorFor, apply));
-          }
-
-          final total = items.fold<double>(0, (sum, r) => sum + r.minutes);
-          return _SheetScaffold(
-            title: '全部记录',
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text(
-                  '${items.length} 条 · 合计 ${formatMinutes(total)}',
-                  style: const TextStyle(color: PineColors.sub, fontSize: 11),
-                ),
-                const SizedBox(height: 4),
-                if (items.isEmpty)
-                  const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 18),
-                    child: Text('还没有计入统计的记录',
-                        style: TextStyle(color: PineColors.sub, fontSize: 12)),
-                  )
-                else
-                  // `_SheetScaffold` 本身不滚动，而记录可达上百条：
-                  // 这里给列表一个显式高度（短则贴合内容、长则封顶后内部滚动）。
-                  // 不用 Flexible——它在 mainAxisSize.min 的 Column 里没有剩余空间可分，
-                  // 会触发 hasSize 布局断言。
-                  SizedBox(
-                    height: _listHeight(
-                        tiles, MediaQuery.of(sheetContext).size.height * 0.6),
-                    child: ListView(
-                      padding: EdgeInsets.zero,
-                      children: tiles,
-                    ),
-                  ),
-              ],
-            ),
-          );
-        },
-      );
-    },
-  );
-}
-
-/// 单条记录：色点 + 任务名 + 时刻 + 时长（与首页「最近完成」同一套行语言）。
-Widget _recordTile(
-  BuildContext context,
-  AppData data,
-  FocusRecord record,
-  Color Function(String taskName) colorFor,
-  void Function(AppData next) apply,
-) {
-  String two(int value) => value.toString().padLeft(2, '0');
-  return InkWell(
-    borderRadius: BorderRadius.circular(8),
-    onTap: () => showRecordDetailSheet(
-      context,
+  Future<void> Function()? onComplete,
+}) => showModalBottomSheet(
+  context: context,
+  isScrollControlled: true,
+  constraints: const BoxConstraints(maxWidth: double.infinity),
+  builder: (context) => SizedBox(
+    height: MediaQuery.sizeOf(context).height * .94,
+    child: LedgerPage(
       data: data,
-      record: record,
-      color: colorFor(record.taskName),
-      onChanged: apply,
+      onChanged: onChanged,
+      onComplete: onComplete,
+      onReturnToPresent: () => Navigator.pop(context),
     ),
-    child: Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 7),
-      child: Row(
-        children: [
-          Container(
-            width: 9,
-            height: 9,
-            decoration: BoxDecoration(
-              color: colorFor(record.taskName),
-              borderRadius: BorderRadius.circular(3),
-            ),
-          ),
-          const SizedBox(width: 9),
-          Expanded(
-            child: Text(
-              record.taskName,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(color: PineColors.ink, fontSize: 12.5),
-            ),
-          ),
-          Text(
-            '${two(record.at.hour)}:${two(record.at.minute)}',
-            style: const TextStyle(color: PineColors.sub, fontSize: 10.5),
-          ),
-          const SizedBox(width: 10),
-          DurationText(record.minutes, style: pineNumberStyle(fontSize: 12)),
-        ],
-      ),
-    ),
-  );
-}
+  ),
+);
 
 /// 完成一轮之后的「主题归属」（2026-11-11 改版）。
 ///

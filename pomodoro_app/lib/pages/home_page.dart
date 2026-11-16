@@ -1184,7 +1184,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
   // ==================== V3 桌面三栏书斋（≥720px） ====================
 
-  /// 216px 楮皮目录栏 + 弹性中栏（日课笺 / 落账手记 / Composer）+ 420px 手稿画布。
+  /// 236px 楮皮目录栏 + 弹性中栏（日课笺 / 落账手记 / Composer）+ 420px 手稿画布。
   /// 三栏内容全部复用现有功能节点，不新增任何业务状态。
   Widget _desktopThreeColumn(ActiveSession? session, SessionView view) {
     final now = DateTime.now();
@@ -1196,7 +1196,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       children: [
         SizedBox(
           key: const ValueKey('study-sidebar'),
-          width: 216,
+          width: 236,
           child: _studySidebar(now, stats),
         ),
         Expanded(
@@ -1231,7 +1231,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         children: [
           Row(
             children: [
-              Text('素纸书房', style: PineText.serif(size: PineType.body)),
+              Text('素纸书房', style: PineText.serif(size: 16)),
               const Spacer(),
               Container(
                 width: 5,
@@ -1257,7 +1257,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             onTap: () =>
                 showTaskSheet(context, data: _data, onChanged: _replace),
             child: Container(
-              height: 36,
+              height: 38,
               padding: const EdgeInsets.symmetric(horizontal: 12),
               decoration: BoxDecoration(
                 color: PineColors.accent,
@@ -1271,7 +1271,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                   Text(
                     '选择任务',
                     style: PineText.serif(
-                      size: PineType.meta,
+                      size: 13,
                       weight: FontWeight.w600,
                       color: PineColors.sheet,
                     ),
@@ -1283,7 +1283,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
           const SizedBox(height: 16),
           Text('书房卷目',
               style: PineText.serif(
-                  size: PineType.caption, color: PineColors.ink3)),
+                  size: 12,
+                  color: PineColors.ink3,
+                  letterSpacing: 2)),
           const SizedBox(height: 4),
           _navRow('专注书房', null, current: true),
           _navRow('专注报告与印谱', _overlayStats),
@@ -1292,7 +1294,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
           const SizedBox(height: 16),
           Text('常驻任务',
               style: PineText.serif(
-                  size: PineType.caption, color: PineColors.ink3)),
+                  size: 12,
+                  color: PineColors.ink3,
+                  letterSpacing: 2)),
           const SizedBox(height: 4),
           if (shown.isEmpty)
             Padding(
@@ -1307,7 +1311,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             for (var i = 0; i < shown.length; i++)
               _HoverRow(
                 onTap: () => _selectTaskByName(shown[i].key),
-                height: 27,
+                height: 34,
                 selected: i == 0,
                 label: shown[i].key,
                 trailing: formatCompactMinutes(shown[i].value),
@@ -1329,7 +1333,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                       ? _data.countdown.label
                       : '考试倒计时未开启',
                   style:
-                      PineText.serif(size: PineType.caption, color: PineColors.ink3),
+                      PineText.serif(size: 12, color: PineColors.ink3),
                 ),
                 const SizedBox(height: 2),
                 if (_data.countdown.enabled)
@@ -1339,7 +1343,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                     children: [
                       Text('尚余 ',
                           style: PineText.serif(
-                              size: PineType.meta, color: PineColors.ink2)),
+                              size: 13, color: PineColors.ink2)),
                       Text(
                         '${_data.countdown.daysFrom(now)}',
                         style: PineText.serif(
@@ -1349,7 +1353,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                       ),
                       Text(' 日',
                           style: PineText.serif(
-                              size: PineType.meta, color: PineColors.ink2)),
+                              size: 13, color: PineColors.ink2)),
                     ],
                   ),
                 const SizedBox(height: 4),
@@ -1358,7 +1362,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style:
-                      PineText.mono(size: PineType.caption, color: PineColors.ink3),
+                      PineText.mono(size: 12, color: PineColors.ink3),
                 ),
               ],
             ),
@@ -1383,7 +1387,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       onTap: overlay == null
           ? null
           : () => setState(() => _desktopOverlay = overlay),
-      height: 27,
+      height: 34,
       selected: active,
       leadingRule: true,
       label: label,
@@ -1455,7 +1459,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
           ),
           const SizedBox(height: 10),
           PaperComposer(
-            hintText: '✎ 添写新课业回车即入今日笺，或按 Space 启停右侧专注书页…',
+            hintText: '✎ 添写新课业回车入笺 · Space 启停专注',
             sealText: resting ? '继续今日' : '今日收工',
             onSeal: resting ? _resumeToday : _openRestCeremony,
             phases: _phaseRow(),
@@ -1480,12 +1484,18 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         children: [
           Row(
             children: [
-              Text(
-                '今日已落账记录（${items.length} 条）',
-                style: PineText.serif(
-                    size: PineType.body, weight: FontWeight.w600),
+              // 左栏加宽后中栏变窄，标题行会溢出；用 Expanded 让标题吃掉剩余空间，
+              // 动作入口贴右且永不被挤（Flexible + Spacer 会平分空档，标题会被提前截断）。
+              Expanded(
+                child: Text(
+                  '今日已落账记录（${items.length} 条）',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: PineText.serif(
+                      size: PineType.body, weight: FontWeight.w600),
+                ),
               ),
-              const Spacer(),
+              const SizedBox(width: 10),
               GestureDetector(
                 onTap: () => showManualSheet(
                     context, data: _data, onChanged: _replace),
@@ -3493,7 +3503,7 @@ class _HoverRowState extends State<_HoverRow> {
               if (widget.leadingRule) ...[
                 Container(
                   width: 2,
-                  height: 10,
+                  height: 12,
                   color: widget.selected
                       ? PineColors.accent
                       : Colors.transparent,
@@ -3506,7 +3516,7 @@ class _HoverRowState extends State<_HoverRow> {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: PineText.serif(
-                    size: PineType.meta,
+                    size: 14,
                     weight: widget.selected ? FontWeight.w600 : FontWeight.w400,
                     color: widget.selected
                         ? PineColors.ink
@@ -3518,7 +3528,7 @@ class _HoverRowState extends State<_HoverRow> {
                 Text(
                   widget.trailing!,
                   style: PineText.mono(
-                      size: PineType.caption, color: PineColors.ink3),
+                      size: 12, color: PineColors.ink3),
                 ),
             ],
           ),

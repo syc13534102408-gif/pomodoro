@@ -23,7 +23,6 @@ class MainFlutterWindow: NSWindow, NSMenuDelegate {
   private var overlayMenuItem: NSMenuItem?
 
   /// 菜单栏「悬浮窗模式」子菜单条目，展开时重建以同步勾选与文案。
-  private var styleMenuItem: NSMenuItem?
 
   private enum MenuTag: Int {
     case head = 1
@@ -32,7 +31,6 @@ class MainFlutterWindow: NSWindow, NSMenuDelegate {
     case confirm
     case reset
     case overlay
-    case style
     case open
     case quit
   }
@@ -40,22 +38,28 @@ class MainFlutterWindow: NSWindow, NSMenuDelegate {
   override func awakeFromNib() {
     let flutterViewController = FlutterViewController()
     self.contentViewController = flutterViewController
-    // V3 素纸「三栏书斋」：默认 1020×760，最小 440×600。
-    // 1020 宽刚好跨过 720 断点，打开即「楮皮目录栏 / 日课笺中栏 / 专注手稿画布」三栏；
-    // 760 高沿用旧预算（4 条今日日程 + 64px 活字读数 + 尺规 + 控制组）。
+    // V4：默认 1100×800，最小 440×600。
+    // 1020 → 1180 的理由（2026-11-16 实测）：三栏 236 + 中栏 + 420 下，中栏只剩 384，
+    // 而中栏标题行「22pt 标题 + 时长胶囊 + 收工按钮」需要 416 → 标题必然截断。
+    // 1100 时中栏 444，标题行富余 28pt；报告整页化后也有 864 宽可用。
+    // 为什么不是更高的 1180：本机屏幕逻辑宽 1470，1180 的窗只剩 145pt 侧栏，
+    // 而悬浮计时器宽 176，塞不进去就必然压住窗口（2026-11-16 实测横向重叠 51pt）。
+    // 820 高沿用旧预算（4 条今日日程 + 64px 活字读数 + 尺规 + 控制组）并给左栏多一行留量。
     // 窄于 720 仍收成单列专注舱（440×600 最小窗的垂直预算断言依赖该路径）。
     self.isRestorable = false
     // 关窗后窗口对象必须存活：菜单栏计时依赖窗口持有的 FlutterEngine 与通道，
     // 若随窗口一起释放，倒计时和菜单动作都会失效。
     self.isReleasedWhenClosed = false
-    self.setContentSize(NSSize(width: 1020, height: 760))
+    self.setContentSize(NSSize(width: 1100, height: 800))
     self.minSize = NSSize(width: 440, height: 600)
     self.center()
     // 记住用户拖过的尺寸：有历史 frame 就用历史的，首次启动才用默认值并居中。
-    if !self.setFrameUsingName("PineMainWindowFrameV3") {
+    if !self.setFrameUsingName("PineMainWindowFrameV5") {
       self.setFrame(self.frame, display: true)
     }
-    _ = self.setFrameAutosaveName("PineMainWindowFrameV3")
+    _ = self.setFrameAutosaveName("PineMainWindowFrameV5")
+    NSLog("[win] after autosave frame=%@ content=%@", NSStringFromRect(self.frame),
+          NSStringFromRect(self.contentLayoutRect))
 
     RegisterGeneratedPlugins(registry: flutterViewController)
 
@@ -153,13 +157,8 @@ class MainFlutterWindow: NSWindow, NSMenuDelegate {
 
     menu.addItem(actionItem(title: "打开 pinecore", tag: .open))
 
-    // 悬浮窗显示模式：子菜单由 FloatingTimerPanel 构造，与胶囊右键菜单共用一套
-    // 构造逻辑（文案与勾选状态只有一处定义）。
-    let style = NSMenuItem(title: "悬浮窗模式", action: nil, keyEquivalent: "")
-    style.tag = MenuTag.style.rawValue
-    style.submenu = FloatingTimerPanel.shared.styleSubmenu()
-    styleMenuItem = style
-    menu.addItem(style)
+    // V4：悬浮窗只剩「墨条」一种形态（数字/进度两种模式已合并），
+    // 所以「显示模式」子菜单整体删除——没有第二种形态可切，留着只会误导。
 
     menu.addItem(actionItem(title: "退出 pinecore", tag: .quit))
     return menu
@@ -187,8 +186,6 @@ class MainFlutterWindow: NSWindow, NSMenuDelegate {
       (state["canReset"] as? NSNumber)?.boolValue ?? false
     let overlay = menu.item(withTag: MenuTag.overlay.rawValue)
     overlay?.state = FloatingTimerPanel.shared.isUserEnabled() ? .on : .off
-    // 子菜单每次展开重建：勾选状态跟随后续在胶囊右键菜单里的切换。
-    styleMenuItem?.submenu = FloatingTimerPanel.shared.styleSubmenu()
   }
 
   private func applyState(_ state: [String: Any]) {

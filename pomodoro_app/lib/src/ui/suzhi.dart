@@ -61,7 +61,8 @@ class SuzhiCard extends StatelessWidget {
       ),
     );
     if (onTap == null) return card;
-    return GestureDetector(behavior: HitTestBehavior.opaque, onTap: onTap, child: card);
+    return GestureDetector(
+        behavior: HitTestBehavior.opaque, onTap: onTap, child: card);
   }
 }
 
@@ -138,7 +139,8 @@ class FolioBar extends StatelessWidget {
                 border: Border.all(color: PineColors.lineStrong, width: 1),
                 borderRadius: BorderRadius.circular(PineRadius.control - 2),
               ),
-              child: const Icon(Icons.menu_rounded, size: 15, color: PineColors.ink2),
+              child: const Icon(Icons.menu_rounded,
+                  size: 15, color: PineColors.ink2),
             ),
           ),
           const SizedBox(width: 10),
@@ -164,7 +166,8 @@ class FolioBar extends StatelessWidget {
                   examText!,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: PineText.sans(size: PineType.meta, color: PineColors.ink2),
+                  style: PineText.sans(
+                      size: PineType.meta, color: PineColors.ink2),
                 ),
               ),
             ),
@@ -180,7 +183,9 @@ class FolioBar extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 7),
-            Text(syncText!, style: PineText.mono(size: PineType.caption, color: PineColors.ink3)),
+            Text(syncText!,
+                style: PineText.mono(
+                    size: PineType.caption, color: PineColors.ink3)),
           ],
         ],
       ),
@@ -190,7 +195,8 @@ class FolioBar extends StatelessWidget {
 
 /// 卷首累计铭文行 34px：全部历史累计 ···· 第 N 日 · 连续 N 日（下边虚线）。
 class InscriptionRow extends StatelessWidget {
-  const InscriptionRow({super.key, required this.totalText, required this.rightText});
+  const InscriptionRow(
+      {super.key, required this.totalText, required this.rightText});
 
   final String totalText;
   final String rightText;
@@ -210,11 +216,14 @@ class InscriptionRow extends StatelessWidget {
             child: Text(
               totalText,
               overflow: TextOverflow.ellipsis,
-              style: PineText.serif(size: PineType.label, color: PineColors.ink2),
+              style:
+                  PineText.serif(size: PineType.label, color: PineColors.ink2),
             ),
           ),
           const SizedBox(width: 8),
-          Text(rightText, style: PineText.serif(size: PineType.caption, color: PineColors.ink3)),
+          Text(rightText,
+              style: PineText.serif(
+                  size: PineType.caption, color: PineColors.ink3)),
         ],
       ),
     );
@@ -261,9 +270,8 @@ class PaperClockDigits extends StatelessWidget {
                 overflow: TextOverflow.fade,
                 style: PineText.serif(
                   size: PineType.clock,
-                  color: overtime
-                      ? PineColors.ochre
-                      : (color ?? PineColors.ink),
+                  color:
+                      overtime ? PineColors.ochre : (color ?? PineColors.ink),
                   weight: FontWeight.w500,
                   letterSpacing: -0.025,
                   features: kNumericFont,
@@ -274,7 +282,8 @@ class PaperClockDigits extends StatelessWidget {
               const SizedBox(width: 8),
               Text(
                 totalText!,
-                style: PineText.mono(size: PineType.meta, color: PineColors.ink3),
+                style:
+                    PineText.mono(size: PineType.meta, color: PineColors.ink3),
               ),
             ],
           ],
@@ -291,7 +300,9 @@ class PaperClockDigits extends StatelessWidget {
         ),
         if (note != null) ...[
           const SizedBox(height: 2),
-          Text(note!, style: PineText.sans(size: PineType.caption, color: PineColors.ink3)),
+          Text(note!,
+              style: PineText.sans(
+                  size: PineType.caption, color: PineColors.ink3)),
         ],
       ],
     );
@@ -318,9 +329,7 @@ class RuledScale extends StatelessWidget {
   final Color? accent;
 
   /// 轴标步长：≤60 分钟每 10 分钟一个，更长的番每 15/30 分钟一个。
-  int get _step => targetMinutes <= 60
-      ? 10
-      : (targetMinutes <= 90 ? 15 : 30);
+  int get _step => targetMinutes <= 60 ? 10 : (targetMinutes <= 90 ? 15 : 30);
 
   @override
   Widget build(BuildContext context) {
@@ -353,8 +362,7 @@ class RuledScale extends StatelessWidget {
               ),
               Text(
                 '${(p * 100).round()}%',
-                style: PineText.mono(
-                    size: PineType.caption, color: color),
+                style: PineText.mono(size: PineType.caption, color: color),
               ),
             ],
           ),
@@ -510,7 +518,16 @@ class PaperChecklist extends StatelessWidget {
   final void Function(int index)? onTapItem;
 
   static const List<String> _numerals = <String>[
-    '一', '二', '三', '四', '五', '六', '七', '八', '九', '十',
+    '一',
+    '二',
+    '三',
+    '四',
+    '五',
+    '六',
+    '七',
+    '八',
+    '九',
+    '十',
   ];
 
   @override
@@ -525,7 +542,8 @@ class PaperChecklist extends StatelessWidget {
               Expanded(
                 child: Text(
                   title!,
-                  style: PineText.serif(size: PineType.meta, color: PineColors.ink2),
+                  style: PineText.serif(
+                      size: PineType.meta, color: PineColors.ink2),
                 ),
               ),
               if (trailing != null)
@@ -533,7 +551,8 @@ class PaperChecklist extends StatelessWidget {
                   onTap: onTrailing,
                   child: Text(
                     trailing!,
-                    style: PineText.serif(size: PineType.meta, color: PineColors.accent),
+                    style: PineText.serif(
+                        size: PineType.meta, color: PineColors.accent),
                   ),
                 ),
             ],
@@ -545,7 +564,8 @@ class PaperChecklist extends StatelessWidget {
   }
 
   Widget _row(int index, PaperCheckItem item) {
-    final numeral = index < _numerals.length ? _numerals[index] : '${index + 1}';
+    final numeral =
+        index < _numerals.length ? _numerals[index] : '${index + 1}';
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: onTapItem == null ? null : () => onTapItem!(index),
@@ -576,7 +596,8 @@ class PaperChecklist extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: item.done ? PineColors.accentSoft : PineColors.sheet,
                   border: Border.all(
-                    color: item.done ? PineColors.accent : PineColors.lineStrong,
+                    color:
+                        item.done ? PineColors.accent : PineColors.lineStrong,
                     width: 1,
                   ),
                   borderRadius: BorderRadius.circular(PineRadius.seal),
@@ -584,7 +605,8 @@ class PaperChecklist extends StatelessWidget {
                 child: item.done
                     ? Text(
                         '✓',
-                        style: PineText.serif(size: PineType.caption, color: PineColors.accent),
+                        style: PineText.serif(
+                            size: PineType.caption, color: PineColors.accent),
                       )
                     : null,
               ),
@@ -610,7 +632,8 @@ class PaperChecklist extends StatelessWidget {
                 ),
                 child: Text(
                   '此刻研读',
-                  style: PineText.serif(size: PineType.caption, color: PineColors.accent),
+                  style: PineText.serif(
+                      size: PineType.caption, color: PineColors.accent),
                 ),
               ),
           ],
@@ -660,11 +683,14 @@ class LedgerBar extends StatelessWidget {
                   kicker,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: PineText.serif(size: PineType.meta, color: PineColors.ink2),
+                  style: PineText.serif(
+                      size: PineType.meta, color: PineColors.ink2),
                 ),
               ),
               const SizedBox(width: 6),
-              Text(percent, style: PineText.mono(size: PineType.label, color: PineColors.accent)),
+              Text(percent,
+                  style: PineText.mono(
+                      size: PineType.label, color: PineColors.accent)),
             ],
           ),
           const SizedBox(height: 4),
@@ -677,7 +703,8 @@ class LedgerBar extends StatelessWidget {
                   value,
                   maxLines: 1,
                   overflow: TextOverflow.fade,
-                  style: PineText.serif(size: PineType.num, weight: FontWeight.w500),
+                  style: PineText.serif(
+                      size: PineType.num, weight: FontWeight.w500),
                 ),
               ),
               const SizedBox(width: 6),
@@ -687,7 +714,8 @@ class LedgerBar extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   textAlign: TextAlign.right,
-                  style: PineText.sans(size: PineType.caption, color: PineColors.ink3),
+                  style: PineText.sans(
+                      size: PineType.caption, color: PineColors.ink3),
                 ),
               ),
             ],
@@ -712,7 +740,8 @@ class LedgerBar extends StatelessWidget {
                     footLeft ?? '',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: PineText.sans(size: PineType.caption, color: PineColors.ink3),
+                    style: PineText.sans(
+                        size: PineType.caption, color: PineColors.ink3),
                   ),
                 ),
                 const SizedBox(width: 6),
@@ -724,7 +753,8 @@ class LedgerBar extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       textAlign: TextAlign.right,
-                      style: PineText.serif(size: PineType.caption, color: PineColors.accent),
+                      style: PineText.serif(
+                          size: PineType.caption, color: PineColors.accent),
                     ),
                   ),
                 ),
@@ -765,26 +795,27 @@ class CinnabarButton extends StatelessWidget {
       label: semanticLabel,
       button: true,
       child: GestureDetector(
-      onTap: onPressed,
-      child: Container(
-        padding: padding,
-        decoration: BoxDecoration(
-          color: bg,
-          borderRadius: BorderRadius.circular(PineRadius.control),
-          boxShadow: enabled ? PineShadow.card : null,
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            if (icon != null) ...[
-              Icon(icon, size: 16, color: fg),
-              const SizedBox(width: 6),
+        onTap: onPressed,
+        child: Container(
+          padding: padding,
+          decoration: BoxDecoration(
+            color: bg,
+            borderRadius: BorderRadius.circular(PineRadius.control),
+            boxShadow: enabled ? PineShadow.card : null,
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              if (icon != null) ...[
+                Icon(icon, size: 16, color: fg),
+                const SizedBox(width: 6),
+              ],
+              Text(label,
+                  style: PineText.serif(size: PineType.label, color: fg)),
             ],
-            Text(label, style: PineText.serif(size: PineType.label, color: fg)),
-          ],
+          ),
         ),
-      ),
       ),
     );
   }
@@ -817,36 +848,37 @@ class PaperButton extends StatelessWidget {
       label: semanticLabel,
       button: true,
       child: GestureDetector(
-      onTap: onPressed,
-      child: Container(
-        padding: padding,
-        decoration: BoxDecoration(
-          color: selected ? PineColors.accentSoft : PineColors.sheet,
-          border: Border.all(
-            color: selected ? PineColors.accent : PineColors.lineStrong,
-            width: 1,
-          ),
-          borderRadius: BorderRadius.circular(PineRadius.control),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            if (icon != null) ...[
-              Icon(icon, size: 16,
-                  color: selected ? PineColors.accent : PineColors.ink2),
-              const SizedBox(width: 6),
-            ],
-            Text(
-              label,
-              style: PineText.serif(
-                size: PineType.label,
-                color: selected ? PineColors.accent : PineColors.ink,
-              ),
+        onTap: onPressed,
+        child: Container(
+          padding: padding,
+          decoration: BoxDecoration(
+            color: selected ? PineColors.accentSoft : PineColors.sheet,
+            border: Border.all(
+              color: selected ? PineColors.accent : PineColors.lineStrong,
+              width: 1,
             ),
-          ],
+            borderRadius: BorderRadius.circular(PineRadius.control),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              if (icon != null) ...[
+                Icon(icon,
+                    size: 16,
+                    color: selected ? PineColors.accent : PineColors.ink2),
+                const SizedBox(width: 6),
+              ],
+              Text(
+                label,
+                style: PineText.serif(
+                  size: PineType.label,
+                  color: selected ? PineColors.accent : PineColors.ink,
+                ),
+              ),
+            ],
+          ),
         ),
-      ),
       ),
     );
   }
@@ -885,7 +917,8 @@ class PaperComposer extends StatelessWidget {
                   hintText,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: PineText.sans(size: PineType.meta, color: PineColors.ink3),
+                  style: PineText.sans(
+                      size: PineType.meta, color: PineColors.ink3),
                 ),
               ),
               const SizedBox(width: 8),
@@ -906,7 +939,8 @@ class PaperComposer extends StatelessWidget {
 
 /// 素纸拨子：取代 iOS 胶囊开关。无状态，值由调用方持有。
 class PaperToggle extends StatelessWidget {
-  const PaperToggle({super.key, required this.value, required this.onChanged, this.label});
+  const PaperToggle(
+      {super.key, required this.value, required this.onChanged, this.label});
 
   final bool value;
   final ValueChanged<bool> onChanged;
@@ -930,7 +964,9 @@ class PaperToggle extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           if (label != null) ...[
-            Text(label!, style: PineText.sans(size: PineType.meta, color: PineColors.ink2)),
+            Text(label!,
+                style:
+                    PineText.sans(size: PineType.meta, color: PineColors.ink2)),
             const SizedBox(width: 8),
           ],
           Container(
@@ -986,7 +1022,8 @@ class PaperTabs extends StatelessWidget {
                       width: 28,
                       height: 2,
                       decoration: BoxDecoration(
-                        color: i == index ? PineColors.accent : Colors.transparent,
+                        color:
+                            i == index ? PineColors.accent : Colors.transparent,
                         borderRadius: BorderRadius.circular(PineRadius.seal),
                       ),
                     ),
@@ -1095,7 +1132,8 @@ class InkStackChart extends StatelessWidget {
                   const SizedBox(width: 4),
                   Text(
                     legend[i],
-                    style: PineText.sans(size: PineType.caption, color: PineColors.ink2),
+                    style: PineText.sans(
+                        size: PineType.caption, color: PineColors.ink2),
                   ),
                 ],
               ),
@@ -1179,7 +1217,10 @@ class InkStackChart extends StatelessWidget {
 
 /// 双线框藏书票：外 1px 定界线 + 内 1px 裁切线。
 class ExLibrisCard extends StatelessWidget {
-  const ExLibrisCard({super.key, required this.child, this.padding = const EdgeInsets.all(14)});
+  const ExLibrisCard(
+      {super.key,
+      required this.child,
+      this.padding = const EdgeInsets.all(14)});
 
   final Widget child;
   final EdgeInsetsGeometry padding;
@@ -1296,14 +1337,23 @@ class PhaseTabs extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: <Widget>[
-        for (var i = 0; i < SessionMode.values.length; i++) ...<Widget>[
-          if (i > 0) const SizedBox(width: 20),
-          _tab(SessionMode.values[i]),
+    // 间距随宽度收：三栏重排后中栏更窄（左栏 216→236），
+    // 单列专注舱（<720）里 16pt 间距会让三段并排溢出 3.6pt，收到 12。
+    final gap = MediaQuery.sizeOf(context).width < 720 ? 12.0 : 16.0;
+    // 再兜一层：极窄时（440×600 舱内的 Composer 只有 198pt）整组等比缩一点，
+    // 而不是让 RenderFlex 报溢出——这几个百分点肉眼不可见。
+    return FittedBox(
+      fit: BoxFit.scaleDown,
+      alignment: Alignment.centerLeft,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          for (var i = 0; i < SessionMode.values.length; i++) ...<Widget>[
+            if (i > 0) SizedBox(width: gap),
+            _tab(SessionMode.values[i]),
+          ],
         ],
-      ],
+      ),
     );
   }
 

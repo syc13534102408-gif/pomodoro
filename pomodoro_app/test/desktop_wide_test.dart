@@ -11,7 +11,7 @@ import 'package:pomodoro_app/src/ui/ui.dart';
 
 /// P5 三栏书斋的几何回归（2026-11-12）。
 ///
-/// 设计稿：`1120×680` → `216px 楮皮目录栏` + `弹性中栏` + `420px 专注手稿画布`；
+/// 设计稿：`1120×680` → `236px 楮皮目录栏` + `弹性中栏` + `420px 专注手稿画布`；
 /// `<720px` 收成单列（这条仍由 `desktop_layout_test` 的 440×600 断言守住，未放宽）。
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -34,9 +34,9 @@ void main() {
       final center = rect('study-center');
       final canvas = rect('study-canvas');
 
-      expect(sidebar.width, 216);
+      expect(sidebar.width, 236);
       expect(canvas.width, 420);
-      expect(center.width, 1120 - 216 - 420);
+      expect(center.width, 1120 - 236 - 420);
       expect(sidebar.height, 680);
       expect(canvas.height, 680);
 

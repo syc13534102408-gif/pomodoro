@@ -138,7 +138,7 @@ MenuBarState menuBarStateOf(AppData data, DateTime now) {
       primary: '继续',
       confirm: confirm,
       canReset: true,
-      tint: PineColors.sub.toARGB32(),
+      tint: PineColors.inkFaint.toARGB32(),
       elapsed: view.elapsedText,
       progress: view.progress,
       active: true,
@@ -156,7 +156,9 @@ MenuBarState menuBarStateOf(AppData data, DateTime now) {
       primary: '暂停',
       confirm: confirm,
       canReset: true,
-      tint: PineColors.gold.toARGB32(),
+      // 墨条/菜单栏都用赭石：`gold` 在素纸配色里是 sand（#E9E2D6），
+      // 画在纸卡上等于隐形（2026-11-16 实测墨条整条消失）。
+      tint: PineColors.goldInk.toARGB32(),
       phase: '已超时',
       elapsed: view.elapsedText,
       progress: 1,

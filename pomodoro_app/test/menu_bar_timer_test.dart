@@ -14,6 +14,7 @@ void main() {
     final state = menuBarStateOf(_base(), DateTime(2026, 9, 6, 10));
 
     expect(state.title, 'pinecore');
+    // 空闲态悬浮窗本就隐藏，tint 不参与绘制，保持中性即可。
     expect(state.tint, PineColors.sub.toARGB32());
     expect(state.primary, '开始');
     expect(state.canReset, false);
@@ -57,7 +58,8 @@ void main() {
     // 25:00 计划 + 1:30 超时 = 26:30 已专注。
     expect(state.title, '专注 26:30');
     expect(state.elapsed, '26:30');
-    expect(state.tint, PineColors.gold.toARGB32());
+    // 素纸配色里 gold 是 sand（#E9E2D6），在纸卡上隐形；超时统一用赭石 goldInk。
+    expect(state.tint, PineColors.goldInk.toARGB32());
     expect(state.detail, contains('超出计划 +01:30'));
     // 超时也不自动结束，仍可暂停/重置。
     expect(state.primary, '暂停');
@@ -74,7 +76,7 @@ void main() {
     // 暂停期间时间不流逝：过了 27 分钟，显示仍是暂停那一刻的已专注 13:00。
     expect(state.title, '13:00');
     expect(state.elapsed, '13:00');
-    expect(state.tint, PineColors.sub.toARGB32());
+    expect(state.tint, PineColors.inkFaint.toARGB32());
     expect(state.primary, '继续');
     expect(state.detail, contains('12:00'));
     // 暂停时悬浮窗仍然显示（用户需要知道停在哪）。

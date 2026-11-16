@@ -1,990 +1,287 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
-import 'engine.dart';
+import 'common_components.dart';
 import 'models.dart';
 import 'theme.dart';
 
-/// 数据类文本统一用的等宽样式（mono + w600 + tabular 防抖）。
-TextStyle brickNumberStyle({
-  double fontSize = 14,
-  Color color = PineColors.ink,
+export 'common_components.dart';
+
+bool get _desktop => !kIsWeb && defaultTargetPlatform == TargetPlatform.macOS;
+double get _touch =>
+    _desktop ? PineSize.minTouchDesktop : PineSize.minTouchAndroid;
+
+/// 等宽数字只服务读数；调用者逐视图迁移时改用对应五档文字样式。
+TextStyle pineNumberStyle({
+  double fontSize = PineType.auxiliary,
+  Color color = PineColors.textPrimary,
   FontWeight weight = FontWeight.w600,
 }) =>
-    TextStyle(
-      fontFamily: 'monospace',
-      color: color,
-      fontSize: fontSize,
-      fontWeight: weight,
-      letterSpacing: 0,
-      fontFeatures: kNumericFont,
-    );
+    PineText.mono(size: fontSize, color: color, weight: weight);
 
-/// 纸面卡片：白纸底 + 20 圆角 + 柔和投影。传入 [onTap] 时整块可压（轻微缩放）。
-class BrickCard extends StatelessWidget {
-  const BrickCard({
-    super.key,
-    required this.child,
-    this.padding = const EdgeInsets.all(14),
-    this.color,
-    this.onTap,
-    this.radius = Paper.cardRadius,
-  });
-
+/// 已定型事实容器；会话语境必须另用 ActiveVariantSurface。
+class SettledCard extends StatelessWidget {
+  const SettledCard(
+      {super.key,
+      required this.child,
+      this.padding = const EdgeInsets.all(PineSpacing.section),
+      this.onTap});
   final Widget child;
   final EdgeInsetsGeometry padding;
-  final Color? color;
-  final double radius;
-
-  /// 传入后整块可点，按下轻微缩放。
   final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    final card = Container(
-      width: double.infinity,
-      padding: padding,
-      decoration: BoxDecoration(
-        color: color ?? PineColors.card,
-        borderRadius: BorderRadius.circular(radius),
-        boxShadow: Paper.shadow,
-      ),
-      child: child,
-    );
-    if (onTap == null) return card;
-    return BrickPressable(
-      onTap: onTap,
-      shadowed: false,
-      child: card,
-    );
+    final surface = SizedBox(
+        width: double.infinity,
+        child: SettledVariantSurface(padding: padding, child: child));
+    return onTap == null
+        ? surface
+        : PinePressable(onTap: onTap, child: surface);
   }
 }
 
-/// 纸面按压内核：按下时整体轻微缩小（scale .97）+ 自带投影随子件收敛，
-/// 松手回弹。键盘焦点 = 2px 松绿描边。
-class BrickPressable extends StatefulWidget {
-  const BrickPressable({
-    super.key,
-    required this.onTap,
-    required this.child,
-    this.semanticLabel,
-    this.onLongPress,
-    this.shadowed = true,
-    this.pressDuration = const Duration(milliseconds: 160),
-  });
-
+/// 鼠标、触控、键盘使用同一即时回调；没有延迟动作或缩放内容。
+class PinePressable extends StatelessWidget {
+  const PinePressable(
+      {super.key,
+      required this.onTap,
+      required this.child,
+      this.semanticLabel,
+      this.onLongPress});
   final VoidCallback? onTap;
   final Widget child;
   final String? semanticLabel;
   final VoidCallback? onLongPress;
 
-  /// 为自身无装饰的子件补柔和投影（带装饰的卡片请传 false）。
-  final bool shadowed;
-  final Duration pressDuration;
-
   @override
-  State<BrickPressable> createState() => _BrickPressableState();
-}
-
-class _BrickPressableState extends State<BrickPressable> {
-  bool _pressed = false;
-  bool _hovered = false;
-  bool _focused = false;
-
-  bool get _enabled => widget.onTap != null;
-
-  void _set(bool value) {
-    if (!_enabled || _pressed == value) return;
-    setState(() => _pressed = value);
-  }
-
-  void _setHover(bool value) {
-    if (!_enabled || _hovered == value) return;
-    setState(() => _hovered = value);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final reduceMotion =
-        MediaQuery.maybeOf(context)?.disableAnimations ?? false;
-    final duration = reduceMotion ? Duration.zero : widget.pressDuration;
-    final pressed = _pressed && !reduceMotion;
-    return Semantics(
+  Widget build(BuildContext context) => Semantics(
       button: true,
-      enabled: _enabled,
-      label: widget.semanticLabel,
-      child: FocusableActionDetector(
-        onShowHoverHighlight: _setHover,
-        onShowFocusHighlight: (value) => setState(() => _focused = value),
-        child: MouseRegion(
-          onEnter: (_) => _setHover(true),
-          onExit: (_) => _setHover(false),
-          child: GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTapDown: (_) => _set(true),
-            onTapUp: (_) => _set(false),
-            onTapCancel: () => _set(false),
-            onTap: widget.onTap,
-            onLongPress: widget.onLongPress,
-            child: AnimatedScale(
-              scale: pressed ? 0.97 : 1.0,
-              duration: duration,
-              curve: Curves.easeOutCubic,
-              child: Container(
-                decoration: BoxDecoration(
-                  boxShadow: widget.shadowed ? Paper.shadow : null,
-                  borderRadius: BorderRadius.circular(Paper.cardRadius),
-                  border: _focused
-                      ? Border.all(color: PineColors.pine, width: 2)
-                      : null,
-                ),
-                child: widget.child,
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
+      enabled: onTap != null || onLongPress != null,
+      label: semanticLabel,
+      child: Material(
+          type: MaterialType.transparency,
+          child: InkWell(
+              onTap: onTap,
+              onLongPress: onLongPress,
+              borderRadius: BorderRadius.circular(PineRadius.settled),
+              splashFactory: NoSplash.splashFactory,
+              overlayColor: const WidgetStatePropertyAll(Colors.transparent),
+              focusColor: PinePalette.of(context).presence,
+              child: ConstrainedBox(
+                  constraints:
+                      BoxConstraints(minWidth: _touch, minHeight: _touch),
+                  child: child))));
 }
 
-/// 纸面按钮：胶囊形。变体由 [color]/[foregroundColor] 决定；
-/// 主行动请传 ink 底 card 字（R2），「完成」类传 gold 底 ink 字。
-class BrickButton extends StatelessWidget {
-  const BrickButton({
-    super.key,
-    required this.label,
-    this.onPressed,
-    this.icon,
-    this.trailing,
-    // V3：未显式指定色的主行动按钮统一走檀褐实底（旧版 R2 是墨底）。
-    this.color = PineColors.accent,
-    this.foregroundColor = PineColors.sheet,
-    this.height = 46,
-    this.expand = true,
-    this.padding = const EdgeInsets.symmetric(horizontal: 18),
-    this.semanticLabel,
-    this.loading = false,
-    this.pressDuration = const Duration(milliseconds: 160),
-  });
-
+/// 通用编辑动作，使用沉淀边界；会话动作由进行中组件单独承载。
+class PineButton extends StatelessWidget {
+  const PineButton(
+      {super.key,
+      required this.label,
+      this.onPressed,
+      this.icon,
+      this.trailing,
+      this.color,
+      this.foregroundColor,
+      this.height,
+      this.expand = true,
+      this.padding =
+          const EdgeInsets.symmetric(horizontal: PineSpacing.section),
+      this.semanticLabel,
+      this.loading = false});
   final String label;
   final VoidCallback? onPressed;
   final IconData? icon;
-
-  /// 图标按钮没有可见文字时用它补语义标签。
-  final String? semanticLabel;
-  final bool loading;
-  final Duration pressDuration;
-
-  /// 文字右侧的补充内容（如阶段分钟数）。
   final Widget? trailing;
-
-  final Color color;
-  final Color foregroundColor;
-  final double height;
-
-  /// 只放图标时置 false，宽度收缩到与高度一致。
+  final Color? color;
+  final Color? foregroundColor;
+  final double? height;
   final bool expand;
   final EdgeInsetsGeometry padding;
+  final String? semanticLabel;
+  final bool loading;
 
   @override
   Widget build(BuildContext context) {
-    final enabled = onPressed != null && !loading;
-    return BrickPressable(
-      onTap: enabled ? onPressed : null,
-      semanticLabel: semanticLabel ?? (label.isEmpty ? null : label),
-      pressDuration: pressDuration,
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          // 父级宽度无界（例如放在带 Spacer 的 Row 尾部）时不能撑满，
-          // 退化为按内容收缩，避免拿到 Infinity 约束。
+    final palette = PinePalette.of(context);
+    final primaryHeight = _desktop
+        ? PineSize.primaryActionDesktop
+        : PineSize.primaryActionAndroid;
+    final requested = height ?? primaryHeight;
+    final effectiveHeight = requested < _touch ? _touch : requested;
+    return Semantics(
+        label: semanticLabel,
+        child: LayoutBuilder(builder: (context, constraints) {
           final fill = expand && constraints.hasBoundedWidth;
-          // 纯图标按钮做成圆形；其余按内容收缩，只有 fill 时撑满。
-          final iconOnly = label.isEmpty && icon != null;
-          final inset = label.isEmpty ? EdgeInsets.zero : padding;
-          return Container(
-            height: height,
-            width: fill ? double.infinity : (iconOnly ? height : null),
-            padding: inset,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: enabled ? color : PineColors.faint,
-              shape: iconOnly ? BoxShape.circle : BoxShape.rectangle,
-              borderRadius: iconOnly ? null : BorderRadius.circular(height / 2),
-            ),
-            child: loading
-                ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: PineColors.card,
-                    ),
-                  )
-                : _content(fill: fill, enabled: enabled),
-          );
-        },
-      ),
-    );
-  }
-
-  Widget _content({required bool fill, required bool enabled}) {
-    final textStyle = TextStyle(
-      color: enabled ? foregroundColor : PineColors.sub,
-      fontSize: 15,
-      fontWeight: FontWeight.w600,
-      letterSpacing: 0,
-    );
-
-    final text = Text(
-      label,
-      maxLines: 1,
-      overflow: TextOverflow.ellipsis,
-      style: textStyle,
-    );
-
-    return Row(
-      mainAxisSize: fill ? MainAxisSize.max : MainAxisSize.min,
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        if (icon != null)
-          Icon(icon,
-              size: 18, color: enabled ? foregroundColor : PineColors.sub),
-        if (label.isNotEmpty) ...[
-          if (icon != null) const SizedBox(width: 8),
-          if (fill) Flexible(child: text) else text,
-        ],
-        if (trailing != null) ...[
-          const SizedBox(width: 6),
-          trailing!,
-        ],
-      ],
-    );
+          return SizedBox(
+              height: effectiveHeight,
+              width: fill ? double.infinity : null,
+              child: FilledButton(
+                  onPressed: loading ? null : onPressed,
+                  style: FilledButton.styleFrom(
+                      backgroundColor: color ?? palette.focus,
+                      foregroundColor: foregroundColor ?? palette.background,
+                      padding: label.isEmpty ? EdgeInsets.zero : padding,
+                      minimumSize: Size(_touch, effectiveHeight),
+                      shape: RoundedRectangleBorder(
+                          borderRadius:
+                              BorderRadius.circular(PineRadius.settled)),
+                      textStyle: PineText.sans(
+                          size: PineType.body, weight: FontWeight.w600)),
+                  child: loading
+                      ? SizedBox(
+                          width: PineSize.stateGraphic,
+                          height: PineSize.stateGraphic,
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2, color: palette.textSecondary))
+                      : Row(
+                          mainAxisSize:
+                              fill ? MainAxisSize.max : MainAxisSize.min,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                              if (icon != null)
+                                Icon(icon, size: PineSize.stateGraphic),
+                              if (icon != null && label.isNotEmpty)
+                                const SizedBox(width: PineSpacing.near),
+                              if (label.isNotEmpty)
+                                Flexible(child: Text(label)),
+                              if (trailing != null) ...[
+                                const SizedBox(width: PineSpacing.micro),
+                                trailing!
+                              ],
+                            ])));
+        }));
   }
 }
 
-/// 细进度条：轨道浅米色、填充为语义色（专注/完成金/松绿），圆角 6。
-class BrickProgress extends StatelessWidget {
-  const BrickProgress({
-    super.key,
-    required this.value,
-    this.color = PineColors.pine,
-    this.trackColor = PineColors.line,
-    this.height = 6,
-  });
-
-  /// 0 ~ 1，超出自动截断。
+/// 聚合进度即时更新，不伪装成当前会话。
+class AggregateProgress extends StatelessWidget {
+  const AggregateProgress(
+      {super.key,
+      required this.value,
+      this.color,
+      this.trackColor,
+      this.height = PineSpacing.micro});
   final double value;
-  final Color color;
-  final Color trackColor;
+  final Color? color;
+  final Color? trackColor;
   final double height;
-
   @override
   Widget build(BuildContext context) {
-    final ratio = value.isNaN ? 0.0 : value.clamp(0.0, 1.0);
-    return Container(
-      height: height,
-      decoration: BoxDecoration(
-        color: trackColor,
-        borderRadius: BorderRadius.circular(3),
-      ),
-      child: LayoutBuilder(
-        builder: (context, constraints) => Row(
-          children: [
-            if (ratio > 0)
-              Container(
-                width: constraints.maxWidth * ratio,
-                decoration: BoxDecoration(
-                  color: color,
-                  borderRadius: BorderRadius.circular(3),
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
+    final palette = PinePalette.of(context);
+    return LinearProgressIndicator(
+        value: value.isNaN ? 0 : value.clamp(0.0, 1.0),
+        color: color ?? palette.textSecondary,
+        backgroundColor: trackColor ?? palette.presence,
+        minHeight: height);
   }
 }
 
-/// 纸面开关：轨道圆角胶囊，开=松绿底白钮 / 关=浅米底白钮。
-class BrickSwitch extends StatelessWidget {
-  const BrickSwitch({super.key, required this.value, required this.onChanged});
-
+/// 资料开关：支持禁用，命中区遵循平台下限，键盘与读屏可操作。
+class SettingsSwitch extends StatelessWidget {
+  const SettingsSwitch(
+      {super.key, required this.value, required this.onChanged});
   final bool value;
-  final ValueChanged<bool> onChanged;
-
+  final ValueChanged<bool>? onChanged;
   @override
-  Widget build(BuildContext context) {
-    final reduceMotion =
-        MediaQuery.maybeOf(context)?.disableAnimations ?? false;
-    return Semantics(
-      toggled: value,
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: () => onChanged(!value),
-        // 控件本身 24px 高，外扩到 44px 保证触摸目标。
-        child: SizedBox(
-          width: 52,
-          height: 44,
-          child: Center(
-            child: AnimatedContainer(
-              duration: reduceMotion
-                  ? Duration.zero
-                  : const Duration(milliseconds: 180),
-              curve: Curves.easeOut,
-              width: 42,
-              height: 24,
-              padding: const EdgeInsets.all(2),
-              decoration: BoxDecoration(
-                color: value ? PineColors.pine : PineColors.line,
-                borderRadius: BorderRadius.circular(999),
-              ),
-              child: Align(
-                alignment: value ? Alignment.centerRight : Alignment.centerLeft,
-                child: Container(
-                  width: 20,
-                  height: 20,
-                  decoration: const BoxDecoration(
-                    color: Colors.white,
-                    shape: BoxShape.circle,
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => SizedBox(
+      width: _desktop ? 48 : 56,
+      height: _touch,
+      child: Switch(value: value, onChanged: onChanged));
 }
 
-/// 计时主卡（松林手帐版）：白纸卡 + 顶部短阶段色条 + 状态 caption +
-/// 大号等宽时钟 + 细进度；超时态色条与时钟转金。
-class BrickTimer extends StatelessWidget {
-  const BrickTimer({
-    super.key,
-    required this.view,
-    required this.caption,
-    this.timeText,
-    this.accent,
-    this.timeStyle,
-  });
-
-  final SessionView view;
-  final String caption;
-
-  /// 环心大字；null 取 `view.clockText`。收工态要写「收工」而不是 00:00。
-  final String? timeText;
-
-  /// 阶段色（色条/色点/进度/数字）；null 按阶段 + 超时推导。
-  /// 收工态传松绿：那不是"某个阶段"，是"今天收完了"。
-  final Color? accent;
-
-  /// 环心大字样式；null 用 [brickNumberStyle]。
-  /// 中文文案不能走等宽字形（等宽字体没有中文字形，会掉到未知回退路径）。
-  final TextStyle? timeStyle;
-
-  @override
-  Widget build(BuildContext context) {
-    final overtime = view.targetReached;
-    // 弧线与大数字用 lineColor：gold 只作实底（评审 P0-2 / 决策 B1）。
-    final phase =
-        accent ?? (overtime ? PineColors.goldInk : view.mode.lineColor);
-    final clockColor = overtime ? PineColors.gold : PineColors.ink;
-    return Semantics(
-      label: '$caption，${timeText ?? view.clockText}',
-      child: BrickCard(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final clockSize = (constraints.maxWidth * 0.28).clamp(40.0, 88.0);
-            return Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                // 顶部短色条：阶段色语义的小面积表达。
-                Container(
-                  width: 56,
-                  height: 6,
-                  decoration: BoxDecoration(
-                    color: phase,
-                    borderRadius: BorderRadius.circular(3),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: 7,
-                      height: 7,
-                      decoration: BoxDecoration(
-                        color: phase,
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Flexible(
-                      child: Text(
-                        caption,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: PineColors.sub,
-                          fontSize: 12,
-                          letterSpacing: 0,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                // Expanded 让 FittedBox 拿到有界高度，矮卡片下数字自动缩小。
-                Expanded(
-                  child: FittedBox(
-                    fit: BoxFit.scaleDown,
-                    child: Text(
-                      timeText ?? view.clockText,
-                      style: timeStyle ??
-                          brickNumberStyle(
-                            fontSize: clockSize,
-                            color: clockColor,
-                          ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 14),
-                BrickProgress(
-                  value: view.progress,
-                  color: phase,
-                ),
-              ],
-            );
-          },
-        ),
-      ),
-    );
-  }
-}
-
-/// 阶段条：专注 / 短休 / 吃饭三段等宽，**当前所在的那一段**就是选中态。
-///
-/// 2026-11-11 取代 10-07 的「三颗等宽休息胶囊」。三颗胶囊的问题是三格长得完全一样：
-/// 看不出自己现在在哪一段，也回不到主计时（只能绕去按 ✓「结束休息」）。
-/// 这里恢复"段选"的语言——选中 = 阶段色浅底 + 实心色点 + ink 字 + w500。
-///
-/// 点当前那一段是**幂等**的：绝不重置剩余时间（重置是「重置」按钮的职责）。
-/// 具体落账（离开专注要不要写记录）由 [onChanged] 的调用方决定，本组件只管点。
-class PhaseSwitcher extends StatelessWidget {
-  const PhaseSwitcher({
-    super.key,
-    required this.current,
-    required this.minutesFor,
-    required this.onChanged,
-  });
-
-  /// 当前所在阶段（有会话取会话阶段，空闲取待开始阶段）。
-  /// null = 今天已收工，不属于任何阶段：三段全部回到未选中态（段选留白是刻意的，
-  /// 收工态下再高亮「专注」等于在已收工的界面上说"你正在专注"）。
-  final SessionMode? current;
-  final int Function(SessionMode mode) minutesFor;
-  final ValueChanged<SessionMode> onChanged;
-
-  /// 段选里塞得下的短名：`label` 的「短休息」三字 + 分钟数在 360 宽手机上会顶格。
-  static String shortLabel(SessionMode mode) => switch (mode) {
-        SessionMode.focus => '专注',
-        SessionMode.shortBreak => '短休',
-        SessionMode.longBreak => '吃饭',
-      };
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        for (var i = 0; i < SessionMode.values.length; i++) ...[
-          if (i > 0) const SizedBox(width: 6),
-          Expanded(
-            child: _PhaseSegment(
-              mode: SessionMode.values[i],
-              minutes: minutesFor(SessionMode.values[i]),
-              selected: SessionMode.values[i] == current,
-              onTap: () => onChanged(SessionMode.values[i]),
-            ),
-          ),
-        ],
-      ],
-    );
-  }
-}
-
-class _PhaseSegment extends StatelessWidget {
-  const _PhaseSegment({
-    required this.mode,
-    required this.minutes,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final SessionMode mode;
-  final int minutes;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final reduceMotion =
-        MediaQuery.maybeOf(context)?.disableAnimations ?? false;
-    final accent = mode.color;
-    final textColor = selected ? PineColors.ink : PineColors.sub;
-    return Semantics(
-      button: true,
-      selected: selected,
-      label: '${mode.label} $minutes 分钟',
-      child: MouseRegion(
-        cursor: SystemMouseCursors.click,
-        child: GestureDetector(
-          // 不要 InkWell：方案 E 红线禁止水波纹，反馈只走颜色与色点变化。
-          behavior: HitTestBehavior.opaque,
-          onTap: onTap,
-          child: AnimatedContainer(
-            duration: reduceMotion
-                ? Duration.zero
-                : const Duration(milliseconds: 180),
-            curve: Curves.easeOut,
-            height: 32,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: selected ? PineColors.tint(accent) : Colors.transparent,
-              borderRadius: BorderRadius.circular(Paper.chipRadius),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 6,
-                  height: 6,
-                  decoration: BoxDecoration(
-                    color: selected ? accent : PineColors.faint,
-                    shape: BoxShape.circle,
-                  ),
-                ),
-                const SizedBox(width: 5),
-                Flexible(
-                  child: Text(
-                    PhaseSwitcher.shortLabel(mode),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: textColor,
-                      fontSize: 12,
-                      fontWeight:
-                          selected ? FontWeight.w500 : FontWeight.w400,
-                      letterSpacing: 0,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 4),
-                Text(
-                  '$minutes',
-                  maxLines: 1,
-                  style: brickNumberStyle(
-                    fontSize: 10,
-                    color: textColor,
-                    weight: FontWeight.w400,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// 分区标题（V3）：14px 檀褐短横定界 + 宋体标题 + 可选右侧补充内容。
-/// 旧版是 4×14 松绿竖条 + 粗黑体，与素纸装帧线语言不一致。
-class SectionHeader extends StatelessWidget {
-  const SectionHeader({super.key, required this.title, this.trailing});
-
+class FactSectionHeader extends StatelessWidget {
+  const FactSectionHeader({super.key, required this.title, this.trailing});
   final String title;
   final Widget? trailing;
-
   @override
-  Widget build(BuildContext context) => Row(
-        children: [
-          Container(
-            width: 14,
-            height: 2,
-            decoration: BoxDecoration(
-              color: PineColors.accent,
-              borderRadius: BorderRadius.circular(PineRadius.seal),
-            ),
-          ),
-          const SizedBox(width: 8),
-          Text(
-            title,
-            style: PineText.serif(size: PineType.label, weight: FontWeight.w500),
-          ),
-          const Spacer(),
-          if (trailing != null) trailing!,
-        ],
-      );
+  Widget build(BuildContext context) => Row(children: [
+        Expanded(
+            child: Text(title,
+                style: PineText.sans(
+                    color: PinePalette.of(context).textPrimary,
+                    weight: FontWeight.w600,
+                    height: PineLineHeight.body))),
+        if (trailing != null) trailing!,
+      ]);
 }
 
-/// 数值指标块（纸面紧凑版）：主数字大号等宽，单位小字同行基线对齐，
-/// 数值行永不换行（数字与「分钟/小时/天」之间不再被折行拆散），
-/// 超宽时整行等比缩排；标签单行截断。适用于 3–4 等分窄列。
-class MetricTile extends StatelessWidget {
-  const MetricTile({
-    super.key,
-    required this.value,
-    required this.label,
-    this.accent,
-  });
-
+/// 聚合主读数 24/30，辅助标签 13/18；单位不再缩成任意字号。
+class AggregateReadout extends StatelessWidget {
+  const AggregateReadout(
+      {super.key, required this.value, required this.label, this.accent});
   final String value;
   final String label;
   final Color? accent;
-
   @override
   Widget build(BuildContext context) {
-    final parts = _splitValue(value);
-    final numberStyle = brickNumberStyle(
-      fontSize: 17,
-      color: accent ?? PineColors.ink,
-      weight: FontWeight.w700,
-    );
+    final palette = PinePalette.of(context);
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SizedBox(
-          width: double.infinity,
-          // 数值行固定高度：并排多块时行高恒等、标签不错位。
-          height: 24,
-          // scaleDown：内容放得下就不缩放；放不下整行等比缩小，绝不换行/溢出。
-          child: FittedBox(
-            fit: BoxFit.scaleDown,
-            alignment: Alignment.centerLeft,
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.baseline,
-              textBaseline: TextBaseline.alphabetic,
-              children: [
-                Text(parts.number, maxLines: 1, style: numberStyle),
-                if (parts.unit.isNotEmpty) ...[
-                  const SizedBox(width: 3),
-                  Text(
-                    parts.unit,
-                    maxLines: 1,
-                    style: const TextStyle(
-                      color: PineColors.sub,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-        ),
-        const SizedBox(height: 2),
-        Text(
-          label,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: const TextStyle(color: PineColors.sub, fontSize: 12),
-        ),
-      ],
-    );
-  }
-
-  /// 把「数值 单位」串拆成主数字与单位两段（`25 分钟` → `25` / `分钟`；
-  /// `1 小时 45分` → `1` / `小时 45分`）。整串不带空格时全部作主数字处理。
-  static ({String number, String unit}) _splitValue(String value) {
-    final space = value.indexOf(' ');
-    if (space <= 0) return (number: value, unit: '');
-    return (
-      number: value.substring(0, space),
-      unit: value.substring(space).trim(),
-    );
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(value,
+              style: PineText.aggregate(color: accent ?? palette.textPrimary)),
+          const SizedBox(height: PineSpacing.micro),
+          Text(label,
+              style: PineText.sans(
+                  size: PineType.auxiliary,
+                  color: palette.textSecondary,
+                  height: PineLineHeight.auxiliary))
+        ]);
   }
 }
 
-/// 柱状图的一段：某任务在某天的分钟数。
-class BrickBarSegment {
-  const BrickBarSegment({required this.value, required this.color});
-
-  final double value;
-  final Color color;
-}
-
-/// 周直方图（纸面版）：圆角堆叠柱、无描边，今日列松绿高亮，空日浅色占位。
-/// 可动画的待办行容器：勾选重排时行会**滑动**到新位置，而不是瞬间闪现。
-///
-/// 为什么不用 `AnimatedList`：它支持插入/删除，但**不支持 move**；而我们唯一要动画的
-/// 恰恰是「同一批行换顺序」。这里用固定行高的 `Stack` + `AnimatedPositioned`，
-/// 每行以 `TodoItem.id` 作 key，位置变化就有中间态可插值（2026-10-26）。
-///
-/// 前置条件：行高固定且内容单行（调用方的行都是 maxLines: 1）。
-class AnimatedTodoRows extends StatelessWidget {
-  const AnimatedTodoRows({
-    super.key,
-    required this.items,
-    required this.rowHeight,
-    required this.itemBuilder,
-    this.duration = const Duration(milliseconds: 240),
-  });
-
+/// 只呈现传入顺序：稳定 id 保持行身份，勾选与排序仍由现有逻辑负责。
+class SettledTodoRows extends StatelessWidget {
+  const SettledTodoRows(
+      {super.key,
+      required this.items,
+      required this.itemBuilder,
+      this.rowHeight,
+      this.duration = PineMotion.maximum});
   final List<TodoItem> items;
-  final double rowHeight;
+  final double? rowHeight;
   final Widget Function(TodoItem item) itemBuilder;
   final Duration duration;
-
   @override
   Widget build(BuildContext context) {
-    final reduceMotion = MediaQuery.maybeOf(context)?.disableAnimations ?? false;
+    final minimum =
+        _desktop ? PineSize.standardItemDesktop : PineSize.standardItemAndroid;
+    final extent =
+        rowHeight == null || rowHeight! < minimum ? minimum : rowHeight!;
+    final reduceMotion =
+        MediaQuery.maybeOf(context)?.disableAnimations ?? false;
+    final transition = reduceMotion
+        ? Duration.zero
+        : (duration > PineMotion.maximum ? PineMotion.maximum : duration);
     return SizedBox(
-      height: rowHeight * items.length,
-      child: Stack(
-        children: [
+        height: extent * items.length,
+        child: Stack(children: [
           for (var i = 0; i < items.length; i++)
             AnimatedPositioned(
-              key: ValueKey<String>(items[i].id),
-              duration: reduceMotion ? Duration.zero : duration,
-              curve: Curves.easeOutCubic,
-              top: i * rowHeight,
-              left: 0,
-              right: 0,
-              height: rowHeight,
-              child: itemBuilder(items[i]),
-            ),
-        ],
-      ),
-    );
+                key: ValueKey(items[i].id),
+                duration: transition,
+                curve: Curves.easeOutCubic,
+                top: extent * i,
+                left: 0,
+                right: 0,
+                height: extent,
+                child: itemBuilder(items[i])),
+        ]));
   }
 }
 
-class BrickBars extends StatelessWidget {
-  const BrickBars({
-    super.key,
-    required this.stacks,
-    required this.maxY,
-    required this.todayIndex,
-    this.height = 150,
-  });
-
-  /// 每天的分段，长度固定 7（周一至周日）。
-  final List<List<BrickBarSegment>> stacks;
-  final double maxY;
-  final int todayIndex;
-  final double height;
-
-  static const List<String> labels = <String>[
-    '周一',
-    '周二',
-    '周三',
-    '周四',
-    '周五',
-    '周六',
-    '周日',
-  ];
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: height,
-      child: Column(
-        children: [
-          Expanded(
-            child: CustomPaint(
-              painter: _BrickBarsPainter(stacks: stacks, maxY: maxY),
-              child: const SizedBox.expand(),
-            ),
-          ),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              for (var i = 0; i < 7; i++)
-                Expanded(
-                  child: Center(
-                    child: _DayLabel(
-                      text: labels[i],
-                      highlight: i == todayIndex,
-                    ),
-                  ),
-                ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _DayLabel extends StatelessWidget {
-  const _DayLabel({required this.text, required this.highlight});
-
-  final String text;
-  final bool highlight;
-
-  @override
-  Widget build(BuildContext context) {
-    if (!highlight) {
-      return Text(
-        text,
-        style: const TextStyle(color: PineColors.sub, fontSize: 11),
-      );
-    }
-    // 今日：松绿字 + 上方「今」角标（顶部留白由下方 painter 对齐线承担）。
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-          decoration: BoxDecoration(
-            color: PineColors.pine,
-            borderRadius: BorderRadius.circular(4),
-          ),
-          child: const Text(
-            '今',
-            style: TextStyle(color: Colors.white, fontSize: 9, height: 1.4),
-          ),
-        ),
-        const SizedBox(height: 2),
-        Text(
-          text,
-          style: const TextStyle(
-            color: PineColors.pine,
-            fontSize: 11,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _BrickBarsPainter extends CustomPainter {
-  _BrickBarsPainter({required this.stacks, required this.maxY});
-
-  final List<List<BrickBarSegment>> stacks;
-  final double maxY;
-
-  static const int _slots = 7;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final baseline = size.height;
-    final plotHeight = size.height;
-    if (plotHeight <= 0 || size.width <= 0 || maxY <= 0) return;
-
-    final slot = size.width / _slots;
-    final barWidth = slot * 0.52;
-
-    // 基线 + 半高网格线（浅色细线）。
-    final gridPaint = Paint()
-      ..strokeWidth = 1
-      ..color = PineColors.line;
-    canvas.drawLine(
-        Offset(0, baseline), Offset(size.width, baseline), gridPaint);
-    final halfPaint = Paint()
-      ..strokeWidth = 1
-      ..color = PineColors.line.withValues(alpha: 0.6);
-    canvas.drawLine(Offset(0, baseline - plotHeight / 2),
-        Offset(size.width, baseline - plotHeight / 2), halfPaint);
-
-    final fill = Paint()..style = PaintingStyle.fill;
-
-    for (var i = 0; i < _slots; i++) {
-      final left = slot * i + (slot - barWidth) / 2;
-      final segments = i < stacks.length ? stacks[i] : null;
-      if (segments == null || segments.isEmpty) {
-        // 空档位：圆角浅色占位块。
-        final stub = RRect.fromRectAndRadius(
-          Rect.fromLTWH(left, baseline - 8, barWidth, 8),
-          const Radius.circular(4),
-        );
-        canvas.drawRRect(stub, fill..color = PineColors.line);
-        continue;
-      }
-      // 自底向上计算各段矩形。
-      var cursor = baseline;
-      var topRect = Rect.zero;
-      var topColor = PineColors.line;
-      for (final segment in segments) {
-        final barHeight = (segment.value / maxY) * plotHeight;
-        if (barHeight <= 0) continue;
-        final rect =
-            Rect.fromLTWH(left, cursor - barHeight, barWidth, barHeight);
-        canvas.drawRect(rect, fill..color = segment.color);
-        topRect = rect;
-        topColor = segment.color;
-        cursor -= barHeight;
-      }
-      // 最顶段补圆角（只圆上方两角）。
-      if (topRect != Rect.zero) {
-        canvas.drawRRect(
-          RRect.fromRectAndCorners(
-            topRect,
-            topLeft: const Radius.circular(6),
-            topRight: const Radius.circular(6),
-          ),
-          fill..color = topColor,
-        );
-      }
-    }
-  }
-
-  @override
-  bool shouldRepaint(_BrickBarsPainter old) =>
-      old.stacks != stacks || old.maxY != maxY;
-}
-
-/// 分钟数格式化：统一保留到整数分钟。
-/// 时长拆成「数字 + 是否用番茄口径」，**取整规则的唯一来源**。
-///
-/// - 不足 1 小时：`45 分钟`，`useMark = false`；
-/// - 正好整小时：按番茄当量取整（180 → `3`、240 → `5`）；
-/// - 含分钟：精确到一位小数（185 → `3.7`、173 → `3.5`）。
-///
-/// 规则来自 2026-09-29 的产品决定（见 CHANGELOG）；2026-09-30 起单位文字改成
-/// 松果图案（见 [MinutesText]），所以这里只出**数字**。
-({String text, bool useMark}) minutesLabel(double minutes) {
-  final total = minutes.round();
-  if (total < 60) return (text: '$total 分钟', useMark: false);
-  if (total % 60 == 0) {
-    return (text: '${pomodoroEquiv(total.toDouble())}', useMark: true);
-  }
-  // 一位小数：total/50 的十分位 = round(total / 5)
-  final tenths = (total / 5).round();
-  return (
-    text:
-        tenths % 10 == 0 ? '${tenths ~/ 10}' : '${tenths ~/ 10}.${tenths % 10}',
-    useMark: true,
-  );
-}
-
-/// 时长文案（单位＝「番茄」，每 50 分钟 1 个）：
-/// 不足 1 小时 `45 分钟`；正好整小时 `3 番茄`；含分钟 `3.7 番茄`。
-///
-/// 只用于无法分级的场合（对话框正文、语义标签、MetricTile 的 value 参数）。
-/// 需要「大数字 + 小单位」的排版，交给 MetricTile 或 [minutesRichSpan]。
-String formatMinutes(double minutes) {
-  final total = minutes.round();
-  if (total < 60) return '$total 分钟';
-  if (total % 60 == 0) return '${pomodoroEquiv(total.toDouble())} 番茄';
-  final tenths = (total / 5).round();
-  return tenths % 10 == 0
-      ? '${tenths ~/ 10} 番茄'
-      : '${tenths ~/ 10}.${tenths % 10} 番茄';
-}
+/// 时长统一自然语言；番茄整数计数由调用处独立呈现。
+String formatMinutes(double minutes) => formatHoursMinutes(minutes);
 
 /// 「X 小时 Y 分钟」人话时长（最近完成列表用）：
 /// `3 小时 5 分钟` / `3 小时` / `45 分钟`；不足 1 分钟为 `<1 分钟`。
 ///
 /// 2026-10-12 起不再显示 `mm:ss`（原来靠秒级精度区分 46.4 与 46.9 分钟，
 /// 但对「看记录」这个场景不直观），四舍五入到分钟。
-/// 聚合统计仍走 [formatMinutes]。
+/// 时长与整数番茄计数分别呈现，不在此做番茄换算。
 String formatHoursMinutes(double minutes) {
   final total = minutes.round();
   if (total <= 0) return '<1 分钟';
@@ -1009,392 +306,43 @@ String formatCompactMinutes(double minutes) {
   return '${h}h${m.toString().padLeft(2, '0')}m';
 }
 
-/// 「大数字 + 小单位」的富文本：单位按 [unitScale] 缩小（默认 0.62）。
-///
-/// 单位是文字而非图案——2026-10-01 结论见 CHANGELOG：这个尺寸下图案做不好看。
-InlineSpan minutesRichSpan(double minutes,
-    {required TextStyle style, double unitScale = 0.58}) {
-  final label = formatMinutes(minutes);
-  final cut = label.lastIndexOf(' ');
-  if (cut <= 0) return TextSpan(text: label, style: style);
-  final unitSize = (style.fontSize ?? 14) * unitScale;
-  return TextSpan(children: [
-    TextSpan(text: label.substring(0, cut), style: style),
-    // 单位前留一点缝（原来靠字符串里的空格，拆成两段后要自己补）
-    WidgetSpan(
-      child: SizedBox(width: unitSize * 0.22),
-    ),
-    TextSpan(
-      text: label.substring(cut + 1),
-      style: style.copyWith(fontSize: unitSize),
-    ),
-  ]);
-}
-
-/// 统计口径的时长：数字 + 松果图案（代替「个番茄」文字）。
-///
-/// 不足 1 小时仍是「45 分钟」（没有单位图案）。用具名 style 传入，颜色随之继承；
-/// 图案不额外着色，避免在同一行里跟任务色抢注意力。
-class MinutesText extends StatelessWidget {
-  const MinutesText(this.minutes, {super.key, this.style});
-
+/// 单条记录与汇总共享自然语言时长，不隐含番茄换算。
+class DurationText extends StatelessWidget {
+  const DurationText(this.minutes, {super.key, this.style});
   final double minutes;
   final TextStyle? style;
-
-  /// 单位用文字「番茄」并**缩小一档**（2026-10-01 定：图案在这个尺寸做不好看，
-  /// 见 CHANGELOG；但「大数字 + 小单位」的层级要保留）。
   @override
-  Widget build(BuildContext context) => Text.rich(
-        minutesRichSpan(minutes, style: style ?? const TextStyle()),
-      );
+  Widget build(BuildContext context) => Text(formatHoursMinutes(minutes),
+      style: PineText.sans(
+              color: PinePalette.of(context).textPrimary,
+              height: PineLineHeight.body)
+          .merge(style));
 }
 
-/// 考试倒计时。
-///
-/// - `compact = false`（默认）：独立小卡，两行——上行「色条 + 名称」、
-///   下行考试日期，右侧大号天数。用于移动端专注页顶部。
-/// - `compact = true`：单行——「色条 + 名称 + 日期」左对齐，天数右对齐。
-///   用于桌面专注舱底部信息卡内嵌（不新增卡片，维持「极简无卡」）。
-///
-/// 紧迫语义由天数派生，是模块唯一的状态语言：
-/// 剩余 > 7 天 = 松绿；1–7 天（冲刺）= 专注红；0 天 = 「今天开考」；
-/// 已过 = 淡色「考试已结束」。不额外引入新色，全部取自方案 E 令牌。
-class CountdownCard extends StatelessWidget {
-  const CountdownCard({
-    super.key,
-    required this.countdown,
-    required this.now,
-    this.compact = false,
-    this.onTap,
-  });
-
+/// V1 只读自然日差：配置入口属于 V6，不引入冲刺或考试阶段语义。
+class TargetDayReadout extends StatelessWidget {
+  const TargetDayReadout(
+      {super.key,
+      required this.countdown,
+      required this.now,
+      this.compact = false});
   final Countdown countdown;
-
-  /// 计算天数用的当前时刻（由页面每秒重建时传入，组件内不取系统时钟，
-  /// 保证同帧内多处显示一致、也便于测试）。
   final DateTime now;
   final bool compact;
-
-  /// 点击进入倒计时设置。
-  final VoidCallback? onTap;
-
-  /// ≤7 天进入冲刺期。
-  static const int _sprintDays = 7;
-
   @override
   Widget build(BuildContext context) {
+    final palette = PinePalette.of(context);
     final target = countdown.target;
-    if (target == null) return const SizedBox.shrink();
-
     final days = countdown.daysFrom(now);
-    final sprint = days > 0 && days <= _sprintDays;
-    final accent = days < 0
-        ? PineColors.faint
-        : sprint || days == 0
-            ? PineColors.focus
-            : PineColors.pine;
-
-    final bar = Container(
-      width: 3,
-      height: compact ? 12 : 14,
-      decoration: BoxDecoration(
-        color: accent,
-        borderRadius: BorderRadius.circular(2),
-      ),
-    );
-
-    if (compact) {
-      final row = Padding(
-        padding: const EdgeInsets.symmetric(vertical: 2),
-        child: Row(
-          children: [
-            bar,
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text.rich(
-                TextSpan(
-                  children: [
-                    TextSpan(
-                      text: countdown.label,
-                      style: const TextStyle(
-                        color: PineColors.ink,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    TextSpan(
-                      text: '  ${chineseDate(target, withYear: false)}',
-                      style: const TextStyle(
-                        color: PineColors.sub,
-                        fontSize: 10.5,
-                      ),
-                    ),
-                  ],
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            const SizedBox(width: 10),
-            _tail(days, compact: true),
-          ],
-        ),
-      );
-      if (onTap == null) return row;
-      return BrickPressable(onTap: onTap, shadowed: false, child: row);
-    }
-
-    return BrickCard(
-      padding: const EdgeInsets.fromLTRB(14, 11, 14, 11),
-      onTap: onTap,
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Row(
-                  children: [
-                    bar,
-                    const SizedBox(width: 8),
-                    Flexible(
-                      child: Text(
-                        countdown.label,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: PineColors.ink,
-                          fontSize: 12.5,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 5),
-                // 缩进 11 = 色条 3 + 间距 8，与上一行文字左缘对齐。
-                Padding(
-                  padding: const EdgeInsets.only(left: 11),
-                  child: Text(
-                    chineseDate(target),
-                    style: const TextStyle(
-                      color: PineColors.sub,
-                      fontSize: 10.5,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 12),
-          _tail(days, compact: false),
-        ],
-      ),
-    );
+    final text = !countdown.enabled || target == null
+        ? '未设置目标日'
+        : days <= 0
+            ? '${countdown.label}已到期'
+            : '距${countdown.label}还有$days天';
+    return Text(text,
+        style: PineText.sans(
+            size: compact ? PineType.auxiliary : PineType.body,
+            color: palette.textSecondary,
+            height: compact ? PineLineHeight.auxiliary : PineLineHeight.body));
   }
-
-  /// 右侧天数区。分档文案见类注释。
-  Widget _tail(int days, {required bool compact}) {
-    if (days < 0) {
-      return const Text(
-        '考试已结束',
-        style: TextStyle(
-          color: PineColors.faint,
-          fontSize: 11.5,
-          fontWeight: FontWeight.w600,
-        ),
-      );
-    }
-    if (days == 0) {
-      return const Text(
-        '今天开考',
-        style: TextStyle(
-          color: PineColors.focus,
-          fontSize: 13,
-          fontWeight: FontWeight.w700,
-        ),
-      );
-    }
-    final sprint = days <= _sprintDays;
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.baseline,
-      textBaseline: TextBaseline.alphabetic,
-      children: [
-        Text(
-          '$days',
-          style: brickNumberStyle(
-            fontSize: compact ? 18 : 24,
-            color: sprint ? PineColors.focus : PineColors.ink,
-          ),
-        ),
-        const SizedBox(width: 3),
-        const Text(
-          '天',
-          style: TextStyle(
-            color: PineColors.sub,
-            fontSize: 11,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-/// 环形计时（2026-11-11 改版）：环是唯一的视觉中心，环心只放时间与状态。
-///
-/// 与旧 [BrickTimer] 卡片的区别：不再给计时套一层纸卡，环直接排在纸面上；
-/// 环心数字按环径算（0.19 倍），不再固定 50 —— 固定值在 188 环上会顶到轨道，
-/// 看起来像数字"撑"在环上。
-class PaperRing extends StatelessWidget {
-  const PaperRing({
-    super.key,
-    required this.progress,
-    required this.color,
-    required this.timeText,
-    required this.caption,
-    this.overtime = false,
-    this.diameter = 208,
-    this.stroke = 2.5,
-    this.timeStyle,
-    this.dimArc = false,
-  });
-
-  final double progress;
-
-  /// 阶段色：只给弧、色点与小面积，不做底。
-  final Color color;
-  final String timeText;
-  final String caption;
-  final bool overtime;
-  final double diameter;
-
-  /// 弧线粗细：纸面风格用 2.5，不再用 12 的粗环。
-  final double stroke;
-
-  /// 收工态环心写「收工」二字，等宽字体没有中文字形，必须整段覆盖。
-  final TextStyle? timeStyle;
-
-  /// 暂停时弧线变淡（旧 BrickTimer 的 is-paused 语义）。
-  final bool dimArc;
-
-  @override
-  Widget build(BuildContext context) {
-    final clockSize = (diameter * 0.19).clamp(32.0, 46.0);
-    return Semantics(
-      label: '$caption，$timeText',
-      child: SizedBox(
-        width: diameter,
-        height: diameter,
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            CustomPaint(
-              painter: RingProgressPainter(
-                progress: progress,
-                color: color,
-                stroke: stroke,
-                dimmed: dimArc,
-              ),
-            ),
-            Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    timeText,
-                    maxLines: 1,
-                    style: timeStyle ??
-                        brickNumberStyle(
-                          fontSize: clockSize,
-                          weight: FontWeight.w300,
-                          color:
-                              overtime ? PineColors.goldInk : PineColors.ink,
-                        ),
-                  ),
-                  const SizedBox(height: 6),
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        width: 5,
-                        height: 5,
-                        decoration: BoxDecoration(
-                          color: color,
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        caption,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: PineColors.sub,
-                          fontSize: 12,
-                          letterSpacing: 0,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// 圆环：纸色轨道 + 阶段色圆弧（顺时针从 12 点起），平头端点。
-///
-/// 端点用 butt 而不是 round：圆头会在轨道内外各多出半个线宽，看起来像
-/// 弧"凸"出圆环（2026-11-11 设计评审）。超时由调用方传整环 progress=1。
-class RingProgressPainter extends CustomPainter {
-  const RingProgressPainter({
-    required this.progress,
-    required this.color,
-    this.stroke = 2.5,
-    this.dimmed = false,
-  });
-
-  final double progress;
-  final Color color;
-  final double stroke;
-  final bool dimmed;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final rect = Offset.zero & size;
-    final radius = (size.shortestSide - stroke) / 2;
-    final track = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = stroke
-      ..color = PineColors.track;
-    canvas.drawCircle(rect.center, radius, track);
-    final p = progress.clamp(0.0, 1.0);
-    if (p <= 0) return;
-    final arc = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = stroke
-      ..strokeCap = StrokeCap.butt
-      ..color = dimmed ? color.withAlpha(107) : color;
-    canvas.drawArc(
-      rect.deflate(stroke / 2),
-      -3.1415926 / 2,
-      6.2831852 * p,
-      false,
-      arc,
-    );
-  }
-
-  @override
-  bool shouldRepaint(RingProgressPainter old) =>
-      old.progress != progress ||
-      old.color != color ||
-      old.stroke != stroke ||
-      old.dimmed != dimmed;
 }

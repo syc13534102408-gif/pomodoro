@@ -93,7 +93,7 @@ void main() {
     });
   });
 
-  group('CountdownCard 渲染', () {
+  group('TargetDayReadout 渲染', () {
     Future<void> pump(
       WidgetTester tester,
       Countdown countdown,
@@ -103,7 +103,7 @@ void main() {
         tester.pumpWidget(
           MaterialApp(
             home: Scaffold(
-              body: CountdownCard(
+              body: TargetDayReadout(
                 countdown: countdown,
                 now: now,
                 compact: compact,
@@ -112,29 +112,26 @@ void main() {
           ),
         );
 
-    testWidgets('常规态：名称 + 考试日期 + 剩余天数', (tester) async {
+    testWidgets('常规态：目标名称 + 自然日差', (tester) async {
       await pump(tester, const Countdown(), DateTime(2026, 9, 13, 16, 49));
-      expect(find.text('2027 考研初试'), findsOneWidget);
-      expect(find.text('2026年12月19日 周六'), findsOneWidget);
-      expect(find.text('97'), findsOneWidget);
-      expect(find.text('天'), findsOneWidget);
-      expect(find.text('今天开考'), findsNothing);
+      expect(find.text('距2027 考研初试还有97天'), findsOneWidget);
+      expect(find.text('2027 考研初试已到期'), findsNothing);
     });
 
-    testWidgets('当天：改为「今天开考」，不再显示天数', (tester) async {
+    testWidgets('当天：改为「2027 考研初试已到期」，不再显示天数', (tester) async {
       await pump(tester, const Countdown(), DateTime(2026, 12, 19, 8, 30));
-      expect(find.text('今天开考'), findsOneWidget);
+      expect(find.text('2027 考研初试已到期'), findsOneWidget);
       expect(find.text('97'), findsNothing);
       expect(find.text('天'), findsNothing);
     });
 
-    testWidgets('已过：显示「考试已结束」', (tester) async {
+    testWidgets('已过：显示「2027 考研初试已到期」', (tester) async {
       await pump(tester, const Countdown(), DateTime(2027, 1, 1));
-      expect(find.text('考试已结束'), findsOneWidget);
+      expect(find.text('2027 考研初试已到期'), findsOneWidget);
       expect(find.text('天'), findsNothing);
     });
 
-    testWidgets('compact 单行内同时含名称、日期与天数', (tester) async {
+    testWidgets('compact 呈现同一名称与自然日差', (tester) async {
       await pump(
         tester,
         const Countdown(),
@@ -146,13 +143,13 @@ void main() {
         findsWidgets,
       );
       expect(
-        find.textContaining('12月19日 周六', findRichText: true),
+        find.textContaining('还有97天', findRichText: true),
         findsWidgets,
       );
-      expect(find.text('97'), findsOneWidget);
+      expect(find.text('距2027 考研初试还有97天'), findsOneWidget);
     });
 
-    testWidgets('目标日不可解析时不渲染（防御脏数据）', (tester) async {
+    testWidgets('目标日不可解析时显示未设置（防御脏数据）', (tester) async {
       // 构造函数不做校验，只有 fromMap 才回落默认值；这里直接喂脏日值。
       await pump(
         tester,
@@ -160,6 +157,7 @@ void main() {
         DateTime(2026, 9, 13),
       );
       expect(find.text('脏数据'), findsNothing);
+      expect(find.text('未设置目标日'), findsOneWidget);
       expect(find.text('天'), findsNothing);
     });
   });

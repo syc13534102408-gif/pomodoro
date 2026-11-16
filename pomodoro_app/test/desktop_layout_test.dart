@@ -223,7 +223,7 @@ void main() {
       await tester.pumpAndSettle();
 
       final importRect = tester.getRect(
-        find.widgetWithText(BrickButton, '导入'),
+        find.widgetWithText(PineButton, '导入'),
       );
       // 三只抽屉开关：日程 / 统计 / 设置
       final toggleRects = <Rect>[

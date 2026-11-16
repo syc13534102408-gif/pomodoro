@@ -988,7 +988,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               examText: examText,
               syncText: _mirrorEnabled ? '已同步' : '本地',
               onMenu: _openPlanSheet,
-              // 倒计时的编辑入口移到书眉：首页不再单独放一张 CountdownCard，
+              // 倒计时的编辑入口移到书眉：首页不再单独放一张 TargetDayReadout，
               // 否则「今日达成条」会被挤出首屏（定稿 S1 对比，2026-11-13）。
               onExamTap: _data.countdown.enabled
                   ? () => showCountdownSheet(context,
@@ -1920,8 +1920,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 ),
                 const SizedBox(height: 8),
                 Center(
-                  child: _DesktopRing(
-                    progress: resting ? 1 : view.progress,
+                  child: _DesktopSessionReadout(
                     diameter: ring,
                     // 金色不能直接用 gold（对纸面 2.00:1），字与弧改 goldInk（3.40:1）；
                     // gold 只留给「按钮底 + ink 字」。
@@ -2218,7 +2217,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   ///
   /// 任务行就在环上方 12pt、带色点，环内再写一遍是纯重复；而环在圆心下方 40pt
   /// 处的可用弦长只有 205pt，长任务名会被截断甚至压到 12pt 轨道上。
-  /// 手机端同步（`BrickTimer` 与本方法同源），两端文案不再分叉。
+  /// 手机与桌面使用同源会话文案。
   String _caption(ActiveSession? session, SessionView view) {
     // 今日休息态：环里直接写状态（省一行横幅，垂直预算只剩几 pt）。
     // 2026-11-11：带上今天的总账——收工后环心是「收工」，这行就是唯一的成绩单。
@@ -2259,7 +2258,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         elapsedSeconds: 0,
       );
 
-  /// 收工态环心字。**刻意不用 [brickNumberStyle]**：它指定 monospace，
+  /// 收工态环心字。**刻意不用 [pineNumberStyle]**：它指定 monospace，
   /// 而等宽字体没有中文字形，中文要交给系统回退链。
   static const TextStyle _restCenterStyle = TextStyle(
     color: PineColors.pine,
@@ -2368,7 +2367,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   Widget _metrics(StatsView stats) {
     final goal = _data.goalMinutes <= 0 ? 1 : _data.goalMinutes;
     final progress = (stats.todayMinutes / goal).clamp(0.0, 1.0);
-    // 定稿 S1 的「今日达成条」：一条横排，不再用三格 MetricTile。
+    // 定稿 S1 的「今日达成条」：一条横排，不再用三格 AggregateReadout。
     return _goalCard(
       Padding(
         padding: const EdgeInsets.only(bottom: 2),
@@ -2420,7 +2419,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     final done = items.where((item) => item.done).length;
     const maxRows = 4;
     final shown = items.take(maxRows).toList();
-    return BrickCard(
+    return SettledCard(
       padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -2479,7 +2478,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             )
           else
             // 勾选后重排要有中间态：固定行高 + AnimatedPositioned 才滑得动。
-            AnimatedTodoRows(
+            SettledTodoRows(
               items: shown,
               rowHeight: 26,
               itemBuilder: (item) => _planRow(
@@ -2619,9 +2618,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        SectionHeader(
+        FactSectionHeader(
           title: '最近记录',
-          trailing: BrickButton(
+          trailing: PineButton(
             label: '补记',
             icon: Icons.add,
             height: 32,
@@ -2633,7 +2632,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
           ),
         ),
         const SizedBox(height: 10),
-        BrickCard(
+        SettledCard(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
           child: items.isEmpty
               ? const Padding(
@@ -2783,9 +2782,8 @@ class _RecentRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return BrickPressable(
+    return PinePressable(
       onTap: onTap,
-      shadowed: false,
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 9),
         child: Row(
@@ -2813,7 +2811,7 @@ class _RecentRow extends StatelessWidget {
             const SizedBox(width: 8),
             Text(
               formatHoursMinutes(record.minutes),
-              style: brickNumberStyle(fontSize: 13),
+              style: pineNumberStyle(fontSize: 13),
             ),
             const SizedBox(width: 4),
             const Icon(Icons.chevron_right, size: 18, color: PineColors.sub),
@@ -2839,11 +2837,9 @@ class _TaskSwatch extends StatelessWidget {
       );
 }
 
-/// 大环形计时（主舱 B）：无卡片容器，圆环是唯一视觉中心。
-/// 圆环随进度收弧（阶段色），中心等宽大数字 + 状态 caption；超时整环金色。
-class _DesktopRing extends StatelessWidget {
-  const _DesktopRing({
-    required this.progress,
+/// 桌面读数使用开放的进行中边界；完整 V1 布局留待当下视图批次迁移。
+class _DesktopSessionReadout extends StatelessWidget {
+  const _DesktopSessionReadout({
     required this.color,
     required this.timeText,
     required this.caption,
@@ -2853,13 +2849,12 @@ class _DesktopRing extends StatelessWidget {
     this.stamp = false,
   });
 
-  final double progress;
   final Color color;
   final String timeText;
   final String caption;
   final bool overtime;
 
-  /// 环心大字样式；null 走 [brickNumberStyle]（等宽 + tabular）。
+  /// 环心大字样式；null 走 [pineNumberStyle]（等宽 + tabular）。
   /// 收工态环心写「收工」二字，等宽字体没有中文字形，必须整段覆盖。
   final TextStyle? timeStyle;
 
@@ -2878,12 +2873,10 @@ class _DesktopRing extends StatelessWidget {
         clipBehavior: Clip.none,
         fit: StackFit.expand,
         children: [
-          CustomPaint(
-            painter: RingProgressPainter(
-              progress: progress,
-              color: color,
-              stroke: 3,
-            ),
+          ActiveVariantSurface(
+            padding: EdgeInsets.zero,
+            borderColor: overtime ? PinePalette.of(context).overtime : color,
+            child: const SizedBox.shrink(),
           ),
           Center(
             child: Column(
@@ -2892,7 +2885,7 @@ class _DesktopRing extends StatelessWidget {
                 Text(
                   timeText,
                   style: timeStyle ??
-                      brickNumberStyle(
+                      pineNumberStyle(
                         // 小环降一档，避免数字顶到 12pt 轨道。
                         fontSize: diameter >= Paper.ringMax
                             ? 42
@@ -2986,9 +2979,8 @@ class _RestEntryChip extends StatelessWidget {
     return Semantics(
       button: true,
       label: active ? '继续今日（撤销收工）' : '收工',
-      child: BrickPressable(
+      child: PinePressable(
         onTap: onTap,
-        shadowed: false,
         child: Container(
           height: 32,
           padding: const EdgeInsets.symmetric(horizontal: 10),
@@ -3031,7 +3023,7 @@ class _RestEntryChip extends StatelessWidget {
 ///
 /// 为什么不是 AlertDialog：① 它要盖住整屏并自带遮罩，才算"天黑下来"；
 /// ② 对话框走内在宽度/高度测量，`docs/07 §7` 记着在这条路上踩过的两个坑
-/// （stretch+Expanded、BrickButton 进 OverflowBar）；③ 仪式要两段式动画，
+/// （stretch+Expanded、PineButton 进 OverflowBar）；③ 仪式要两段式动画，
 /// 对话框的 builder 不适合承载。
 ///
 /// 两段式（由 [resting] 驱动，**不另设本地状态**——数据一落，第二幕就是事实）：
@@ -3143,19 +3135,19 @@ class _RestCeremony extends StatelessWidget {
                   Row(
                     children: [
                       Expanded(
-                        child: MetricTile(
+                        child: AggregateReadout(
                           value: '${stats.todayMinutes.round()} 分钟',
                           label: '今日专注',
                         ),
                       ),
                       Expanded(
-                        child: MetricTile(
+                        child: AggregateReadout(
                           value: '${stats.todayCount} 个',
                           label: '番茄',
                         ),
                       ),
                       Expanded(
-                        child: MetricTile(
+                        child: AggregateReadout(
                           value: '${stats.streak} 天',
                           label: '连续',
                         ),
@@ -3172,7 +3164,7 @@ class _RestCeremony extends StatelessWidget {
                       const Spacer(),
                       Text(
                         '$goalMinutes 分钟 · 达成 ${(ratio * 100).round()}%',
-                        style: brickNumberStyle(
+                        style: pineNumberStyle(
                           fontSize: 10,
                           color: PineColors.sub,
                           weight: FontWeight.w400,
@@ -3181,10 +3173,10 @@ class _RestCeremony extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 6),
-                  BrickProgress(value: ratio),
+                  AggregateProgress(value: ratio),
                   if (!resting) ...[
                     const SizedBox(height: 18),
-                    BrickButton(
+                    PineButton(
                       label: '收工',
                       icon: Icons.check_rounded,
                       height: 44,

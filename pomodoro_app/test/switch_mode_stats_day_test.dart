@@ -146,12 +146,12 @@ void main() {
     });
   });
 
-  group('formatMinutes：番茄口径（单位是文字）', () {
-    test('不足 1 小时说分钟，其余说番茄', () {
+  group('formatMinutes：P4 自然语言时长', () {
+    test('分钟与小时按自然语言呈现', () {
       expect(formatMinutes(45), '45 分钟');
-      expect(formatMinutes(180), '3 番茄');
-      expect(formatMinutes(185), '3.7 番茄');
-      expect(formatMinutes(240), '5 番茄');
+      expect(formatMinutes(180), '3 小时');
+      expect(formatMinutes(185), '3 小时 5 分钟');
+      expect(formatMinutes(240), '4 小时');
     });
   });
 }

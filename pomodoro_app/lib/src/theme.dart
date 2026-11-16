@@ -116,16 +116,10 @@ class PineColors {
   static const lineStrong = Color(0xFF8A93A3);
 
   static const accent = Color(0xFF7AB8FF);
-  static const accentDeep = Color(0xFF7AB8FF);
   static const accentSoft = Color(0xFF20242B);
   static const celadon = Color(0xFF75D0A4);
   static const ochre = Color(0xFFE7B86A);
   static const crimson = Color(0xFFFF8F85);
-
-  // 图表旧名只保留不透明语义色，不再使用透明叠加。
-  static const ink82 = Color(0xFFF2F3F5);
-  static const ink46 = Color(0xFFC7CAD1);
-  static const ink22 = Color(0xFF9CA2AE);
 
   static const card = sheet;
   static const sub = ink2;
@@ -144,11 +138,6 @@ class PineColors {
   static const textSecondary = ink2;
   static const textAuxiliary = ink3;
   static const textPresence = ink;
-  static const shortBreak = celadon;
-  static const longBreak = ochre;
-  static const paused = Color(0xFFA4ADBD);
-  static const overtime = Color(0xFFC4A5F5);
-  static const adjudication = crimson;
   static const divider = line;
   static const logicalDayDivider = lineStrong;
 
@@ -279,7 +268,6 @@ class PineRadius {
   static const double card = settled;
   static const double control = settled;
   static const double seal = adjudication;
-  static const double pill = active;
 }
 
 /// 新宪章不设置阴影令牌；空列表仅保留旧调用兼容。
@@ -337,11 +325,9 @@ class PineMotion {
 class Paper {
   const Paper._();
 
-  static const cardBorder = 1.0;
   static const chipBorder = 1.0;
   static const cardRadius = PineRadius.settled;
   static const chipRadius = PineRadius.settled;
-  static const tinyRadius = PineRadius.adjudication;
 
   // 旧桌面环径在对应视图迁移时继续重排，本批不改布局。
   static const double cabinColumn = 452;
@@ -350,23 +336,7 @@ class Paper {
   static const double ringMin = 184;
 
   static const hairline = 1.0;
-  static const offset = 0.0;
   static const List<BoxShadow> shadow = PineShadow.card;
-
-  static BoxDecoration box({
-    Color? color,
-    double border = cardBorder,
-    double radius = cardRadius,
-    bool shadowed = false,
-  }) =>
-      BoxDecoration(
-        color: color ?? PineColors.card,
-        borderRadius: BorderRadius.circular(radius),
-        border: border > 0
-            ? Border.all(color: PineColors.line, width: border)
-            : null,
-        boxShadow: shadowed ? shadow : null,
-      );
 }
 
 /// 预设六色任务标识；旧数据保存的是色值，不受色集收敛影响。
@@ -614,27 +584,5 @@ ThemeData buildPineTheme({Brightness brightness = Brightness.light}) {
         borderRadius: BorderRadius.all(Radius.circular(PineRadius.settled)),
       ),
     ),
-    extensions: <ThemeExtension<dynamic>>[
-      _SemanticColors(mint: palette.shortBreak, gold: palette.longBreak),
-    ],
   );
-}
-
-class _SemanticColors extends ThemeExtension<_SemanticColors> {
-  const _SemanticColors({required this.mint, required this.gold});
-
-  final Color mint;
-  final Color gold;
-
-  @override
-  _SemanticColors copyWith({Color? mint, Color? gold}) => _SemanticColors(
-        mint: mint ?? this.mint,
-        gold: gold ?? this.gold,
-      );
-
-  @override
-  _SemanticColors lerp(_SemanticColors? other, double t) => _SemanticColors(
-        mint: Color.lerp(mint, other?.mint ?? mint, t)!,
-        gold: Color.lerp(gold, other?.gold ?? gold, t)!,
-      );
 }

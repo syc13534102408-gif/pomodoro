@@ -24,7 +24,7 @@ import 'package:pomodoro_app/src/sheets.dart';
 import 'package:pomodoro_app/src/theme.dart';
 
 /// 测试环境默认字体渲染成方块，必须显式加载一个含中文的字体。
-/// 同时把 'monospace' 也指向它——`brickNumberStyle` 显式指定了该族。
+/// 同时注册等宽字体回退所需的中文字符。
 Future<void> _loadFonts() async {
   final bytes = File('/System/Library/Fonts/Supplemental/Arial Unicode.ttf')
       .readAsBytesSync();

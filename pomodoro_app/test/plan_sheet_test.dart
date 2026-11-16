@@ -207,7 +207,7 @@ void main() {
     await tester.tap(find.text('全部 ›').first);
     await tester.pumpAndSettle();
 
-    await tester.tap(find.widgetWithText(BrickButton, '导入').first);
+    await tester.tap(find.widgetWithText(PineButton, '导入').first);
     await tester.pumpAndSettle();
 
     // 日期必须相对"今天"生成：写死 10/24、10/25 会在真正的 10/25 那天
@@ -273,7 +273,7 @@ void main() {
     await tester.tap(find.text('打开日程'));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.widgetWithText(BrickButton, '导入').first);
+    await tester.tap(find.widgetWithText(PineButton, '导入').first);
     await tester.pumpAndSettle();
 
     await tester.enterText(
@@ -314,7 +314,7 @@ void main() {
     ));
     await tester.tap(find.text('打开日程'));
     await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(BrickButton, '导入').first);
+    await tester.tap(find.widgetWithText(PineButton, '导入').first);
     await tester.pumpAndSettle();
     await tester.enterText(
       find.descendant(
@@ -481,7 +481,7 @@ void main() {
     );
 
     await tester.tap(find.text('第二条'));
-    // 重排是 240ms 的位置动画，必须等它落定再量坐标（否则量到的是中间态）。
+    // 重排是 200ms 的位置动画，必须等它落定再量坐标（否则量到的是中间态）。
     await tester.pumpAndSettle();
     await tester.tap(find.text('第三条'));
     await tester.pumpAndSettle();
@@ -509,7 +509,7 @@ void main() {
 
     final beforeY = tester.getTopLeft(find.text('乙')).dy;
     await tester.tap(find.text('乙'));
-    // 起动画后只推进 100ms（总时长 240ms），此时应处在中间态。
+    // 起动画后只推进 100ms（总时长 200ms），此时应处在中间态。
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
     final midY = tester.getTopLeft(find.text('乙')).dy;

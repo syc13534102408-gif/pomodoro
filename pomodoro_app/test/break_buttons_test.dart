@@ -215,7 +215,7 @@ void main() {
         await tester.tap(find.text('收工'));
         await tester.pumpAndSettle();
 
-        await tester.tap(find.widgetWithText(BrickButton, '收工'));
+        await tester.tap(find.widgetWithText(PineButton, '收工'));
         await tester.pump();
         // 第二幕：数据已落，标题换成「今日已收工」
         expect(find.text('今日已收工'), findsOneWidget);

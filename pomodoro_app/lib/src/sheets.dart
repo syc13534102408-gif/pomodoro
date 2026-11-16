@@ -283,7 +283,7 @@ class _TaskSheetState extends State<_TaskSheet> {
     final tasks = _data.tasks;
     return _SheetScaffold(
       title: '专注事件',
-      trailing: BrickButton(
+      trailing: PineButton(
         label: '新增',
         icon: Icons.add,
         height: 36,
@@ -337,7 +337,7 @@ class _TaskRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final swatch = task.swatch;
-    return BrickPressable(
+    return PinePressable(
       onTap: onTap,
       child: Container(
         clipBehavior: Clip.antiAlias,
@@ -392,7 +392,7 @@ class _GhostIcon extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Padding(
         padding: const EdgeInsets.symmetric(horizontal: 2),
-        child: BrickButton(
+        child: PineButton(
           label: '',
           semanticLabel: label,
           icon: icon,
@@ -502,7 +502,7 @@ class _TodoSheetState extends State<_TodoSheet> {
       title: '今日清单',
       trailing: Text(
         '$done / ${items.length}',
-        style: brickNumberStyle(fontSize: 12, color: PineColors.sub),
+        style: pineNumberStyle(fontSize: 12, color: PineColors.sub),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -546,7 +546,7 @@ class _TodoSheetState extends State<_TodoSheet> {
                 ),
               ),
               const SizedBox(width: 10),
-              BrickButton(
+              PineButton(
                 label: '添加',
                 height: 46,
                 color: PineColors.pine,
@@ -586,7 +586,7 @@ class _TodoRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final row = BrickPressable(
+    final row = PinePressable(
       onTap: null,
       onLongPress: onEdit ?? onFocus,
       semanticLabel: onEdit == null
@@ -965,7 +965,7 @@ class _PlanPanelState extends State<PlanPanel> {
                       fontSize: 17,
                       fontWeight: FontWeight.w700)),
               const Spacer(),
-              BrickButton(
+              PineButton(
                 label: '导入',
                 icon: Icons.file_upload_outlined,
                 expand: false,
@@ -985,7 +985,7 @@ class _PlanPanelState extends State<PlanPanel> {
               : ListView(
                   padding: EdgeInsets.zero,
                   children: [
-                    AnimatedTodoRows(
+                    SettledTodoRows(
                       items: items,
                       rowHeight: 54,
                       itemBuilder: (item) => Padding(
@@ -1022,7 +1022,7 @@ class _PlanPanelState extends State<PlanPanel> {
               ),
             ),
             const SizedBox(width: 8),
-            BrickButton(
+            PineButton(
               label: '添加',
               icon: Icons.add,
               expand: false,
@@ -1461,7 +1461,7 @@ class _ManualSheetState extends State<_ManualSheet> {
           TextField(
             controller: _minutes,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            style: brickNumberStyle(fontSize: 14),
+            style: pineNumberStyle(fontSize: 14),
             decoration: const InputDecoration(
                 labelText: '专注时长', suffixText: '分钟', isDense: true),
           ),
@@ -1469,7 +1469,7 @@ class _ManualSheetState extends State<_ManualSheet> {
           Row(
             children: [
               Expanded(
-                child: BrickButton(
+                child: PineButton(
                   label:
                       '${_at.month}/${_at.day}（${_at.year == DateTime.now().year ? '' : '${_at.year}/'}${_weekdayLabel(_at)}）',
                   icon: Icons.event,
@@ -1480,7 +1480,7 @@ class _ManualSheetState extends State<_ManualSheet> {
               ),
               const SizedBox(width: 10),
               Expanded(
-                child: BrickButton(
+                child: PineButton(
                   label:
                       '完成时间 ${_at.hour.toString().padLeft(2, '0')}:${_at.minute.toString().padLeft(2, '0')}',
                   icon: Icons.schedule,
@@ -1492,7 +1492,7 @@ class _ManualSheetState extends State<_ManualSheet> {
             ],
           ),
           const SizedBox(height: 10),
-          BrickButton(
+          PineButton(
             label: '添加完成记录',
             onPressed: _save,
           ),
@@ -1601,20 +1601,20 @@ class _RecordDetailSheet extends StatelessWidget {
           ),
           _DetailRow(
             label: '时长',
-            child: MinutesText(record.minutes,
-                style: brickNumberStyle(fontSize: 14)),
+            child: DurationText(record.minutes,
+                style: pineNumberStyle(fontSize: 14)),
           ),
           _DetailRow(
             label: '完成于',
             child: Text(
               '${at.month}月${at.day}日 ${at.hour.toString().padLeft(2, '0')}:${at.minute.toString().padLeft(2, '0')}',
-              style: brickNumberStyle(fontSize: 13),
+              style: pineNumberStyle(fontSize: 13),
             ),
           ),
           const SizedBox(height: 16),
           SizedBox(
             height: 46,
-            child: BrickButton(
+            child: PineButton(
               label: '修改这条记录',
               onPressed: () => _edit(context),
             ),
@@ -1696,7 +1696,7 @@ class _RecordDetailSheet extends StatelessWidget {
                     autofocus: true,
                     keyboardType:
                         const TextInputType.numberWithOptions(decimal: true),
-                    style: brickNumberStyle(fontSize: 14),
+                    style: pineNumberStyle(fontSize: 14),
                     decoration: const InputDecoration(
                         labelText: '专注时长', suffixText: '分钟', isDense: true),
                   ),
@@ -1704,7 +1704,7 @@ class _RecordDetailSheet extends StatelessWidget {
                   Row(
                     children: [
                       Expanded(
-                        child: BrickButton(
+                        child: PineButton(
                           label:
                               '${at.month}/${at.day}（${at.year == DateTime.now().year ? '' : '${at.year}/'}${_weekdayLabel(at)}）',
                           icon: Icons.event,
@@ -1731,7 +1731,7 @@ class _RecordDetailSheet extends StatelessWidget {
                       ),
                       const SizedBox(width: 10),
                       Expanded(
-                        child: BrickButton(
+                        child: PineButton(
                           label: '${two(at.hour)}:${two(at.minute)}',
                           icon: Icons.schedule,
                           color: PineColors.card,
@@ -1983,7 +1983,7 @@ class _CountdownSheetState extends State<_CountdownSheet> {
               const Spacer(),
               Text(
                 _remainingText(days),
-                style: brickNumberStyle(
+                style: pineNumberStyle(
                   fontSize: 12.5,
                   color: days >= 0 && days <= 7
                       ? PineColors.focus
@@ -1996,7 +1996,7 @@ class _CountdownSheetState extends State<_CountdownSheet> {
           Row(
             children: [
               Expanded(
-                child: BrickButton(
+                child: PineButton(
                   label: '恢复默认',
                   color: PineColors.card,
                   foregroundColor: PineColors.ink,
@@ -2005,7 +2005,7 @@ class _CountdownSheetState extends State<_CountdownSheet> {
               ),
               const SizedBox(width: 10),
               Expanded(
-                child: BrickButton(label: '保存', onPressed: _save),
+                child: PineButton(label: '保存', onPressed: _save),
               ),
             ],
           ),
@@ -2289,7 +2289,7 @@ class _EventSheetState extends State<_EventSheet> {
             style: const TextStyle(color: PineColors.sub, fontSize: 11),
           ),
           const SizedBox(height: 12),
-          BrickButton(
+          PineButton(
             label: _editing ? '保存修改' : '开始累计',
             onPressed: _save,
           ),
@@ -2330,7 +2330,7 @@ Future<void> showEventDetailSheet(
           Text(
             '累计 ${formatMinutes(stats.minutes)} · ${stats.tomatoCount} 番茄 · '
             '${stats.days} 天 · ${stats.records.length} 次',
-            style: brickNumberStyle(fontSize: 13),
+            style: pineNumberStyle(fontSize: 13),
           ),
           const SizedBox(height: 12),
           if (stats.records.isEmpty)
@@ -2370,8 +2370,8 @@ Future<void> showEventDetailSheet(
                           color: PineColors.sub, fontSize: 10.5),
                     ),
                     const SizedBox(width: 10),
-                    MinutesText(record.minutes,
-                        style: brickNumberStyle(fontSize: 12)),
+                    DurationText(record.minutes,
+                        style: pineNumberStyle(fontSize: 12)),
                   ],
                 ),
               ),
@@ -2415,7 +2415,7 @@ Future<void> showEventActionSheet(
             style: const TextStyle(color: PineColors.sub, fontSize: 11.5),
           ),
           const SizedBox(height: 14),
-          BrickButton(
+          PineButton(
             label: '编辑事件（名称 / 绑定任务）',
             icon: Icons.edit,
             color: PineColors.card,
@@ -2431,7 +2431,7 @@ Future<void> showEventActionSheet(
             // 2026-11-07 反馈：面板里没有"切换"入口，只能靠任务行徽标间接切。
             // 「切换」不只是换个事件名——它同时要暂停旧事件、恢复新事件、
             // 并把选中任务换成新事件绑定的任务（否则新一轮专注还记到原来那条）。
-            BrickButton(
+            PineButton(
               label: '切换到其他事件（${others.length} 条可选）',
               icon: Icons.swap_horiz,
               color: PineColors.card,
@@ -2447,7 +2447,7 @@ Future<void> showEventActionSheet(
           ],
           const SizedBox(height: 10),
           if (event.isRunning)
-            BrickButton(
+            PineButton(
               label: '暂停累计（暂停期间的记录不归入）',
               icon: Icons.pause,
               color: PineColors.card,
@@ -2458,7 +2458,7 @@ Future<void> showEventActionSheet(
               },
             )
           else
-            BrickButton(
+            PineButton(
               label: '继续累计',
               icon: Icons.play_arrow,
               onPressed: () {
@@ -2467,7 +2467,7 @@ Future<void> showEventActionSheet(
               },
             ),
           const SizedBox(height: 10),
-          BrickButton(
+          PineButton(
             label: '完成此事件（归档保留）',
             icon: Icons.check,
             onPressed: () {
@@ -2476,7 +2476,7 @@ Future<void> showEventActionSheet(
             },
           ),
           const SizedBox(height: 10),
-          BrickButton(
+          PineButton(
             label: '开启新事件（此事件自动暂停）',
             icon: Icons.add,
             color: PineColors.card,
@@ -2647,7 +2647,7 @@ Future<void> showEventArchiveSheet(
 
           return _SheetScaffold(
             title: '事件档案',
-            trailing: BrickButton(
+            trailing: PineButton(
               label: byDuration ? '按时长' : '按最近',
               icon: Icons.swap_vert,
               height: 34,
@@ -2697,7 +2697,7 @@ Future<void> showEventArchiveSheet(
                           Text(
                             '${row.value['count']!.toInt()} 个 · '
                             '${formatHoursMinutes(row.value['minutes']!)}',
-                            style: brickNumberStyle(
+                            style: pineNumberStyle(
                                 fontSize: 11, color: PineColors.sub),
                           ),
                         ],
@@ -2808,7 +2808,7 @@ Widget _eventArchiveTile(
                 const SizedBox(width: 8),
                 Text(
                   formatHoursMinutes(stats.minutes),
-                  style: brickNumberStyle(fontSize: 12, color: PineColors.sub),
+                  style: pineNumberStyle(fontSize: 12, color: PineColors.sub),
                 ),
               ],
             ),
@@ -3054,7 +3054,7 @@ Widget _recordTile(
             style: const TextStyle(color: PineColors.sub, fontSize: 10.5),
           ),
           const SizedBox(width: 10),
-          MinutesText(record.minutes, style: brickNumberStyle(fontSize: 12)),
+          DurationText(record.minutes, style: pineNumberStyle(fontSize: 12)),
         ],
       ),
     ),

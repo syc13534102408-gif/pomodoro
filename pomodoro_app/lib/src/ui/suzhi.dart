@@ -1077,9 +1077,9 @@ class InkStackChart extends StatelessWidget {
 
   static const List<Color> _colors = <Color>[
     PineColors.accent,
-    PineColors.ink82, // 浓墨 82%
-    PineColors.ink46, // 中墨 46%
-    PineColors.ink22, // 淡墨 22%
+    PineColors.ink,
+    PineColors.ink2,
+    PineColors.ink3,
   ];
 
   @override
@@ -1283,7 +1283,7 @@ class SealCalendar extends StatelessWidget {
                   ? PineColors.accentSoft
                   : PineColors.sheet,
           border: Border.all(
-            color: isToday ? PineColors.accentDeep : PineColors.line,
+            color: isToday ? PineColors.accent : PineColors.line,
             width: 1,
           ),
           borderRadius: BorderRadius.circular(PineRadius.seal),

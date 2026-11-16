@@ -130,7 +130,7 @@ void main() {
         size: const Size(560, 760), after: () async {
       await tester.tap(find.text('收工'));
       await tester.pumpAndSettle();
-      await tester.tap(find.widgetWithText(BrickButton, '收工'));
+      await tester.tap(find.widgetWithText(PineButton, '收工'));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 500));
     });

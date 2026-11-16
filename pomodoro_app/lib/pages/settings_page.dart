@@ -196,7 +196,7 @@ class _SettingsPageState extends State<SettingsPage> {
             onPressed: () => Navigator.pop(context),
             child: const Text('取消'),
           ),
-          BrickButton(
+          PineButton(
             label: '恢复',
             height: 40,
             expand: false,
@@ -225,7 +225,7 @@ class _SettingsPageState extends State<SettingsPage> {
             onPressed: () => Navigator.pop(context, false),
             child: const Text('取消'),
           ),
-          BrickButton(
+          PineButton(
             label: '继续',
             height: 40,
             expand: false,
@@ -245,7 +245,7 @@ class _SettingsPageState extends State<SettingsPage> {
             onPressed: () => Navigator.pop(context, false),
             child: const Text('取消'),
           ),
-          BrickButton(
+          PineButton(
             label: '清空',
             height: 40,
             expand: false,
@@ -274,9 +274,9 @@ class _SettingsPageState extends State<SettingsPage> {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(20, 6, 20, 24),
         children: [
-          const SectionHeader(title: '计时与目标'),
+          const FactSectionHeader(title: '计时与目标'),
           const SizedBox(height: 10),
-          BrickCard(
+          SettledCard(
             child: Column(
               children: [
                 Row(
@@ -297,7 +297,7 @@ class _SettingsPageState extends State<SettingsPage> {
                   ],
                 ),
                 const SizedBox(height: 16),
-                BrickButton(
+                PineButton(
                   label: '保存计时设置',
                   onPressed: _saveTimer,
                 ),
@@ -305,9 +305,9 @@ class _SettingsPageState extends State<SettingsPage> {
             ),
           ),
           const SizedBox(height: 16),
-          const SectionHeader(title: '考试倒计时'),
+          const FactSectionHeader(title: '考试倒计时'),
           const SizedBox(height: 10),
-          BrickCard(
+          SettledCard(
             child: Column(
               children: [
                 _switchRow(
@@ -334,9 +334,9 @@ class _SettingsPageState extends State<SettingsPage> {
             ),
           ),
           const SizedBox(height: 16),
-          const SectionHeader(title: '提醒'),
+          const FactSectionHeader(title: '提醒'),
           const SizedBox(height: 10),
-          BrickCard(
+          SettledCard(
             child: Column(
               children: [
                 _switchRow(
@@ -391,9 +391,9 @@ class _SettingsPageState extends State<SettingsPage> {
             ),
           ),
           const SizedBox(height: 16),
-          const SectionHeader(title: '云端同步'),
+          const FactSectionHeader(title: '云端同步'),
           const SizedBox(height: 10),
-          BrickCard(
+          SettledCard(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -402,13 +402,13 @@ class _SettingsPageState extends State<SettingsPage> {
                     Expanded(
                       child: Text(
                         code.isEmpty ? '尚未生成同步码' : code,
-                        style: brickNumberStyle(
+                        style: pineNumberStyle(
                           fontSize: 13,
                           color: code.isEmpty ? PineColors.sub : PineColors.ink,
                         ),
                       ),
                     ),
-                    BrickButton(
+                    PineButton(
                       label: '',
                       semanticLabel: '复制同步码',
                       icon: Icons.copy,
@@ -444,7 +444,7 @@ class _SettingsPageState extends State<SettingsPage> {
                 Row(
                   children: [
                     Expanded(
-                      child: BrickButton(
+                      child: PineButton(
                         label: '上传本机数据',
                         height: 44,
                         onPressed: _syncBusy ? null : () => _runSync(_upload),
@@ -452,7 +452,7 @@ class _SettingsPageState extends State<SettingsPage> {
                     ),
                     const SizedBox(width: 10),
                     Expanded(
-                      child: BrickButton(
+                      child: PineButton(
                         label: '从云端恢复',
                         height: 44,
                         color: PineColors.card,
@@ -464,7 +464,7 @@ class _SettingsPageState extends State<SettingsPage> {
                 ),
                 if (_syncBusy) ...[
                   const SizedBox(height: 14),
-                  const BrickProgress(value: 0.35, color: PineColors.gold),
+                  const AggregateProgress(value: 0.35, color: PineColors.gold),
                 ],
                 if (_syncMessage.isNotEmpty) ...[
                   const SizedBox(height: 12),
@@ -505,7 +505,7 @@ class _SettingsPageState extends State<SettingsPage> {
                       ),
                     ),
                     const SizedBox(width: 10),
-                    BrickSwitch(
+                    SettingsSwitch(
                       value: widget.mirrorEnabled && code.isNotEmpty,
                       onChanged: code.isEmpty || widget.onMirrorChanged == null
                           ? (_) {}
@@ -527,9 +527,9 @@ class _SettingsPageState extends State<SettingsPage> {
             ),
           ),
           const SizedBox(height: 16),
-          const SectionHeader(title: '关于'),
+          const FactSectionHeader(title: '关于'),
           const SizedBox(height: 10),
-          const BrickCard(
+          const SettledCard(
             child: Column(
               children: [
                 Padding(
@@ -567,9 +567,9 @@ class _SettingsPageState extends State<SettingsPage> {
             ),
           ),
           const SizedBox(height: 16),
-          const SectionHeader(title: '本机数据'),
+          const FactSectionHeader(title: '本机数据'),
           const SizedBox(height: 10),
-          BrickCard(
+          SettledCard(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -677,9 +677,8 @@ class _SettingsPageState extends State<SettingsPage> {
     required String subtitle,
     required VoidCallback onTap,
   }) {
-    return BrickPressable(
+    return PinePressable(
       onTap: onTap,
-      shadowed: false,
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 10),
         child: Row(
@@ -709,7 +708,7 @@ class _SettingsPageState extends State<SettingsPage> {
       TextField(
         controller: controller,
         keyboardType: TextInputType.number,
-        style: brickNumberStyle(fontSize: 14),
+        style: pineNumberStyle(fontSize: 14),
         decoration: InputDecoration(
           labelText: label,
           isDense: true,

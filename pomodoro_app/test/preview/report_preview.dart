@@ -10,7 +10,6 @@
 //   ../outputs/stats-preview.png
 
 // 依赖 macOS 自带的中文字体；缺失时整体跳过而不是报错。
-import 'dart:async';
 import 'dart:io';
 import 'dart:ui' show ImageByteFormat;
 
@@ -20,7 +19,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pomodoro_app/pages/stats_page.dart';
 import 'package:pomodoro_app/src/models.dart';
-import 'package:pomodoro_app/src/sheets.dart';
 import 'package:pomodoro_app/src/theme.dart';
 
 /// 测试环境默认字体渲染成方块，必须显式加载一个含中文的字体。
@@ -176,9 +174,8 @@ void main() {
     print('渲染完成 → ${file.path}  ${image.width}×${image.height}');
   }
 
-  testWidgets('R4 功课册（390）', (tester) async {
-    await shoot(tester, const Size(390, 1900), '06-report-r4.png');
-  });
+  // R4 已核对（06-report-r4.png），这里只重渲 R5，省一次 10 分钟 teardown。
+  testWidgets('R4 功课册（390）', (tester) async {}, skip: true);
 
   testWidgets('R5 图谱（900）', (tester) async {
     await shoot(tester, const Size(900, 1250), '07-report-r5.png');

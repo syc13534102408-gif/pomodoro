@@ -340,14 +340,6 @@ class _StatsPageState extends State<StatsPage> {
                   ],
                 ),
               ),
-              const SizedBox(width: 10),
-              SizedBox(
-                width: 18,
-                child: Align(
-                  alignment: Alignment.topCenter,
-                  child: _VerticalNote(text: m.marginNote),
-                ),
-              ),
             ],
           ),
         ),
@@ -894,8 +886,10 @@ class _BigHours extends StatelessWidget {
     final total = minutes.round();
     final h = total ~/ 60;
     final mm = total % 60;
-    final unit = PineText.serif(size: size * 0.38, color: PineColors.ink3)
-        .copyWith(height: 1);
+    final unit = PineText.serif(
+      size: size * 0.38 < 9 ? 9 : size * 0.38,
+      color: PineColors.ink3,
+    ).copyWith(height: 1);
     return Row(
       crossAxisAlignment: CrossAxisAlignment.baseline,
       textBaseline: TextBaseline.alphabetic,
@@ -1590,26 +1584,6 @@ class _RecentRow extends StatelessWidget {
           Text(formatCompactMinutes(record.minutes),
               style: PineText.mono(size: 10, color: PineColors.ink2)),
         ],
-      ),
-    );
-  }
-}
-
-/// R5 的右缘竖排边注。
-class _VerticalNote extends StatelessWidget {
-  const _VerticalNote({required this.text});
-
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    return RotatedBox(
-      quarterTurns: 1,
-      child: Text(
-        text,
-        maxLines: 1,
-        style: PineText.serif(size: 8.5, color: PineColors.ink3)
-            .copyWith(letterSpacing: 3),
       ),
     );
   }

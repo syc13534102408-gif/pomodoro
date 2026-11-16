@@ -10,9 +10,7 @@ import 'package:pomodoro_app/src/theme.dart';
 double _luminance(Color c) {
   double channel(double v) =>
       v <= 0.03928 ? v / 12.92 : math.pow((v + 0.055) / 1.055, 2.4).toDouble();
-  return 0.2126 * channel(c.r) +
-      0.7152 * channel(c.g) +
-      0.0722 * channel(c.b);
+  return 0.2126 * channel(c.r) + 0.7152 * channel(c.g) + 0.0722 * channel(c.b);
 }
 
 double _contrast(Color a, Color b) {
@@ -60,11 +58,77 @@ void main() {
           greaterThanOrEqualTo(4.5));
     });
 
-    test('轨道 track 比 hairline 线更显眼（1.2 – 1.8 之间，不能抢弧）', () {
+    test('轨道与分隔线均满足图形对比度，轨道保持更强层级', () {
       final track = _contrast(PineColors.track, PineColors.paper);
       final line = _contrast(PineColors.line, PineColors.paper);
       expect(track, greaterThan(line));
-      expect(track, lessThan(1.8));
+      expect(track, greaterThanOrEqualTo(3.0));
+      expect(line, greaterThanOrEqualTo(3.0));
+    });
+  });
+
+  group('P4 双模式令牌', () {
+    test('明暗两套文本色对三种底色均 ≥ 4.5:1', () {
+      for (final palette in <PinePalette>[
+        PinePalette.light,
+        PinePalette.dark
+      ]) {
+        final backgrounds = <Color>[
+          palette.background,
+          palette.surface,
+          palette.presence,
+        ];
+        final texts = <Color>[
+          palette.textPrimary,
+          palette.textSecondary,
+          palette.textAuxiliary,
+          palette.textPresence,
+        ];
+        for (final text in texts) {
+          for (final background in backgrounds) {
+            expect(_contrast(text, background), greaterThanOrEqualTo(4.5));
+          }
+        }
+      }
+    });
+
+    test('明暗两套状态、分隔与六色任务标识均 ≥ 3.0:1', () {
+      for (final palette in <PinePalette>[
+        PinePalette.light,
+        PinePalette.dark
+      ]) {
+        expect(palette.taskColors, hasLength(6));
+        final graphics = <Color>[
+          palette.focus,
+          palette.shortBreak,
+          palette.longBreak,
+          palette.paused,
+          palette.overtime,
+          palette.adjudication,
+          palette.divider,
+          palette.logicalDayDivider,
+          ...palette.taskColors,
+        ];
+        for (final graphic in graphics) {
+          expect(graphic.a, 1.0);
+          for (final background in <Color>[
+            palette.background,
+            palette.surface,
+            palette.presence,
+          ]) {
+            expect(_contrast(graphic, background), greaterThanOrEqualTo(3.0));
+          }
+        }
+      }
+    });
+
+    test('暗色主题使用暗色语义底且不设置阴影', () {
+      final theme = buildPineTheme(brightness: Brightness.dark);
+      expect(theme.brightness, Brightness.dark);
+      expect(theme.scaffoldBackgroundColor, PinePalette.dark.background);
+      expect(theme.cardTheme.elevation, 0);
+      expect(PineShadow.card, isEmpty);
+      expect(PineShadow.composer, isEmpty);
     });
   });
 }

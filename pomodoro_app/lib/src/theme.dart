@@ -1,158 +1,213 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
-/// V3「Claude 素纸书房 · 檀褐 Rosewood」设计令牌（2026-11-12 定稿）。
+/// P4 双模式语义色板。页面与自建组件只允许引用语义角色，不写局部色值。
+class PinePalette {
+  const PinePalette({
+    required this.background,
+    required this.surface,
+    required this.presence,
+    required this.textPrimary,
+    required this.textSecondary,
+    required this.textAuxiliary,
+    required this.textPresence,
+    required this.focus,
+    required this.shortBreak,
+    required this.longBreak,
+    required this.paused,
+    required this.overtime,
+    required this.adjudication,
+    required this.divider,
+    required this.logicalDayDivider,
+    required this.taskColors,
+  });
+
+  final Color background;
+  final Color surface;
+  final Color presence;
+  final Color textPrimary;
+  final Color textSecondary;
+  final Color textAuxiliary;
+  final Color textPresence;
+  final Color focus;
+  final Color shortBreak;
+  final Color longBreak;
+  final Color paused;
+  final Color overtime;
+  final Color adjudication;
+  final Color divider;
+  final Color logicalDayDivider;
+  final List<Color> taskColors;
+
+  static const light = PinePalette(
+    background: Color(0xFFF7F6F2),
+    surface: Color(0xFFFFFFFF),
+    presence: Color(0xFFECEFF3),
+    textPrimary: Color(0xFF202228),
+    textSecondary: Color(0xFF454952),
+    textAuxiliary: Color(0xFF646B76),
+    textPresence: Color(0xFF202228),
+    focus: Color(0xFF146CA4),
+    shortBreak: Color(0xFF24784F),
+    longBreak: Color(0xFF8A5A00),
+    paused: Color(0xFF596577),
+    overtime: Color(0xFF7551A6),
+    adjudication: Color(0xFFA7352D),
+    divider: Color(0xFF727A86),
+    logicalDayDivider: Color(0xFF596577),
+    taskColors: <Color>[
+      Color(0xFFA5465C),
+      Color(0xFF247565),
+      Color(0xFF356FA8),
+      Color(0xFF875E12),
+      Color(0xFF73549A),
+      Color(0xFF52752B),
+    ],
+  );
+
+  static const dark = PinePalette(
+    background: Color(0xFF101114),
+    surface: Color(0xFF181A1F),
+    presence: Color(0xFF20242B),
+    textPrimary: Color(0xFFF2F3F5),
+    textSecondary: Color(0xFFC7CAD1),
+    textAuxiliary: Color(0xFF9CA2AE),
+    textPresence: Color(0xFFF2F3F5),
+    focus: Color(0xFF7AB8FF),
+    shortBreak: Color(0xFF75D0A4),
+    longBreak: Color(0xFFE7B86A),
+    paused: Color(0xFFA4ADBD),
+    overtime: Color(0xFFC4A5F5),
+    adjudication: Color(0xFFFF8F85),
+    divider: Color(0xFF68707E),
+    logicalDayDivider: Color(0xFF8A93A3),
+    taskColors: <Color>[
+      Color(0xFFE89AA6),
+      Color(0xFF7CC6B3),
+      Color(0xFF8EB7ED),
+      Color(0xFFD8B36A),
+      Color(0xFFB7A0E3),
+      Color(0xFFA9C77A),
+    ],
+  );
+
+  static PinePalette of(BuildContext context) =>
+      Theme.of(context).brightness == Brightness.dark ? dark : light;
+}
+
+/// 默认暗色的语义令牌与旧名兼容层。
 ///
-/// 权威来源：`outputs/redesign-v3-2026-11-12/01-claude-studio.html` 与
-/// `design-spec-v3.md`。**页面代码禁止出现十六进制色值**，一律走这里。
-///
-/// 兼容约定：下方「旧名兼容」段保留了 v1.3.27 及之前所有令牌名
-/// （`card/sub/faint/pine/focus/mint/gold/goldInk/track`），因为 `models.dart`
-/// 的 `SessionMode.color/lineColor` 与其它逻辑层代码引用了它们；逻辑层一行未动，
-/// 只把取值映射到新色板。新增代码请直接用定稿语义名。
+/// models.dart 与尚未迁移的表现层仍引用旧名；保留别名可避免逻辑层改动。
+/// 新代码使用 PinePalette.of(context)，确保跟随当前明暗模式。
 class PineColors {
   const PineColors._();
 
-  // ── 纸面四阶 ───────────────────────────────────────────────────────────
-  /// 主宣纸：页面主底
-  static const paper = Color(0xFFFAF8F2);
+  static const paper = Color(0xFF101114);
+  static const sheet = Color(0xFF181A1F);
+  static const sunken = Color(0xFF20242B);
+  static const sand = Color(0xFF20242B);
 
-  /// 手稿书页：卡片 / Composer 笺纸
-  static const sheet = Color(0xFFFFFEFA);
+  static const ink = Color(0xFFF2F3F5);
+  static const ink2 = Color(0xFFC7CAD1);
+  static const ink3 = Color(0xFF9CA2AE);
+  static const inkFaint = Color(0xFF9CA2AE);
 
-  /// 亚麻凹槽：比例尺槽 / 输入底
-  static const sunken = Color(0xFFF0EBE2);
+  static const line = Color(0xFF68707E);
+  static const lineStrong = Color(0xFF8A93A3);
 
-  /// 楮皮侧栏 / 装帧底
-  static const sand = Color(0xFFE9E2D6);
+  static const accent = Color(0xFF7AB8FF);
+  static const accentDeep = Color(0xFF7AB8FF);
+  static const accentSoft = Color(0xFF20242B);
+  static const celadon = Color(0xFF75D0A4);
+  static const ochre = Color(0xFFE7B86A);
+  static const crimson = Color(0xFFFF8F85);
 
-  // ── 松烟墨四阶 ─────────────────────────────────────────────────────────
-  /// 浓墨（对纸 15.7:1）
-  static const ink = Color(0xFF221D19);
+  // 图表旧名只保留不透明语义色，不再使用透明叠加。
+  static const ink82 = Color(0xFFF2F3F5);
+  static const ink46 = Color(0xFFC7CAD1);
+  static const ink22 = Color(0xFF9CA2AE);
 
-  /// 中墨（对纸 7.5:1）
-  static const ink2 = Color(0xFF56504A);
-
-  /// 淡墨：元信息、刻度注记
-  static const ink3 = Color(0xFF857F78);
-
-  /// 极淡墨：空刻度、完成划线
-  static const inkFaint = Color(0xFFBCB5AC);
-
-  // ── 装帧线 ─────────────────────────────────────────────────────────────
-  /// 1px 裁切线
-  static const line = Color(0xFFE4DED3);
-
-  /// 定界线 / 控件描边
-  static const lineStrong = Color(0xFFD0C8BA);
-
-  // ── 主强调 · 檀褐 ──────────────────────────────────────────────────────
-  /// 檀褐（对纸 5.73:1，白字对其 5.99:1）：主行动、定界线、比例尺游标、方印
-  static const accent = Color(0xFF8F5240);
-
-  /// 按下态深笔
-  static const accentDeep = Color(0xFF7A4434);
-
-  /// 淡敷底 / 选中底
-  static const accentSoft = Color(0xFFF3E6E1);
-
-  // ── 辅助矿物色 ─────────────────────────────────────────────────────────
-  /// 青瓷松绿：同步点 / 短休
-  static const celadon = Color(0xFF55705C);
-
-  /// 赭石：超时加分 / 吃饭
-  static const ochre = Color(0xFF8A6A33);
-
-  /// 茜红：危险操作
-  static const crimson = Color(0xFF9E3328);
-
-  // ── 水墨四阶（图表堆叠柱专用，固定顺序不可换）─────────────────────────
-  /// 浓墨 82%
-  static const ink82 = Color(0xD1221D19);
-
-  /// 中墨 46%
-  static const ink46 = Color(0x7556504A);
-
-  /// 淡墨 22%
-  static const ink22 = Color(0x38857F78);
-
-  // ── 旧名兼容（逻辑层引用，勿删）────────────────────────────────────────
   static const card = sheet;
   static const sub = ink2;
   static const faint = inkFaint;
   static const pine = celadon;
   static const focus = accent;
   static const mint = celadon;
-
-  /// 长休 / 完成的「实底」：浅赭纸底。`ink` 压在其上 ≥4.5:1
-  /// （stage_color_test 断言），故不能直接用较暗的 `ochre`。
   static const gold = sand;
-
-  /// 赭石线色：长休的线条 / 超时加分，对纸 ≥3.0:1 且与 `gold` 不同。
   static const goldInk = ochre;
-
-  /// 进度轨道：比 hairline 更显眼但不能抢主体（stage_color_test 断言 1.2–1.8）。
   static const track = lineStrong;
 
-  /// 语义色派生浅底（α=.14 叠在纸面），供段选、选中行、徽章底使用。
-  /// 一律由代码派生，禁止各页手写近似色值。
-  static Color tint(Color semantic) =>
-      Color.alphaBlend(semantic.withAlpha(36), paper);
+  static const background = paper;
+  static const surface = sheet;
+  static const presence = sunken;
+  static const textPrimary = ink;
+  static const textSecondary = ink2;
+  static const textAuxiliary = ink3;
+  static const textPresence = ink;
+  static const shortBreak = celadon;
+  static const longBreak = ochre;
+  static const paused = Color(0xFFA4ADBD);
+  static const overtime = Color(0xFFC4A5F5);
+  static const adjudication = crimson;
+  static const divider = line;
+  static const logicalDayDivider = lineStrong;
+
+  /// 旧选中底接口统一映射到陪驻角色，不做透明叠色。
+  static Color tint(Color semantic) => presence;
 }
 
-/// 字号阶梯：一屏最多六档。新代码只准引用这里，禁止写 `fontSize: 12.5`。
-/// `clock` 是定稿手稿页的 64px 活字大字（w500 / letter-spacing -0.025em）。
+/// 五档字阶。旧名是兼容别名，不再派生更小档位。
 class PineType {
   const PineType._();
 
-  static const double clock = 64;
-  static const double num = 24;
-  static const double body = 15;
-  static const double label = 13;
-  static const double meta = 12;
-  static const double caption = 11;
+  static const double session = 40;
+  static const double presence = 28;
+  static const double aggregate = 24;
+  static const double body = 16;
+  static const double auxiliary = 13;
+
+  static const double clock = session;
+  static const double num = aggregate;
+  static const double label = auxiliary;
+  static const double meta = auxiliary;
+  static const double caption = auxiliary;
 }
 
-/// 字体三线：宋体衬线（标题/计时/按钮/页签）、苹方（正文）、等宽（时间戳）。
-///
-/// 雷区：宋体在低端 Android 上 `w600` 可能回退发虚，标题统一 `w500` +
-/// `letterSpacing .01em`；`fontFamilyFallback` 保证无宋体时退到通用 serif。
+class PineLineHeight {
+  const PineLineHeight._();
+
+  static const double session = 48 / PineType.session;
+  static const double presence = 34 / PineType.presence;
+  static const double aggregate = 30 / PineType.aggregate;
+  static const double body = 24 / PineType.body;
+  static const double auxiliary = 18 / PineType.auxiliary;
+}
+
+/// 系统无衬线为正文，等宽数字只服务读数与完成时刻。
 class PineText {
   const PineText._();
 
-  static const String serifFamily = 'Songti SC';
-  static const List<String> serifFallback = <String>[
-    'STSong',
-    'Source Han Serif SC',
-    'Noto Serif SC',
-    'serif',
-  ];
   static const List<String> monoFallback = <String>[
     'SF Mono',
     'Menlo',
     'monospace',
   ];
 
-  /// 标题 / 大字 / 按钮 / 页签。`size` 只准传 `PineType.*`。
   static TextStyle serif({
     double size = PineType.body,
     Color color = PineColors.ink,
-    FontWeight weight = FontWeight.w500,
-    double letterSpacing = 0.01,
+    FontWeight weight = FontWeight.w600,
+    double letterSpacing = 0,
     double? height,
     List<FontFeature>? features,
   }) =>
-      TextStyle(
-        fontFamily: serifFamily,
-        fontFamilyFallback: serifFallback,
-        fontSize: size,
+      sans(
+        size: size,
         color: color,
-        fontWeight: weight,
-        letterSpacing: letterSpacing,
+        weight: weight,
         height: height,
-        fontFeatures: features,
-      );
+      ).copyWith(letterSpacing: letterSpacing, fontFeatures: features);
 
-  /// 正文说明：系统无衬线（苹方）。
   static TextStyle sans({
     double size = PineType.body,
     Color color = PineColors.ink,
@@ -166,11 +221,11 @@ class PineText {
         height: height,
       );
 
-  /// 时间戳 / 编号：等宽 + tabular-nums，避免秒数跳动时宽度抖动。
   static TextStyle mono({
-    double size = PineType.meta,
+    double size = PineType.auxiliary,
     Color color = PineColors.ink2,
-    FontWeight weight = FontWeight.w500,
+    FontWeight weight = FontWeight.w400,
+    double? height,
   }) =>
       TextStyle(
         fontFamily: 'SF Mono',
@@ -178,107 +233,126 @@ class PineText {
         fontSize: size,
         color: color,
         fontWeight: weight,
+        height: height,
         fontFeatures: kNumericFont,
+      );
+
+  static TextStyle session({Color color = PineColors.textPrimary}) => mono(
+        size: PineType.session,
+        color: color,
+        weight: FontWeight.w600,
+        height: PineLineHeight.session,
+      );
+
+  static TextStyle presence({Color color = PineColors.textPresence}) => mono(
+        size: PineType.presence,
+        color: color,
+        weight: FontWeight.w600,
+        height: PineLineHeight.presence,
+      );
+
+  static TextStyle aggregate({Color color = PineColors.textPrimary}) => sans(
+        size: PineType.aggregate,
+        color: color,
+        weight: FontWeight.w600,
+        height: PineLineHeight.aggregate,
       );
 }
 
-/// 圆角：定稿是「书页切角」不是软糖卡 —— 卡片 10、控件 6~9、方印 3~4、pill 999。
+class PineSpacing {
+  const PineSpacing._();
+
+  static const double micro = 4;
+  static const double near = 8;
+  static const double section = 16;
+  static const double far = 32;
+  static const double major = 64;
+}
+
 class PineRadius {
   const PineRadius._();
 
-  static const double card = 10;
-  static const double control = 8;
-  static const double seal = 3;
-  static const double pill = 999;
+  static const double active = 16;
+  static const double settled = 8;
+  static const double adjudication = 4;
+
+  static const double card = settled;
+  static const double control = settled;
+  static const double seal = adjudication;
+  static const double pill = active;
 }
 
-/// 两级阴影：卡片 / Composer。用负 spread 实现稿里的 `-12px` 收缩，
-/// 顶部 1px 内白高光由 [PineDecoration] 的渐变模拟（Flutter 无 inset 阴影）。
+/// 新宪章不设置阴影令牌；空列表仅保留旧调用兼容。
 class PineShadow {
   const PineShadow._();
 
-  static const List<BoxShadow> card = <BoxShadow>[
-    BoxShadow(
-      color: Color(0x241C1A17),
-      offset: Offset(0, 6),
-      blurRadius: 18,
-      spreadRadius: -12,
-    ),
-  ];
-
-  static const List<BoxShadow> composer = <BoxShadow>[
-    BoxShadow(
-      color: Color(0x2E1C1A17),
-      offset: Offset(0, 10),
-      blurRadius: 26,
-      spreadRadius: -12,
-    ),
-  ];
+  static const List<BoxShadow> card = <BoxShadow>[];
+  static const List<BoxShadow> composer = <BoxShadow>[];
 }
 
-/// 素纸容器的统一装饰：1px 裁切线 + 顶部内白高光 + 轻纸边影。
 class PineDecoration {
   const PineDecoration._();
 
-  /// [composer] 为真时换成 Composer 的更强一级阴影与定界线。
   static BoxDecoration sheet({
     Color color = PineColors.sheet,
-    double radius = PineRadius.card,
+    double radius = PineRadius.settled,
     bool composer = false,
     bool shadowed = true,
     Color? borderColor,
   }) {
-    final border = borderColor ?? (composer ? PineColors.lineStrong : PineColors.line);
+    final border = borderColor ??
+        (composer ? PineColors.logicalDayDivider : PineColors.divider);
     return BoxDecoration(
-      gradient: LinearGradient(
-        begin: Alignment.topCenter,
-        end: Alignment.bottomCenter,
-        stops: const <double>[0, 0.015, 1],
-        colors: <Color>[
-          Color.alphaBlend(const Color(0x59FFFFFF), color),
-          color,
-          color,
-        ],
-      ),
+      color: color,
       borderRadius: BorderRadius.circular(radius),
       border: Border.all(color: border, width: Paper.hairline),
-      boxShadow: shadowed ? (composer ? PineShadow.composer : PineShadow.card) : null,
+      boxShadow: shadowed ? PineShadow.card : null,
     );
   }
 }
 
-/// 纸面几何常量。半径/投影/描边统一由这里取值。
+class PineSize {
+  const PineSize._();
+
+  static const double minTouchAndroid = 48;
+  static const double minTouchDesktop = 32;
+  static const double primaryActionAndroid = 52;
+  static const double primaryActionDesktop = 44;
+  static const double standardItemAndroid = 64;
+  static const double standardItemDesktop = 56;
+  static const double denseItemAndroid = 52;
+  static const double denseItemDesktop = 44;
+  static const double stateGraphic = 20;
+  static const double taskGraphic = 12;
+}
+
+class PineMotion {
+  const PineMotion._();
+
+  static const Duration immediate = Duration.zero;
+  static const Duration standard = Duration(milliseconds: 160);
+  static const Duration maximum = Duration(milliseconds: 200);
+}
+
 class Paper {
   const Paper._();
 
-  /// 卡片默认 1px 装帧线（v3 定稿：不再靠纯明度差分层）。
   static const cardBorder = 1.0;
-
-  /// 输入框等 1px hairline 描边
   static const chipBorder = 1.0;
+  static const cardRadius = PineRadius.settled;
+  static const chipRadius = PineRadius.settled;
+  static const tinyRadius = PineRadius.adjudication;
 
-  static const cardRadius = PineRadius.card;
-
-  static const chipRadius = PineRadius.control;
-
-  static const tinyRadius = PineRadius.seal;
-
-  /// 桌面「专注舱」的版心与环径（垂直预算的自变量，P5 重排时重新标定）。
+  // 旧桌面环径在对应视图迁移时继续重排，本批不改布局。
   static const double cabinColumn = 452;
   static const double ringMax = 244;
   static const double ringMid = 200;
   static const double ringMin = 184;
 
-  /// 最细线宽（分隔线等）
   static const hairline = 1.0;
-
-  /// 按压位移（纸面方案不平移，恒 0；保留字段兼容旧调用）。
   static const offset = 0.0;
-
-  /// 常态投影（卡片级）。
   static const List<BoxShadow> shadow = PineShadow.card;
 
-  /// 描边 + 圆角 + 可选投影的通用装饰（默认 1px 裁切线、10 圆角）。
   static BoxDecoration box({
     Color? color,
     double border = cardBorder,
@@ -295,220 +369,257 @@ class Paper {
       );
 }
 
-/// 任务可选配色。8 色，顺序兼容既有 colorIndex 0–7，换成定稿矿物/墨阶低饱和调。
+/// 预设六色任务标识；旧数据保存的是色值，不受色集收敛影响。
 const List<Color> kTaskPalette = <Color>[
-  PineColors.accent, // 0 檀褐
-  PineColors.celadon, // 1 青瓷
-  PineColors.ochre, // 2 赭石
-  PineColors.ink2, // 3 中墨
-  PineColors.crimson, // 4 茜红
-  PineColors.ink3, // 5 淡墨
-  PineColors.accentDeep, // 6 深笔
-  PineColors.lineStrong, // 7 定界
+  Color(0xFFE89AA6),
+  Color(0xFF7CC6B3),
+  Color(0xFF8EB7ED),
+  Color(0xFFD8B36A),
+  Color(0xFFB7A0E3),
+  Color(0xFFA9C77A),
 ];
 
-/// 计时与数据统一走等宽字形，避免秒数跳动时宽度抖动。
 const List<FontFeature> kNumericFont = <FontFeature>[
   FontFeature.tabularFigures(),
 ];
 
-ThemeData buildPineTheme() {
-  const ink = PineColors.ink;
-  const ink2 = PineColors.ink2;
-  const line = PineColors.line;
-  const accent = PineColors.accent;
-  const celadon = PineColors.celadon;
-  const ochre = PineColors.ochre;
+ThemeData buildPineTheme({Brightness brightness = Brightness.light}) {
+  final palette =
+      brightness == Brightness.dark ? PinePalette.dark : PinePalette.light;
+  final actionHeight = !kIsWeb && defaultTargetPlatform == TargetPlatform.macOS
+      ? PineSize.primaryActionDesktop
+      : PineSize.primaryActionAndroid;
 
   final base = ThemeData(
     useMaterial3: true,
-    brightness: Brightness.light,
-    scaffoldBackgroundColor: PineColors.paper,
-    canvasColor: PineColors.paper,
-    colorScheme: const ColorScheme.light(
-      primary: PineColors.accent,
-      onPrimary: PineColors.sheet,
-      secondary: PineColors.celadon,
-      onSecondary: PineColors.sheet,
-      tertiary: PineColors.ochre,
-      onTertiary: PineColors.ink,
-      surface: PineColors.sheet,
-      onSurface: ink,
-      error: PineColors.crimson,
-      onError: PineColors.sheet,
-      outline: PineColors.lineStrong,
+    brightness: brightness,
+    scaffoldBackgroundColor: palette.background,
+    canvasColor: palette.background,
+    colorScheme: ColorScheme(
+      brightness: brightness,
+      primary: palette.focus,
+      onPrimary: palette.background,
+      secondary: palette.shortBreak,
+      onSecondary: palette.background,
+      tertiary: palette.longBreak,
+      onTertiary: palette.background,
+      error: palette.adjudication,
+      onError: palette.background,
+      surface: palette.surface,
+      onSurface: palette.textPrimary,
+      outline: palette.divider,
     ),
   );
 
   return base.copyWith(
-    textTheme: base.textTheme.apply(bodyColor: ink, displayColor: ink).copyWith(
-          headlineSmall: PineText.serif(
-            size: PineType.num,
-            height: 1.15,
-            weight: FontWeight.w500,
-          ),
-          titleLarge: PineText.serif(
+    textTheme: base.textTheme
+        .apply(
+          bodyColor: palette.textPrimary,
+          displayColor: palette.textPrimary,
+        )
+        .copyWith(
+          displaySmall: PineText.session(color: palette.textPrimary),
+          headlineSmall: PineText.aggregate(color: palette.textPrimary),
+          titleLarge: PineText.sans(
             size: PineType.body,
-            weight: FontWeight.w500,
+            color: palette.textPrimary,
+            weight: FontWeight.w600,
+            height: PineLineHeight.body,
           ),
-          bodyMedium: PineText.sans(size: PineType.body, height: 1.5),
+          bodyMedium: PineText.sans(
+            size: PineType.body,
+            color: palette.textPrimary,
+            height: PineLineHeight.body,
+          ),
+          bodySmall: PineText.sans(
+            size: PineType.auxiliary,
+            color: palette.textAuxiliary,
+            height: PineLineHeight.auxiliary,
+          ),
         ),
     appBarTheme: AppBarTheme(
-      backgroundColor: PineColors.paper,
+      backgroundColor: palette.background,
       surfaceTintColor: Colors.transparent,
-      foregroundColor: ink,
+      foregroundColor: palette.textPrimary,
       elevation: 0,
       scrolledUnderElevation: 0,
       centerTitle: false,
-      titleTextStyle: PineText.serif(size: PineType.num, weight: FontWeight.w500),
+      titleTextStyle: PineText.aggregate(color: palette.textPrimary),
     ),
-    cardTheme: const CardThemeData(
-      color: PineColors.sheet,
+    cardTheme: CardThemeData(
+      color: palette.surface,
       surfaceTintColor: Colors.transparent,
       elevation: 0,
       margin: EdgeInsets.zero,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.all(Radius.circular(Paper.cardRadius)),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.all(Radius.circular(PineRadius.settled)),
       ),
     ),
-    dividerTheme: const DividerThemeData(
-      color: line,
+    dividerTheme: DividerThemeData(
+      color: palette.divider,
       thickness: Paper.hairline,
       space: Paper.hairline,
     ),
-    listTileTheme: const ListTileThemeData(
-      iconColor: ink2,
-      textColor: ink,
+    listTileTheme: ListTileThemeData(
+      iconColor: palette.textSecondary,
+      textColor: palette.textPrimary,
+      minTileHeight: PineSize.standardItemAndroid,
     ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
-      fillColor: PineColors.sunken,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+      fillColor: palette.presence,
+      contentPadding: const EdgeInsets.all(PineSpacing.section),
       border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(Paper.chipRadius),
-        borderSide: const BorderSide(color: PineColors.lineStrong, width: Paper.chipBorder),
+        borderRadius: BorderRadius.circular(PineRadius.settled),
+        borderSide: BorderSide(color: palette.divider, width: Paper.chipBorder),
       ),
       enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(Paper.chipRadius),
-        borderSide: const BorderSide(color: PineColors.lineStrong, width: Paper.chipBorder),
+        borderRadius: BorderRadius.circular(PineRadius.settled),
+        borderSide: BorderSide(color: palette.divider, width: Paper.chipBorder),
       ),
       focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(Paper.chipRadius),
-        borderSide: const BorderSide(color: accent, width: 1.5),
+        borderRadius: BorderRadius.circular(PineRadius.settled),
+        borderSide: BorderSide(color: palette.focus, width: Paper.chipBorder),
       ),
-      labelStyle: PineText.sans(size: PineType.label, color: ink2),
-      hintStyle: PineText.sans(size: PineType.label, color: PineColors.ink3),
+      labelStyle: PineText.sans(
+        size: PineType.auxiliary,
+        color: palette.textSecondary,
+        height: PineLineHeight.auxiliary,
+      ),
+      hintStyle: PineText.sans(
+        size: PineType.auxiliary,
+        color: palette.textAuxiliary,
+        height: PineLineHeight.auxiliary,
+      ),
     ),
     filledButtonTheme: FilledButtonThemeData(
       style: FilledButton.styleFrom(
-        backgroundColor: accent,
-        foregroundColor: PineColors.sheet,
-        minimumSize: const Size.fromHeight(46),
-        textStyle: PineText.serif(size: PineType.body, color: PineColors.sheet),
+        backgroundColor: palette.focus,
+        foregroundColor: palette.background,
+        minimumSize: Size.fromHeight(actionHeight),
+        textStyle: PineText.sans(
+          size: PineType.body,
+          color: palette.background,
+          weight: FontWeight.w600,
+        ),
         shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.all(Radius.circular(Paper.chipRadius)),
+          borderRadius: BorderRadius.all(Radius.circular(PineRadius.active)),
         ),
       ),
     ),
     outlinedButtonTheme: OutlinedButtonThemeData(
       style: OutlinedButton.styleFrom(
-        foregroundColor: ink,
-        backgroundColor: PineColors.sheet,
-        minimumSize: const Size.fromHeight(46),
-        textStyle: PineText.serif(size: PineType.body),
-        side: const BorderSide(color: PineColors.lineStrong, width: Paper.chipBorder),
+        foregroundColor: palette.textPrimary,
+        backgroundColor: palette.surface,
+        minimumSize: Size.fromHeight(actionHeight),
+        textStyle: PineText.sans(size: PineType.body),
+        side: BorderSide(color: palette.divider, width: Paper.chipBorder),
         shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.all(Radius.circular(Paper.chipRadius)),
+          borderRadius: BorderRadius.all(Radius.circular(PineRadius.active)),
         ),
       ),
     ),
     textButtonTheme: TextButtonThemeData(
-      style: TextButton.styleFrom(foregroundColor: ink),
+      style: TextButton.styleFrom(foregroundColor: palette.textPrimary),
     ),
     iconButtonTheme: IconButtonThemeData(
       style: IconButton.styleFrom(
-        foregroundColor: ink,
-        iconSize: 20,
+        foregroundColor: palette.textPrimary,
+        iconSize: PineSize.stateGraphic,
+        minimumSize:
+            const Size(PineSize.minTouchAndroid, PineSize.minTouchAndroid),
         visualDensity: VisualDensity.compact,
       ),
     ),
     dialogTheme: DialogThemeData(
-      backgroundColor: PineColors.sheet,
+      backgroundColor: palette.surface,
       surfaceTintColor: Colors.transparent,
       elevation: 0,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(Paper.cardRadius),
+        borderRadius: BorderRadius.circular(PineRadius.settled),
       ),
-      titleTextStyle: PineText.serif(size: PineType.num, weight: FontWeight.w500),
-      contentTextStyle: PineText.sans(size: PineType.body),
+      titleTextStyle: PineText.aggregate(color: palette.textPrimary),
+      contentTextStyle: PineText.sans(
+        size: PineType.body,
+        color: palette.textPrimary,
+        height: PineLineHeight.body,
+      ),
     ),
-    bottomSheetTheme: const BottomSheetThemeData(
-      backgroundColor: PineColors.paper,
+    bottomSheetTheme: BottomSheetThemeData(
+      backgroundColor: palette.background,
       surfaceTintColor: Colors.transparent,
       elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(Paper.cardRadius)),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(PineRadius.settled),
+        ),
       ),
     ),
     snackBarTheme: SnackBarThemeData(
-      backgroundColor: PineColors.sheet,
-      contentTextStyle: PineText.sans(size: PineType.body),
+      backgroundColor: palette.surface,
+      contentTextStyle: PineText.sans(
+        size: PineType.body,
+        color: palette.textPrimary,
+      ),
       behavior: SnackBarBehavior.floating,
     ),
     switchTheme: SwitchThemeData(
-      thumbColor: const WidgetStatePropertyAll(PineColors.sheet),
+      thumbColor: WidgetStatePropertyAll(palette.background),
       trackColor: WidgetStateProperty.resolveWith(
-        (states) => states.contains(WidgetState.selected) ? accent : line,
+        (states) => states.contains(WidgetState.selected)
+            ? palette.focus
+            : palette.divider,
       ),
       trackOutlineColor: const WidgetStatePropertyAll(Colors.transparent),
     ),
     checkboxTheme: CheckboxThemeData(
       fillColor: WidgetStateProperty.resolveWith(
         (states) => states.contains(WidgetState.selected)
-            ? accent
+            ? palette.focus
             : Colors.transparent,
       ),
-      checkColor: const WidgetStatePropertyAll(PineColors.sheet),
-      side: const BorderSide(color: PineColors.lineStrong, width: 1.5),
+      checkColor: WidgetStatePropertyAll(palette.background),
+      side: BorderSide(color: palette.divider, width: Paper.chipBorder),
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(Paper.tinyRadius),
+        borderRadius: BorderRadius.circular(PineRadius.adjudication),
       ),
     ),
-    progressIndicatorTheme: const ProgressIndicatorThemeData(
-      color: accent,
-      linearTrackColor: PineColors.sunken,
-      linearMinHeight: 6,
+    progressIndicatorTheme: ProgressIndicatorThemeData(
+      color: palette.focus,
+      linearTrackColor: palette.presence,
+      linearMinHeight: PineSpacing.micro,
     ),
     navigationBarTheme: NavigationBarThemeData(
-      backgroundColor: PineColors.sheet,
+      backgroundColor: palette.surface,
       surfaceTintColor: Colors.transparent,
       elevation: 0,
       height: 64,
-      indicatorColor: PineColors.accentSoft,
+      indicatorColor: palette.presence,
       labelTextStyle: WidgetStateProperty.resolveWith(
-        (states) => PineText.serif(
-          size: PineType.caption,
-          color: states.contains(WidgetState.selected) ? accent : ink2,
+        (states) => PineText.sans(
+          size: PineType.auxiliary,
+          color: states.contains(WidgetState.selected)
+              ? palette.textPrimary
+              : palette.textSecondary,
           weight: states.contains(WidgetState.selected)
-              ? FontWeight.w500
+              ? FontWeight.w600
               : FontWeight.w400,
+          height: PineLineHeight.auxiliary,
         ),
       ),
     ),
-    timePickerTheme: const TimePickerThemeData(
-      backgroundColor: PineColors.sheet,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.all(Radius.circular(Paper.cardRadius)),
+    timePickerTheme: TimePickerThemeData(
+      backgroundColor: palette.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.all(Radius.circular(PineRadius.settled)),
       ),
     ),
-    // 语义色供系统组件兜底（正文代码请直接用 `PineColors.*`）。
-    extensions: const <ThemeExtension<dynamic>>[
-      _SemanticColors(mint: celadon, gold: ochre),
+    extensions: <ThemeExtension<dynamic>>[
+      _SemanticColors(mint: palette.shortBreak, gold: palette.longBreak),
     ],
   );
 }
 
-/// 供系统组件兜底引用的语义色（正文代码请直接用 `PineColors.*`）。
 class _SemanticColors extends ThemeExtension<_SemanticColors> {
   const _SemanticColors({required this.mint, required this.gold});
 

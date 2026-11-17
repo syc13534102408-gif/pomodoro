@@ -67,20 +67,13 @@ const previewSession = SessionView(
     elapsedSeconds: 1260);
 
 Future<void> fonts() async {
-  final bytes = File('/System/Library/Fonts/Supplemental/Arial Unicode.ttf')
-      .readAsBytesSync();
-  for (final family in [
-    'Ahem',
-    'Roboto',
-    'FlutterTest',
-    'sans-serif',
-    'PinePreview',
-    'SF Mono',
-    'Menlo',
-    'monospace'
-  ]) {
-    await (FontLoader(family)
-          ..addFont(Future.value(ByteData.sublistView(bytes))))
+  for (final entry in {
+    PineText.headingFamily: 'assets/fonts/NotoSerifSC-wght.ttf',
+    PineText.bodyFamily: 'assets/fonts/NotoSansSC-wght.ttf',
+  }.entries) {
+    await (FontLoader(entry.key)
+          ..addFont(Future.value(
+              ByteData.sublistView(File(entry.value).readAsBytesSync()))))
         .load();
   }
   final icons = File(
@@ -95,23 +88,10 @@ Future<void> capture(
   tester.view.devicePixelRatio = 1;
   tester.view.physicalSize = size;
   final key = GlobalKey();
-  final base = buildPineTheme(brightness: Brightness.dark);
-  final theme = base.copyWith(
-    textTheme: base.textTheme.apply(fontFamily: 'PinePreview'),
-    filledButtonTheme: FilledButtonThemeData(
-        style: base.filledButtonTheme.style!.copyWith(
-            textStyle: WidgetStatePropertyAll(base
-                .filledButtonTheme.style!.textStyle!
-                .resolve({})!.copyWith(fontFamily: 'PinePreview')))),
-    outlinedButtonTheme: OutlinedButtonThemeData(
-        style: base.outlinedButtonTheme.style!.copyWith(
-            textStyle: WidgetStatePropertyAll(base
-                .outlinedButtonTheme.style!.textStyle!
-                .resolve({})!.copyWith(fontFamily: 'PinePreview')))),
-  );
+  final theme = buildPineTheme();
   await tester.pumpWidget(
       MaterialApp(theme: theme, home: RepaintBoundary(key: key, child: body)));
-  await tester.pumpAndSettle();
+  await tester.pump(PineMotion.maximum);
   expect(tester.takeException(), isNull);
   final boundary =
       key.currentContext!.findRenderObject()! as RenderRepaintBoundary;
@@ -147,10 +127,18 @@ class ComponentOverview extends StatelessWidget {
             child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Text('当下与台账',
-                      style: PineText.aggregate(color: palette.textPrimary)),
+                  Align(
+                      alignment: Alignment.centerLeft,
+                      child: Container(
+                          width: 24, height: 2, color: palette.brand)),
                   const SizedBox(height: PineSpacing.near),
-                  Text('共享组件 · 暗色模式',
+                  Text('当下与台账',
+                      style: PineText.serif(
+                          size: PineType.aggregate,
+                          color: palette.textPrimary,
+                          height: PineLineHeight.aggregate)),
+                  const SizedBox(height: PineSpacing.near),
+                  Text('共享组件 · 暖纸浅色',
                       style: PineText.sans(color: palette.textSecondary)),
                   const SizedBox(height: PineSpacing.far),
                   section(
@@ -187,16 +175,15 @@ class ComponentOverview extends StatelessWidget {
                           onComplete: () {},
                           onPauseOrResume: () {})),
                   section(
-                      '06  聚合、目标日与设置',
-                      SettledVariantSurface(
+                      '06  范围先于聚合',
+                      const SettledVariantSurface(
                           child: Row(children: [
-                        const Expanded(
+                        Expanded(
                             child: AggregateReadout(
                                 value: '105 分钟', label: '今日专注')),
-                        const Expanded(
+                        Expanded(
                             child: AggregateReadout(
                                 value: '2 个', label: '今日已落番茄')),
-                        SettingsSwitch(value: true, onChanged: (_) {}),
                       ]))),
                   section(
                       '07  逻辑日、目标日与聚合进度',
@@ -215,7 +202,60 @@ class ComponentOverview extends StatelessWidget {
                             PineButton(label: '保存', onPressed: () {}),
                           ])),
                   section(
-                      '08  安全副本与独立裁决边界',
+                      '08  开关与按钮六态',
+                      Column(children: [
+                        Row(children: [
+                          SettingsSwitch(value: true, onChanged: (_) {}),
+                          const SizedBox(width: PineSpacing.section),
+                          SettingsSwitch(value: false, onChanged: (_) {}),
+                          const SizedBox(width: PineSpacing.section),
+                          PineCheckbox(value: true, onChanged: (_) {}),
+                          PineCheckbox(value: false, onChanged: (_) {}),
+                        ]),
+                        const SizedBox(height: PineSpacing.near),
+                        const ActionStatesPreview(),
+                      ])),
+                  section(
+                      '09  当前会话开放弧 · 三阶段同形',
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          for (final mode in SessionMode.values)
+                            SessionTimerArc(
+                                view: SessionView(
+                                    mode: mode,
+                                    running: true,
+                                    targetReached: false,
+                                    plannedSeconds: 3000,
+                                    remainingSeconds: 1740,
+                                    overtimeSeconds: 0,
+                                    elapsedSeconds: 1260))
+                        ],
+                      )),
+                  section(
+                      '10  暂停、超时、暂停且超时',
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          for (final flags in [
+                            (false, false),
+                            (true, true),
+                            (false, true)
+                          ])
+                            SessionTimerArc(
+                                size: PineTimerArc.spaciousBox,
+                                view: SessionView(
+                                    mode: SessionMode.focus,
+                                    running: flags.$1,
+                                    targetReached: flags.$2,
+                                    plannedSeconds: 3000,
+                                    remainingSeconds: 1740,
+                                    overtimeSeconds: flags.$2 ? 1260 : 0,
+                                    elapsedSeconds: flags.$2 ? 4260 : 1260))
+                        ],
+                      )),
+                  section(
+                      '11  安全副本与独立裁决边界',
                       ConflictAdjudicationPanel(
                           status: AdjudicationStatus.readyToAdjudicate,
                           onKeepLocal: () {},
@@ -227,12 +267,67 @@ class ComponentOverview extends StatelessWidget {
   }
 }
 
+class ActionStatesPreview extends StatefulWidget {
+  const ActionStatesPreview({super.key});
+  @override
+  State<ActionStatesPreview> createState() => _ActionStatesPreviewState();
+}
+
+class _ActionStatesPreviewState extends State<ActionStatesPreview> {
+  final controllers = [
+    WidgetStatesController(),
+    WidgetStatesController({WidgetState.hovered}),
+    WidgetStatesController({WidgetState.pressed}),
+    WidgetStatesController({WidgetState.focused}),
+  ];
+  @override
+  void dispose() {
+    for (final controller in controllers) {
+      controller.dispose();
+    }
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => Column(children: [
+        Row(children: [
+          for (var i = 0; i < 3; i++) ...[
+            if (i > 0) const SizedBox(width: PineSpacing.section),
+            Expanded(
+                child: FilledButton(
+                    statesController: controllers[i],
+                    onPressed: () {},
+                    child: Text(['默认', '悬停', '按下'][i]))),
+          ]
+        ]),
+        const SizedBox(height: PineSpacing.section),
+        Row(children: [
+          Expanded(
+              child: FilledButton(
+                  statesController: controllers[3],
+                  onPressed: () {},
+                  child: const Text('键盘焦点'))),
+          const SizedBox(width: PineSpacing.section),
+          const Expanded(child: PineButton(label: '正在导入', loading: true)),
+          const SizedBox(width: PineSpacing.section),
+          const Expanded(child: PineButton(label: '需先选择文件')),
+        ]),
+      ]);
+}
+
 void main() {
-  testWidgets('生成组件总览与 V2/V5 暗色预览', (tester) async {
+  testWidgets('生成组件总览与 V2/V5 浅色预览', (tester) async {
     try {
       await fonts();
+      // 旧暗色产物退场，避免误读为本轮仍支持暗色。
+      final output = Directory('../outputs/ui-reset-preview');
+      if (output.existsSync()) {
+        for (final file in output.listSync().whereType<File>()) {
+          if (file.path.endsWith('-dark.png')) file.deleteSync();
+        }
+      }
       debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
-      await capture(tester, 'components-dark', const Size(800, 1900),
+      await capture(tester, 'components-light', const Size(800, 2600),
           const ComponentOverview());
       for (final segment in [
         PineLedgerSegment.records,
@@ -243,7 +338,7 @@ void main() {
         for (final size in [const Size(500, 640), const Size(960, 720)]) {
           await capture(
               tester,
-              '$code-${size.width.toInt()}-dark',
+              '$code-${size.width.toInt()}-light',
               size,
               LedgerPage(
                   data: TimerEngine.start(previewData(), SessionMode.focus,
@@ -256,7 +351,7 @@ void main() {
         debugDefaultTargetPlatformOverride = TargetPlatform.android;
         await capture(
             tester,
-            '$code-360-dark',
+            '$code-360-light',
             const Size(360, 800),
             LedgerPage(
                 data: TimerEngine.start(previewData(), SessionMode.focus,

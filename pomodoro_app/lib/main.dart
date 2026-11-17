@@ -25,8 +25,6 @@ class PomodoroApp extends StatelessWidget {
         title: 'pinecore',
         debugShowCheckedModeBanner: false,
         theme: buildPineTheme(),
-        darkTheme: buildPineTheme(brightness: Brightness.dark),
-        themeMode: ThemeMode.dark,
         home: const HomePage(),
       );
 }

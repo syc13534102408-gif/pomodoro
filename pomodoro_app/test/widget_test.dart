@@ -44,7 +44,7 @@ void main() {
     expect(modern.goalMinutes, 150);
   });
 
-  testWidgets('统计页渲染本月回顾（含记录与空态两种路径）', (tester) async {
+  testWidgets('统计页渲染月度分布（含记录与空态两种路径）', (tester) async {
     // 报告已整页化，本月回顾在宽版式里排在下半页；把视口拉高让它进入构建范围。
     tester.view.physicalSize = const Size(1000, 2600);
     tester.view.devicePixelRatio = 1.0;
@@ -64,11 +64,11 @@ void main() {
       settings: const TimerSettings(focus: 25, short: 5, meal: 15),
     );
     await tester.pumpWidget(MaterialApp(home: StatsPage(data: withData, onChanged: (_) {})));
-    expect(find.text('本月回顾'), findsOneWidget);
+    expect(find.text('月度分布'), findsOneWidget);
     expect(find.text('本月累计'), findsOneWidget);
 
     await tester.pumpWidget(MaterialApp(home: StatsPage(data: AppData(), onChanged: (_) {})));
-    expect(find.text('本月回顾'), findsOneWidget);
+    expect(find.text('月度分布'), findsOneWidget);
     expect(find.text('本月还没有专注记录'), findsOneWidget);
   });
 

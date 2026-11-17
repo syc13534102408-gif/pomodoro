@@ -117,13 +117,13 @@ void main() {
       }
     }
 
-    testWidgets('三段阶段条（专注/短休/吃饭）都在，且带各自的分钟数', (tester) async {
+    testWidgets('三段阶段条（专注/短休/长休）都在，且带各自的分钟数', (tester) async {
       debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
       try {
         await pump(tester, _base());
         expect(find.text('专注'), findsOneWidget);
         expect(find.text('短休'), findsOneWidget);
-        expect(find.text('吃饭'), findsOneWidget);
+        expect(find.text('长休'), findsOneWidget);
         expect(find.text('50'), findsOneWidget); // 专注时长
         expect(find.text('10'), findsOneWidget); // 短休时长
         expect(find.text('40'), findsOneWidget); // 吃饭时长
@@ -132,11 +132,11 @@ void main() {
       }
     });
 
-    testWidgets('点「吃饭」→ 环内切成吃饭', (tester) async {
+    testWidgets('点「长休」→ 环内切成吃饭', (tester) async {
       debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
       try {
         await pump(tester, _base());
-        await tester.tap(find.text('吃饭'));
+        await tester.tap(find.text('长休'));
         await tester.pumpAndSettle();
         expect(find.text('吃饭，慢慢来'), findsOneWidget);
         // 时钟按真实时间倒数，精确值会飘（39:59…），只验"起了 40 分钟的一轮"。

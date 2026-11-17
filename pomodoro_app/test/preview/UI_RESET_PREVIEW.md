@@ -1,4 +1,4 @@
-# P5 批次三暗色离屏预览
+# P5 批次 3.5 单浅色离屏预览
 
 在仓库的 `pomodoro_app/` 运行：
 
@@ -8,13 +8,25 @@
 
 预览直接渲染真实组件与 `LedgerPage`，不启动桌面应用、不读取用户存储，也不发起网络请求。样本时间固定为 2026-11-16 14:30，包含运行中的会话、跨日完成记录、无任务记录、往期与未来日程。默认测试收集不包含这个显式执行文件。
 
-中文字体沿用现有 macOS 离屏预览传统，从 `/System/Library/Fonts/Supplemental/Arial Unicode.ttf` 加载。按钮继承预览主题字体，Material 图标使用仓库 Flutter SDK 自带字体；字体不作为产品资源打包。
+中文标题与正文使用应用打包的 Noto Serif SC、Noto Sans SC 可变字体；字体按 OFL 许可随应用分发。Material 图标使用仓库 Flutter SDK 自带字体。
 
 PNG 使用 2 倍像素输出到仓库根 `outputs/ui-reset-preview/`：
 
-- `components-dark.png`：组件总览，800×1900 逻辑尺寸。
-- `v2-records-360-dark.png` / `v5-schedule-360-dark.png`：360×800，Android。
-- `v2-records-500-dark.png` / `v5-schedule-500-dark.png`：500×640，macOS 最小档。
-- `v2-records-960-dark.png` / `v5-schedule-960-dark.png`：960×720，macOS 宽档。
+- `components-light.png`：组件总览，800×2600 逻辑尺寸。
+- `v2-records-360-light.png` / `v5-schedule-360-light.png`：360×800，Android。
+- `v2-records-500-light.png` / `v5-schedule-500-light.png`：500×640，macOS 最小档。
+- `v2-records-960-light.png` / `v5-schedule-960-light.png`：960×720，macOS 宽档。
 
 `outputs/` 按仓库现有规则忽略；源码与复现说明提交，PNG 保留为本机人工审美验收产物。可滚动记录在画面底部的后续条目需要滚动阅读，不表示字段被省略。新测试另行断言首条双时间字段、日期选择、首条日程及固定动作的视口可见性。
+
+## 批次 3.5 美术核对
+
+- D1：总览实际渲染 `SessionTimerArc` 的 160/192 开放弧、288° 留口、末端白隔离圆点；专注/短休/长休同形，另含暂停、超时、暂停且超时。完整 V1 布局和归属接线仍留 V1 批次，本批没有把弧塞进 V2/V5。
+- D2：深赤陶行动/导航选中/勾选/开关，阶段色仅标阶段；总览通过真实按钮的 WidgetStatesController 展示默认、悬停、按下、焦点，另有禁用原因与保留标签的加载态。两个裁决来源均为中性次行动。
+- D3：暖纸本底、白事实、暖灰陪驻；事实卡为装饰轻边且无逐行投影，输入与日期选项保留功能边。两级环境阴影仅定义于令牌，列表默认不用。
+- D4：Noto Serif SC 标题、Noto Sans SC 正文及等宽数字；聚合先范围后数值/单位，记录时长 16、完整双时间 13，日程条目常规字重。
+- D5：记录组间 32、组内 8、双时间组前 16；日程清单到固定添加区 16。360×800、500×640 首条必要事实可见；下方列表仍按既有逻辑滚动。
+
+脚本清除本目录旧 `*-dark.png` 后生成七张 `*-light.png`，避免混淆旧图。含真实异步加载样本，捕获使用固定 200ms 渲染时点而非等待永不停止的加载图形。所有截图使用打包字体，不依赖设计机系统中文字体。
+
+遗留边界：跨日/收工/暂停/镜像等长复合陪驻说明仍允许完整换行增高；本批不宣称这类组合均满足原固定高度。未做 Android/macOS 安装包和真机字体栅格化验收，也未实测 APK 大小。

@@ -17,7 +17,7 @@ void main() {
       '2026-11-18': [],
     });
     await tester.pumpWidget(MaterialApp(
-        theme: buildPineTheme(brightness: Brightness.dark),
+        theme: buildPineTheme(),
         home: Scaffold(
             body: PlanPanel(
                 data: data,
@@ -72,7 +72,7 @@ void main() {
           data = TimerEngine.start(data, SessionMode.focus,
               now.subtract(const Duration(minutes: 10)));
           await tester.pumpWidget(MaterialApp(
-              theme: buildPineTheme(brightness: Brightness.dark),
+              theme: buildPineTheme(),
               home: LedgerPage(
                   data: data,
                   now: now,

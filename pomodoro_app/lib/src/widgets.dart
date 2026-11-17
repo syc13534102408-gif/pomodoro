@@ -59,19 +59,21 @@ class PinePressable extends StatelessWidget {
       button: true,
       enabled: onTap != null || onLongPress != null,
       label: semanticLabel,
-      child: Material(
-          type: MaterialType.transparency,
-          child: InkWell(
-              onTap: onTap,
-              onLongPress: onLongPress,
-              borderRadius: BorderRadius.circular(PineRadius.settled),
-              splashFactory: NoSplash.splashFactory,
-              overlayColor: const WidgetStatePropertyAll(Colors.transparent),
-              focusColor: PinePalette.of(context).presence,
-              child: ConstrainedBox(
-                  constraints:
-                      BoxConstraints(minWidth: _touch, minHeight: _touch),
-                  child: child))));
+      child: PineFocusRing(
+          child: Material(
+              type: MaterialType.transparency,
+              child: InkWell(
+                  onTap: onTap,
+                  onLongPress: onLongPress,
+                  borderRadius: BorderRadius.circular(PineRadius.settled),
+                  splashFactory: NoSplash.splashFactory,
+                  overlayColor:
+                      const WidgetStatePropertyAll(Colors.transparent),
+                  focusColor: PinePalette.of(context).presence,
+                  child: ConstrainedBox(
+                      constraints:
+                          BoxConstraints(minWidth: _touch, minHeight: _touch),
+                      child: child)))));
 }
 
 /// 通用编辑动作，使用沉淀边界；会话动作由进行中组件单独承载。
@@ -119,38 +121,45 @@ class PineButton extends StatelessWidget {
               width: fill ? double.infinity : null,
               child: FilledButton(
                   onPressed: loading ? null : onPressed,
-                  style: FilledButton.styleFrom(
-                      backgroundColor: color ?? palette.focus,
-                      foregroundColor: foregroundColor ?? palette.background,
-                      padding: label.isEmpty ? EdgeInsets.zero : padding,
-                      minimumSize: Size(_touch, effectiveHeight),
-                      shape: RoundedRectangleBorder(
-                          borderRadius:
-                              BorderRadius.circular(PineRadius.settled)),
-                      textStyle: Theme.of(context).textTheme.labelLarge!.merge(
-                          PineText.sans(size: PineType.body, weight: FontWeight.w600))),
-                  child: loading
-                      ? SizedBox(
-                          width: PineSize.stateGraphic,
-                          height: PineSize.stateGraphic,
-                          child: CircularProgressIndicator(
-                              strokeWidth: 2, color: palette.textSecondary))
-                      : Row(
-                          mainAxisSize:
-                              fill ? MainAxisSize.max : MainAxisSize.min,
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                              if (icon != null)
-                                Icon(icon, size: PineSize.stateGraphic),
-                              if (icon != null && label.isNotEmpty)
-                                const SizedBox(width: PineSpacing.near),
-                              if (label.isNotEmpty)
-                                Flexible(child: Text(label)),
-                              if (trailing != null) ...[
-                                const SizedBox(width: PineSpacing.micro),
-                                trailing!
-                              ],
-                            ])));
+                  style: pinePrimaryButtonStyle(
+                          background: color,
+                          foreground: foregroundColor,
+                          loading: loading)
+                      .merge(FilledButton.styleFrom(
+                          backgroundColor: color ?? palette.action,
+                          foregroundColor: foregroundColor ?? Colors.white,
+                          padding: label.isEmpty ? EdgeInsets.zero : padding,
+                          minimumSize: Size(_touch, effectiveHeight),
+                          shape: RoundedRectangleBorder(
+                              borderRadius:
+                                  BorderRadius.circular(PineRadius.settled)),
+                          textStyle: Theme.of(context)
+                              .textTheme
+                              .labelLarge!
+                              .merge(PineText.sans(
+                                  size: PineType.body,
+                                  weight: FontWeight.w600)))),
+                  child: Row(
+                      mainAxisSize: fill ? MainAxisSize.max : MainAxisSize.min,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        if (loading)
+                          SizedBox(
+                              width: PineSize.stateGraphic,
+                              height: PineSize.stateGraphic,
+                              child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: foregroundColor ?? Colors.white))
+                        else if (icon != null)
+                          Icon(icon, size: PineSize.stateGraphic),
+                        if ((loading || icon != null) && label.isNotEmpty)
+                          const SizedBox(width: PineSpacing.near),
+                        if (label.isNotEmpty) Flexible(child: Text(label)),
+                        if (trailing != null) ...[
+                          const SizedBox(width: PineSpacing.micro),
+                          trailing!
+                        ],
+                      ])));
         }));
   }
 }
@@ -172,8 +181,8 @@ class AggregateProgress extends StatelessWidget {
     final palette = PinePalette.of(context);
     return LinearProgressIndicator(
         value: value.isNaN ? 0 : value.clamp(0.0, 1.0),
-        color: color ?? palette.textSecondary,
-        backgroundColor: trackColor ?? palette.presence,
+        color: color ?? palette.action,
+        backgroundColor: trackColor ?? palette.divider,
         minHeight: height);
   }
 }
@@ -188,7 +197,7 @@ class SettingsSwitch extends StatelessWidget {
   Widget build(BuildContext context) => SizedBox(
       width: _desktop ? 48 : 56,
       height: _touch,
-      child: Switch(value: value, onChanged: onChanged));
+      child: PineFocusRing(child: Switch(value: value, onChanged: onChanged)));
 }
 
 class FactSectionHeader extends StatelessWidget {
@@ -199,7 +208,7 @@ class FactSectionHeader extends StatelessWidget {
   Widget build(BuildContext context) => Row(children: [
         Expanded(
             child: Text(title,
-                style: PineText.sans(
+                style: PineText.serif(
                     color: PinePalette.of(context).textPrimary,
                     weight: FontWeight.w600,
                     height: PineLineHeight.body))),
@@ -217,18 +226,34 @@ class AggregateReadout extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = PinePalette.of(context);
+    final split = value.indexOf(' ');
+    final number = split < 0 ? value : value.substring(0, split);
+    final unit = split < 0 ? '' : value.substring(split + 1);
     return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(value,
-              style: PineText.aggregate(color: accent ?? palette.textPrimary)),
-          const SizedBox(height: PineSpacing.micro),
           Text(label,
               style: PineText.sans(
                   size: PineType.auxiliary,
                   color: palette.textSecondary,
-                  height: PineLineHeight.auxiliary))
+                  height: PineLineHeight.auxiliary)),
+          const SizedBox(height: PineSpacing.near),
+          Text.rich(
+              TextSpan(children: [
+                TextSpan(
+                    text: number,
+                    style: PineText.aggregate(
+                        color: accent ?? palette.textPrimary)),
+                if (unit.isNotEmpty)
+                  TextSpan(
+                      text: ' $unit',
+                      style: PineText.sans(
+                          size: PineType.auxiliary,
+                          color: palette.textSecondary,
+                          height: PineLineHeight.auxiliary)),
+              ]),
+              semanticsLabel: value),
         ]);
   }
 }
@@ -345,4 +370,74 @@ class TargetDayReadout extends StatelessWidget {
             color: palette.textSecondary,
             height: compact ? PineLineHeight.auxiliary : PineLineHeight.body));
   }
+}
+
+/// 保留原生 Checkbox 的键盘、命中区和语义，绘制即时 20×20 视觉。
+/// 不播放原生勾选的收缩动画，也不把整行染色。
+class PineCheckbox extends StatelessWidget {
+  const PineCheckbox({super.key, required this.value, required this.onChanged});
+  final bool value;
+  final ValueChanged<bool?>? onChanged;
+  @override
+  Widget build(BuildContext context) => PineFocusRing(
+        radius: PineRadius.adjudication,
+        child: CustomPaint(
+          foregroundPainter:
+              _PineCheckboxPainter(value: value, enabled: onChanged != null),
+          child: Checkbox(
+            value: value,
+            onChanged: onChanged,
+            fillColor: const WidgetStatePropertyAll(Colors.transparent),
+            checkColor: Colors.transparent,
+            side: BorderSide.none,
+            overlayColor: const WidgetStatePropertyAll(Colors.transparent),
+            splashRadius: 0,
+          ),
+        ),
+      );
+}
+
+class _PineCheckboxPainter extends CustomPainter {
+  const _PineCheckboxPainter({required this.value, required this.enabled});
+  final bool value, enabled;
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rect = Rect.fromCenter(
+        center: size.center(Offset.zero), width: 20, height: 20);
+    final shape = RRect.fromRectAndRadius(rect, const Radius.circular(8));
+    canvas.drawRRect(
+        shape,
+        Paint()
+          ..color = !enabled
+              ? PineColors.presence
+              : value
+                  ? PineColors.accent
+                  : Colors.white);
+    if (!value || !enabled) {
+      canvas.drawRRect(
+          shape.deflate(.75),
+          Paint()
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 1.5
+            ..color = PineColors.line);
+    }
+    if (value) {
+      final path = Path()
+        ..moveTo(rect.left + 5, rect.top + 10)
+        ..lineTo(rect.left + 8.5, rect.top + 13.5)
+        ..lineTo(rect.left + 15, rect.top + 6.5);
+      canvas.drawPath(
+          path,
+          Paint()
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 2
+            ..strokeCap = StrokeCap.round
+            ..strokeJoin = StrokeJoin.round
+            ..color = enabled ? Colors.white : PineColors.textAuxiliary);
+    }
+  }
+
+  @override
+  bool shouldRepaint(_PineCheckboxPainter oldDelegate) =>
+      value != oldDelegate.value || enabled != oldDelegate.enabled;
 }

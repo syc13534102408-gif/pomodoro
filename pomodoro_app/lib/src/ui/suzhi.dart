@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 
 import '../models.dart';
 import '../theme.dart';
+import '../widgets.dart' show PinePressable;
 
 /// 素纸卡片：1px 裁切线 + 顶部 36×2.5 檀褐定界 + 轻纸边影。
 /// [composer] 为真时换成 Composer 那一级更强的阴影与定界线。
@@ -801,7 +802,7 @@ class CinnabarButton extends StatelessWidget {
           decoration: BoxDecoration(
             color: bg,
             borderRadius: BorderRadius.circular(PineRadius.control),
-            boxShadow: enabled ? PineShadow.card : null,
+            boxShadow: null,
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
@@ -1332,7 +1333,7 @@ class PhaseTabs extends StatelessWidget {
   static String shortLabel(SessionMode mode) => switch (mode) {
         SessionMode.focus => '专注',
         SessionMode.shortBreak => '短休',
-        SessionMode.longBreak => '吃饭',
+        SessionMode.longBreak => '长休',
       };
 
   @override
@@ -1359,8 +1360,7 @@ class PhaseTabs extends StatelessWidget {
 
   Widget _tab(SessionMode mode) {
     final selected = mode == current;
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
+    return PinePressable(
       onTap: () => onChanged(mode),
       child: Padding(
         padding: const EdgeInsets.only(top: 3, bottom: 2),
@@ -1372,11 +1372,17 @@ class PhaseTabs extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.baseline,
               textBaseline: TextBaseline.alphabetic,
               children: <Widget>[
+                Icon(Icons.circle, size: PineSize.taskGraphic, color: switch(mode) {
+                  SessionMode.focus => PinePalette.light.focus,
+                  SessionMode.shortBreak => PinePalette.light.shortBreak,
+                  SessionMode.longBreak => PinePalette.light.longBreak,
+                }),
+                const SizedBox(width: PineSpacing.micro),
                 Text(
                   shortLabel(mode),
-                  style: PineText.serif(
+                  style: PineText.sans(
                     size: PineType.body,
-                    weight: selected ? FontWeight.w600 : FontWeight.w500,
+                    weight: selected ? FontWeight.w600 : FontWeight.w400,
                     color: selected ? PineColors.ink : PineColors.ink3,
                   ),
                 ),
@@ -1395,7 +1401,7 @@ class PhaseTabs extends StatelessWidget {
               width: 16,
               height: 2,
               decoration: BoxDecoration(
-                color: selected ? PineColors.accent : const Color(0x00000000),
+                color: selected ? mode.lineColor : Colors.transparent,
                 borderRadius: BorderRadius.circular(PineRadius.seal),
               ),
             ),

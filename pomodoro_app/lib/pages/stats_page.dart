@@ -156,7 +156,7 @@ class _StatsPageState extends State<StatsPage> {
         // ── 四 · 本月印记 ───────────────────────────────────────
         SectionMark(
           no: '四',
-          title: '本月回顾',
+          title: '月度分布',
           action: _MonthSwitch(
             label: '${m.monthAnchor.year} 年 ${m.monthAnchor.month} 月',
             onPrev: () => setState(() => _monthOffset--),
@@ -320,7 +320,7 @@ class _StatsPageState extends State<StatsPage> {
                   children: [
                     SectionMark(
                       no: '三',
-                      title: '本月回顾',
+                      title: '月度分布',
                       action: _MonthSwitch(
                         label: '${m.monthAnchor.month} 月',
                         onPrev: () => setState(() => _monthOffset--),

@@ -90,7 +90,7 @@ class _SheetScaffold extends StatelessWidget {
   }
 }
 
-/// 确认对话框：纸面样式。破坏性操作用红字按钮（R2 语义）。
+/// 确认对话框：危险确认使用深红实底，其余入口保持中性。
 Future<bool> _confirmDanger(
   BuildContext context, {
   required String title,
@@ -107,21 +107,8 @@ Future<bool> _confirmDanger(
           onPressed: () => Navigator.pop(context, false),
           child: const Text('取消'),
         ),
-        SizedBox(
-          height: 40,
-          child: OutlinedButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: PineColors.focus,
-              backgroundColor: Colors.transparent,
-              side: const BorderSide(color: PineColors.focus, width: 1.5),
-              shape: const StadiumBorder(),
-              textStyle:
-                  const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-            ),
-            child: Text(confirmLabel),
-          ),
-        ),
+        PineButton(label: confirmLabel, expand: false, color: PineColors.crimson,
+          onPressed: () => Navigator.pop(context, true)),
       ],
     ),
   );
@@ -653,7 +640,7 @@ class _ScheduleRow extends StatelessWidget {
               SizedBox(
                 width: 48,
                 height: 48,
-                child: Checkbox(value: item.done, onChanged: (_) => onToggle()),
+                child: PineCheckbox(value: item.done, onChanged: (_) => onToggle()),
               ),
               Expanded(
                 child: Text(
@@ -674,12 +661,12 @@ class _ScheduleRow extends StatelessWidget {
               IconButton(
                 tooltip: '编辑内容',
                 onPressed: onEdit,
-                icon: const Icon(Icons.edit_outlined, size: 18),
+                icon: const Icon(Icons.edit_outlined, size: PineSize.stateGraphic),
               ),
               IconButton(
                 tooltip: '删除待办',
                 onPressed: onRemove,
-                icon: const Icon(Icons.delete_outline, size: 18),
+                icon: const Icon(Icons.delete_outline, size: PineSize.stateGraphic),
               ),
             ],
           ),
@@ -1057,9 +1044,11 @@ class _PlanPanelState extends State<PlanPanel> {
                 children: [
                   Text(
                     '日程',
-                    style: PineText.sans(
-                      size: PineType.body,
+                    style: PineText.serif(
+                      size: PineType.aggregate,
                       color: palette.textPrimary,
+                      weight: FontWeight.w600,
+                      height: PineLineHeight.aggregate,
                     ),
                   ),
                   const Spacer(),
@@ -1074,7 +1063,7 @@ class _PlanPanelState extends State<PlanPanel> {
                   ),
                 ],
               ),
-            if (widget.showTitle) const SizedBox(height: 10),
+            if (widget.showTitle) const SizedBox(height: PineSpacing.section),
             _dateStrip(keys),
             const SizedBox(height: 8),
             Text(
@@ -1093,9 +1082,9 @@ class _PlanPanelState extends State<PlanPanel> {
                       children: [
                         SettledTodoRows(
                           items: items,
-                          rowHeight: rowHeight + 6,
+                          rowHeight: rowHeight + PineSpacing.near,
                           itemBuilder: (item) => Padding(
-                            padding: const EdgeInsets.only(bottom: 6),
+                            padding: const EdgeInsets.only(bottom: PineSpacing.near),
                             child: _ScheduleRow(
                               item: item,
                               onToggle: () => _toggle(_selectedKey, item),
@@ -1113,7 +1102,7 @@ class _PlanPanelState extends State<PlanPanel> {
                       ],
                     ),
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: PineSpacing.section),
             Row(
               children: [
                 Expanded(
@@ -1133,7 +1122,6 @@ class _PlanPanelState extends State<PlanPanel> {
                   icon: Icons.add,
                   expand: false,
                   height: desktop ? 44 : 52,
-                  color: palette.textPrimary,
                   onPressed: _addToSelected,
                 ),
               ],
@@ -1180,13 +1168,17 @@ class _PlanPanelState extends State<PlanPanel> {
                 semanticLabel: '选择日期 $key',
                 child: SettledVariantSurface(
                   padding: EdgeInsets.zero,
-                  borderColor: selected ? palette.textPrimary : palette.divider,
+                  borderColor: selected ? palette.action : palette.divider,
+                  borderWidth: selected ? 2 : Paper.hairline,
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text(
                         _shortLabel(key),
-                        style: PineText.sans(color: palette.textPrimary),
+                        style: PineText.sans(
+                          color: palette.textPrimary,
+                          weight: selected ? FontWeight.w600 : FontWeight.w400,
+                        ),
                       ),
                       Text(
                         '${list.where((item) => item.done).length}/${list.length}',
@@ -1450,11 +1442,13 @@ Future<void> showRecordDetailSheet(BuildContext context, {
     padding: const EdgeInsets.all(PineSpacing.section), child: Column(
       mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text('记录详情', style: PineText.aggregate(color: PinePalette.of(context).textPrimary)),
+        Text('记录详情', style: PineText.serif(size: PineType.aggregate,
+          color: PinePalette.of(context).textPrimary, height: PineLineHeight.aggregate)),
         const SizedBox(height: PineSpacing.section),
         RecordFactTile(data: data, record: record),
         const SizedBox(height: PineSpacing.section),
-        PineButton(label: '编辑记录', onPressed: () async {
+        PineButton(label: '编辑记录', color: PineColors.surface,
+          foregroundColor: PineColors.textSecondary, onPressed: () async {
           final next = await showDialog<AppData>(context: context,
             builder: (dialogContext) => Dialog(child: SizedBox(width: 480,
               child: RecordEditor(data: data, record: record,

@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
-/// P4 双模式语义色板。页面与自建组件只允许引用语义角色，不写局部色值。
+/// 单浅色语义色板。页面与自建组件只允许引用语义角色，不写局部色值。
 class PinePalette {
   const PinePalette({
     required this.background,
@@ -20,6 +20,8 @@ class PinePalette {
     required this.divider,
     required this.logicalDayDivider,
     required this.taskColors,
+    required this.brand,
+    required this.action,
   });
 
   final Color background;
@@ -38,23 +40,25 @@ class PinePalette {
   final Color divider;
   final Color logicalDayDivider;
   final List<Color> taskColors;
+  final Color brand;
+  final Color action;
 
   static const light = PinePalette(
     background: Color(0xFFF7F6F2),
     surface: Color(0xFFFFFFFF),
-    presence: Color(0xFFECEFF3),
-    textPrimary: Color(0xFF202228),
-    textSecondary: Color(0xFF454952),
-    textAuxiliary: Color(0xFF646B76),
-    textPresence: Color(0xFF202228),
-    focus: Color(0xFF146CA4),
-    shortBreak: Color(0xFF24784F),
-    longBreak: Color(0xFF8A5A00),
-    paused: Color(0xFF596577),
-    overtime: Color(0xFF7551A6),
-    adjudication: Color(0xFFA7352D),
-    divider: Color(0xFF727A86),
-    logicalDayDivider: Color(0xFF596577),
+    presence: Color(0xFFF1EDE6),
+    textPrimary: Color(0xFF2B2925),
+    textSecondary: Color(0xFF514B43),
+    textAuxiliary: Color(0xFF70675D),
+    textPresence: Color(0xFF2B2925),
+    focus: Color(0xFF2E6573),
+    shortBreak: Color(0xFF38684C),
+    longBreak: Color(0xFF775A28),
+    paused: Color(0xFF686357),
+    overtime: Color(0xFF6F587C),
+    adjudication: Color(0xFFA3322B),
+    divider: Color(0xFF8B8276),
+    logicalDayDivider: Color(0xFF70675D),
     taskColors: <Color>[
       Color(0xFFA5465C),
       Color(0xFF247565),
@@ -63,72 +67,53 @@ class PinePalette {
       Color(0xFF73549A),
       Color(0xFF52752B),
     ],
+    brand: Color(0xFFD97757),
+    action: Color(0xFFA8472F),
   );
 
-  static const dark = PinePalette(
-    background: Color(0xFF101114),
-    surface: Color(0xFF181A1F),
-    presence: Color(0xFF20242B),
-    textPrimary: Color(0xFFF2F3F5),
-    textSecondary: Color(0xFFC7CAD1),
-    textAuxiliary: Color(0xFF9CA2AE),
-    textPresence: Color(0xFFF2F3F5),
-    focus: Color(0xFF7AB8FF),
-    shortBreak: Color(0xFF75D0A4),
-    longBreak: Color(0xFFE7B86A),
-    paused: Color(0xFFA4ADBD),
-    overtime: Color(0xFFC4A5F5),
-    adjudication: Color(0xFFFF8F85),
-    divider: Color(0xFF68707E),
-    logicalDayDivider: Color(0xFF8A93A3),
-    taskColors: <Color>[
-      Color(0xFFE89AA6),
-      Color(0xFF7CC6B3),
-      Color(0xFF8EB7ED),
-      Color(0xFFD8B36A),
-      Color(0xFFB7A0E3),
-      Color(0xFFA9C77A),
-    ],
-  );
-
-  static PinePalette of(BuildContext context) =>
-      Theme.of(context).brightness == Brightness.dark ? dark : light;
+  static PinePalette of(BuildContext context) => light;
 }
 
-/// 默认暗色的语义令牌与旧名兼容层。
+/// 单浅色语义令牌与旧名兼容层。
 ///
 /// models.dart 与尚未迁移的表现层仍引用旧名；保留别名可避免逻辑层改动。
-/// 新代码使用 PinePalette.of(context)，确保跟随当前明暗模式。
+/// 新代码使用 PinePalette.of(context)，统一消费单浅色角色。
 class PineColors {
   const PineColors._();
 
-  static const paper = Color(0xFF101114);
-  static const sheet = Color(0xFF181A1F);
-  static const sunken = Color(0xFF20242B);
-  static const sand = Color(0xFF20242B);
+  static const paper = Color(0xFFF7F6F2);
+  static const sheet = Color(0xFFFFFFFF);
+  static const sunken = Color(0xFFF1EDE6);
+  static const sand = Color(0xFFF1EDE6);
 
-  static const ink = Color(0xFFF2F3F5);
-  static const ink2 = Color(0xFFC7CAD1);
-  static const ink3 = Color(0xFF9CA2AE);
-  static const inkFaint = Color(0xFF9CA2AE);
+  static const ink = Color(0xFF2B2925);
+  static const ink2 = Color(0xFF514B43);
+  static const ink3 = Color(0xFF70675D);
+  static const inkFaint = Color(0xFF70675D);
 
-  static const line = Color(0xFF68707E);
-  static const lineStrong = Color(0xFF8A93A3);
+  static const line = Color(0xFF8B8276);
+  static const lineStrong = Color(0xFF70675D);
 
-  static const accent = Color(0xFF7AB8FF);
-  static const accentSoft = Color(0xFF20242B);
-  static const celadon = Color(0xFF75D0A4);
-  static const ochre = Color(0xFFE7B86A);
-  static const crimson = Color(0xFFFF8F85);
+  static const accent = Color(0xFFA8472F);
+  static const accentSoft = Color(0xFFF1EDE6);
+  static const celadon = Color(0xFF38684C);
+  static const ochre = Color(0xFF775A28);
+  static const crimson = Color(0xFFA3322B);
+  static const signature = Color(0xFFD97757);
+  static const surfaceHairline = Color(0xFFDED8CE);
+  static const actionHover = Color(0xFF943D29);
+  static const actionPressed = Color(0xFF7E3424);
+  static const dangerHover = Color(0xFF8C2924);
+  static const dangerPressed = Color(0xFF76221E);
 
   static const card = sheet;
   static const sub = ink2;
   static const faint = inkFaint;
   static const pine = celadon;
-  static const focus = accent;
+  static const focus = Color(0xFF2E6573);
   static const mint = celadon;
-  static const gold = sand;
-  static const goldInk = ochre;
+  static const gold = Color(0xFF775A28);
+  static const goldInk = gold;
   static const track = lineStrong;
 
   static const background = paper;
@@ -172,14 +157,24 @@ class PineLineHeight {
   static const double auxiliary = 18 / PineType.auxiliary;
 }
 
-/// 系统无衬线为正文，等宽数字只服务读数与完成时刻。
+/// 打包宋体仅用于标题；正文和等宽数字均使用打包无衬线族。
 class PineText {
   const PineText._();
 
-  static const List<String> monoFallback = <String>[
-    'SF Mono',
-    'Menlo',
-    'monospace',
+  static const List<String> monoFallback = bodyFallback;
+  static const String headingFamily = 'Noto Serif SC';
+  static const String bodyFamily = 'Noto Sans SC';
+  static const List<String> headingFallback = <String>[
+    'Noto Serif CJK SC',
+    'Songti SC',
+    'STSong',
+    'serif'
+  ];
+  static const List<String> bodyFallback = <String>[
+    'Noto Sans CJK SC',
+    'PingFang SC',
+    'Microsoft YaHei',
+    'sans-serif'
   ];
 
   static TextStyle serif({
@@ -190,12 +185,16 @@ class PineText {
     double? height,
     List<FontFeature>? features,
   }) =>
-      sans(
-        size: size,
+      TextStyle(
+        fontFamily: headingFamily,
+        fontFamilyFallback: headingFallback,
+        fontSize: size,
         color: color,
-        weight: weight,
+        fontWeight: weight,
         height: height,
-      ).copyWith(letterSpacing: letterSpacing, fontFeatures: features);
+        letterSpacing: letterSpacing,
+        fontFeatures: features,
+      );
 
   static TextStyle sans({
     double size = PineType.body,
@@ -204,6 +203,8 @@ class PineText {
     double? height,
   }) =>
       TextStyle(
+        fontFamily: bodyFamily,
+        fontFamilyFallback: bodyFallback,
         fontSize: size,
         color: color,
         fontWeight: weight,
@@ -217,7 +218,7 @@ class PineText {
     double? height,
   }) =>
       TextStyle(
-        fontFamily: 'SF Mono',
+        fontFamily: bodyFamily,
         fontFamilyFallback: monoFallback,
         fontSize: size,
         color: color,
@@ -261,21 +262,27 @@ class PineSpacing {
 class PineRadius {
   const PineRadius._();
 
-  static const double active = 16;
-  static const double settled = 8;
-  static const double adjudication = 4;
+  static const double active = 24;
+  static const double settled = 16;
+  static const double adjudication = 8;
 
   static const double card = settled;
   static const double control = settled;
   static const double seal = adjudication;
 }
 
-/// 新宪章不设置阴影令牌；空列表仅保留旧调用兼容。
 class PineShadow {
   const PineShadow._();
+  static const List<BoxShadow> none = <BoxShadow>[];
+  static const ambient = card;
+  static const overlay = composer;
 
-  static const List<BoxShadow> card = <BoxShadow>[];
-  static const List<BoxShadow> composer = <BoxShadow>[];
+  static const List<BoxShadow> card = <BoxShadow>[
+    BoxShadow(color: Color(0x0A2B2925), offset: Offset(0, 2), blurRadius: 8),
+  ];
+  static const List<BoxShadow> composer = <BoxShadow>[
+    BoxShadow(color: Color(0x142B2925), offset: Offset(0, 8), blurRadius: 24),
+  ];
 }
 
 class PineDecoration {
@@ -285,7 +292,7 @@ class PineDecoration {
     Color color = PineColors.sheet,
     double radius = PineRadius.settled,
     bool composer = false,
-    bool shadowed = true,
+    bool shadowed = false,
     Color? borderColor,
   }) {
     final border = borderColor ??
@@ -336,45 +343,57 @@ class Paper {
   static const double ringMin = 184;
 
   static const hairline = 1.0;
-  static const List<BoxShadow> shadow = PineShadow.card;
+  static const List<BoxShadow> shadow = <BoxShadow>[];
 }
 
 /// 预设六色任务标识；旧数据保存的是色值，不受色集收敛影响。
 const List<Color> kTaskPalette = <Color>[
-  Color(0xFFE89AA6),
-  Color(0xFF7CC6B3),
-  Color(0xFF8EB7ED),
-  Color(0xFFD8B36A),
-  Color(0xFFB7A0E3),
-  Color(0xFFA9C77A),
+  Color(0xFFA5465C),
+  Color(0xFF247565),
+  Color(0xFF356FA8),
+  Color(0xFF875E12),
+  Color(0xFF73549A),
+  Color(0xFF52752B),
 ];
+
+class PineTimerArc {
+  const PineTimerArc._();
+  static const double compactBox = 160;
+  static const double spaciousBox = 192;
+  static const double sweepDegrees = 288;
+  static const double startDegrees = 216;
+  static const double stroke = 4;
+  static const double endDot = 8;
+  static const double separator = 2;
+}
 
 const List<FontFeature> kNumericFont = <FontFeature>[
   FontFeature.tabularFigures(),
 ];
 
-ThemeData buildPineTheme({Brightness brightness = Brightness.light}) {
-  final palette =
-      brightness == Brightness.dark ? PinePalette.dark : PinePalette.light;
+ThemeData buildPineTheme() {
+  const palette = PinePalette.light;
   final actionHeight = !kIsWeb && defaultTargetPlatform == TargetPlatform.macOS
       ? PineSize.primaryActionDesktop
       : PineSize.primaryActionAndroid;
 
   final base = ThemeData(
     useMaterial3: true,
-    brightness: brightness,
+    fontFamily: PineText.bodyFamily,
+    fontFamilyFallback: PineText.bodyFallback,
+    brightness: Brightness.light,
     scaffoldBackgroundColor: palette.background,
     canvasColor: palette.background,
     colorScheme: ColorScheme(
-      brightness: brightness,
-      primary: palette.focus,
-      onPrimary: palette.background,
-      secondary: palette.shortBreak,
-      onSecondary: palette.background,
+      brightness: Brightness.light,
+      primary: palette.action,
+      onPrimary: Colors.white,
+      secondary: palette.action,
+      onSecondary: Colors.white,
       tertiary: palette.longBreak,
-      onTertiary: palette.background,
+      onTertiary: Colors.white,
       error: palette.adjudication,
-      onError: palette.background,
+      onError: Colors.white,
       surface: palette.surface,
       onSurface: palette.textPrimary,
       outline: palette.divider,
@@ -384,6 +403,7 @@ ThemeData buildPineTheme({Brightness brightness = Brightness.light}) {
   return base.copyWith(
     textTheme: base.textTheme
         .apply(
+          fontFamily: PineText.bodyFamily,
           bodyColor: palette.textPrimary,
           displayColor: palette.textPrimary,
         )
@@ -414,7 +434,10 @@ ThemeData buildPineTheme({Brightness brightness = Brightness.light}) {
       elevation: 0,
       scrolledUnderElevation: 0,
       centerTitle: false,
-      titleTextStyle: PineText.aggregate(color: palette.textPrimary),
+      titleTextStyle: PineText.serif(
+          size: PineType.aggregate,
+          color: palette.textPrimary,
+          height: PineLineHeight.aggregate),
     ),
     cardTheme: CardThemeData(
       color: palette.surface,
@@ -437,7 +460,7 @@ ThemeData buildPineTheme({Brightness brightness = Brightness.light}) {
     ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
-      fillColor: palette.presence,
+      fillColor: palette.surface,
       contentPadding: const EdgeInsets.all(PineSpacing.section),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(PineRadius.settled),
@@ -447,10 +470,13 @@ ThemeData buildPineTheme({Brightness brightness = Brightness.light}) {
         borderRadius: BorderRadius.circular(PineRadius.settled),
         borderSide: BorderSide(color: palette.divider, width: Paper.chipBorder),
       ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(PineRadius.settled),
-        borderSide: BorderSide(color: palette.focus, width: Paper.chipBorder),
-      ),
+      focusedBorder: const PineInputFocusBorder(),
+      floatingLabelBehavior: FloatingLabelBehavior.always,
+      errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(PineRadius.settled),
+          borderSide: BorderSide(color: palette.adjudication)),
+      focusedErrorBorder:
+          PineInputFocusBorder(side: BorderSide(color: palette.adjudication)),
       labelStyle: PineText.sans(
         size: PineType.auxiliary,
         color: palette.textSecondary,
@@ -463,34 +489,71 @@ ThemeData buildPineTheme({Brightness brightness = Brightness.light}) {
       ),
     ),
     filledButtonTheme: FilledButtonThemeData(
-      style: FilledButton.styleFrom(
-        backgroundColor: palette.focus,
-        foregroundColor: palette.background,
+      style: pinePrimaryButtonStyle().merge(FilledButton.styleFrom(
+        backgroundColor: palette.action,
+        foregroundColor: Colors.white,
         minimumSize: Size.fromHeight(actionHeight),
         textStyle: PineText.sans(
           size: PineType.body,
-          color: palette.background,
+          color: Colors.white,
           weight: FontWeight.w600,
         ),
         shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.all(Radius.circular(PineRadius.active)),
+          borderRadius: BorderRadius.all(Radius.circular(PineRadius.settled)),
         ),
-      ),
+      )),
     ),
     outlinedButtonTheme: OutlinedButtonThemeData(
       style: OutlinedButton.styleFrom(
-        foregroundColor: palette.textPrimary,
+        foregroundColor: palette.textSecondary,
         backgroundColor: palette.surface,
         minimumSize: Size.fromHeight(actionHeight),
         textStyle: PineText.sans(size: PineType.body),
         side: BorderSide(color: palette.divider, width: Paper.chipBorder),
         shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.all(Radius.circular(PineRadius.active)),
+          borderRadius: BorderRadius.all(Radius.circular(PineRadius.settled)),
         ),
+      ).copyWith(
+        visualDensity: VisualDensity.standard,
+        animationDuration: Duration.zero,
+        overlayColor: const WidgetStatePropertyAll(Colors.transparent),
+        backgroundColor: WidgetStateProperty.resolveWith((states) =>
+            states.contains(WidgetState.disabled) ||
+                    states.contains(WidgetState.pressed)
+                ? palette.presence
+                : states.contains(WidgetState.hovered)
+                    ? palette.background
+                    : palette.surface),
+        foregroundColor: WidgetStateProperty.resolveWith((states) =>
+            states.contains(WidgetState.disabled)
+                ? palette.textAuxiliary
+                : palette.textSecondary),
+        shape: WidgetStateProperty.resolveWith((states) =>
+            PineButtonBorder(focused: states.contains(WidgetState.focused))),
       ),
     ),
     textButtonTheme: TextButtonThemeData(
-      style: TextButton.styleFrom(foregroundColor: palette.textPrimary),
+      style:
+          TextButton.styleFrom(foregroundColor: palette.textSecondary).copyWith(
+        animationDuration: Duration.zero,
+        overlayColor: const WidgetStatePropertyAll(Colors.transparent),
+        foregroundColor: WidgetStateProperty.resolveWith(
+            (states) => states.contains(WidgetState.disabled)
+                ? palette.textAuxiliary
+                : states.contains(WidgetState.pressed)
+                    ? PineColors.actionPressed
+                    : states.contains(WidgetState.hovered)
+                        ? palette.action
+                        : palette.textSecondary),
+        textStyle: WidgetStateProperty.resolveWith((states) => PineText.sans()
+            .copyWith(
+                decoration: states.contains(WidgetState.hovered) ||
+                        states.contains(WidgetState.pressed)
+                    ? TextDecoration.underline
+                    : TextDecoration.none)),
+        shape: WidgetStateProperty.resolveWith((states) =>
+            PineButtonBorder(focused: states.contains(WidgetState.focused))),
+      ),
     ),
     iconButtonTheme: IconButtonThemeData(
       style: IconButton.styleFrom(
@@ -499,7 +562,9 @@ ThemeData buildPineTheme({Brightness brightness = Brightness.light}) {
         minimumSize:
             const Size(PineSize.minTouchAndroid, PineSize.minTouchAndroid),
         visualDensity: VisualDensity.compact,
-      ),
+      ).copyWith(
+          shape: WidgetStateProperty.resolveWith((states) =>
+              PineButtonBorder(focused: states.contains(WidgetState.focused)))),
     ),
     dialogTheme: DialogThemeData(
       backgroundColor: palette.surface,
@@ -508,7 +573,10 @@ ThemeData buildPineTheme({Brightness brightness = Brightness.light}) {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(PineRadius.settled),
       ),
-      titleTextStyle: PineText.aggregate(color: palette.textPrimary),
+      titleTextStyle: PineText.serif(
+          size: PineType.aggregate,
+          color: palette.textPrimary,
+          height: PineLineHeight.aggregate),
       contentTextStyle: PineText.sans(
         size: PineType.body,
         color: palette.textPrimary,
@@ -534,28 +602,31 @@ ThemeData buildPineTheme({Brightness brightness = Brightness.light}) {
       behavior: SnackBarBehavior.floating,
     ),
     switchTheme: SwitchThemeData(
-      thumbColor: WidgetStatePropertyAll(palette.background),
+      thumbColor: WidgetStateProperty.resolveWith((states) =>
+          states.contains(WidgetState.selected)
+              ? Colors.white
+              : palette.textPrimary),
       trackColor: WidgetStateProperty.resolveWith(
         (states) => states.contains(WidgetState.selected)
-            ? palette.focus
-            : palette.divider,
+            ? palette.action
+            : palette.presence,
       ),
-      trackOutlineColor: const WidgetStatePropertyAll(Colors.transparent),
+      trackOutlineColor: WidgetStatePropertyAll(palette.divider),
     ),
     checkboxTheme: CheckboxThemeData(
       fillColor: WidgetStateProperty.resolveWith(
         (states) => states.contains(WidgetState.selected)
-            ? palette.focus
+            ? palette.action
             : Colors.transparent,
       ),
-      checkColor: WidgetStatePropertyAll(palette.background),
-      side: BorderSide(color: palette.divider, width: Paper.chipBorder),
+      checkColor: const WidgetStatePropertyAll(Colors.white),
+      side: BorderSide(color: palette.divider, width: 1.5),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(PineRadius.adjudication),
       ),
     ),
     progressIndicatorTheme: ProgressIndicatorThemeData(
-      color: palette.focus,
+      color: palette.action,
       linearTrackColor: palette.presence,
       linearMinHeight: PineSpacing.micro,
     ),
@@ -584,5 +655,176 @@ ThemeData buildPineTheme({Brightness brightness = Brightness.light}) {
         borderRadius: BorderRadius.all(Radius.circular(PineRadius.settled)),
       ),
     ),
+  );
+}
+
+/// 键盘焦点画在外侧，不改变布局或稳定选中状态。
+class PineFocusRing extends StatefulWidget {
+  const PineFocusRing(
+      {super.key, required this.child, this.radius = PineRadius.settled});
+  final Widget child;
+  final double radius;
+  @override
+  State<PineFocusRing> createState() => _PineFocusRingState();
+}
+
+class _PineFocusRingState extends State<PineFocusRing> {
+  bool _focused = false;
+  @override
+  Widget build(BuildContext context) => Focus(
+        canRequestFocus: false,
+        skipTraversal: true,
+        onFocusChange: (value) => setState(() => _focused = value),
+        child: CustomPaint(
+          foregroundPainter: _focused ? _PineFocusPainter(widget.radius) : null,
+          child: widget.child,
+        ),
+      );
+}
+
+class _PineFocusPainter extends CustomPainter {
+  const _PineFocusPainter(this.radius);
+  final double radius;
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rect = Offset.zero & size;
+    final paint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2;
+    canvas.drawRRect(
+        RRect.fromRectAndRadius(rect.inflate(1), Radius.circular(radius + 1)),
+        paint..color = Colors.white);
+    canvas.drawRRect(
+        RRect.fromRectAndRadius(rect.inflate(3), Radius.circular(radius + 3)),
+        paint..color = PineColors.accent);
+  }
+
+  @override
+  bool shouldRepaint(_PineFocusPainter oldDelegate) =>
+      radius != oldDelegate.radius;
+}
+
+/// 原生按钮同样使用外侧白隔离与赤陶焦点，尺寸与命中区域不变。
+class PineButtonBorder extends RoundedRectangleBorder {
+  const PineButtonBorder({this.focused = false, super.side = BorderSide.none})
+      : super(
+            borderRadius:
+                const BorderRadius.all(Radius.circular(PineRadius.settled)));
+  final bool focused;
+  @override
+  bool operator ==(Object other) =>
+      other is PineButtonBorder &&
+      other.focused == focused &&
+      other.side == side;
+  @override
+  int get hashCode => Object.hash(focused, side);
+  @override
+  ShapeBorder? lerpFrom(ShapeBorder? a, double t) => t < 0.5 ? a : this;
+  @override
+  ShapeBorder? lerpTo(ShapeBorder? b, double t) => t < 0.5 ? this : b;
+  @override
+  void paint(Canvas canvas, Rect rect, {TextDirection? textDirection}) {
+    super.paint(canvas, rect, textDirection: textDirection);
+    if (!focused) return;
+    final paint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2;
+    canvas.drawRRect(
+        RRect.fromRectAndRadius(rect.inflate(1), const Radius.circular(17)),
+        paint..color = Colors.white);
+    canvas.drawRRect(
+        RRect.fromRectAndRadius(rect.inflate(3), const Radius.circular(19)),
+        paint..color = PineColors.accent);
+  }
+
+  @override
+  PineButtonBorder copyWith(
+          {BorderSide? side, BorderRadiusGeometry? borderRadius}) =>
+      PineButtonBorder(focused: focused, side: side ?? this.side);
+}
+
+class PineInputFocusBorder extends OutlineInputBorder {
+  const PineInputFocusBorder(
+      {BorderSide side = const BorderSide(color: PineColors.line)})
+      : super(
+            borderRadius:
+                const BorderRadius.all(Radius.circular(PineRadius.settled)),
+            borderSide: side);
+  @override
+  PineInputFocusBorder copyWith(
+          {BorderSide? borderSide,
+          BorderRadius? borderRadius,
+          double? gapPadding}) =>
+      PineInputFocusBorder(side: borderSide ?? this.borderSide);
+  @override
+  ShapeBorder? lerpFrom(ShapeBorder? a, double t) => this;
+  @override
+  void paint(Canvas canvas, Rect rect,
+      {double? gapStart,
+      double gapExtent = 0,
+      double gapPercentage = 0,
+      TextDirection? textDirection}) {
+    super.paint(canvas, rect,
+        gapStart: gapStart,
+        gapExtent: gapExtent,
+        gapPercentage: gapPercentage,
+        textDirection: textDirection);
+    final paint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2;
+    canvas.drawRRect(
+        RRect.fromRectAndRadius(rect.inflate(1), const Radius.circular(17)),
+        paint..color = Colors.white);
+    canvas.drawRRect(
+        RRect.fromRectAndRadius(rect.inflate(3), const Radius.circular(19)),
+        paint..color = PineColors.accent);
+  }
+}
+
+/// 六态主行动工艺。加载使用相同默认底，文本仍保留。
+ButtonStyle pinePrimaryButtonStyle(
+    {Color? background, Color? foreground, bool loading = false}) {
+  final neutral =
+      background == PineColors.surface || background == PineColors.paper;
+  final danger = background == PineColors.crimson;
+  return ButtonStyle(
+    visualDensity: VisualDensity.standard,
+    animationDuration: Duration.zero,
+    elevation: const WidgetStatePropertyAll(0),
+    overlayColor: const WidgetStatePropertyAll(Colors.transparent),
+    backgroundColor: WidgetStateProperty.resolveWith((states) {
+      if (states.contains(WidgetState.disabled) && !loading) {
+        return PineColors.presence;
+      }
+      if (neutral) {
+        if (states.contains(WidgetState.pressed)) return PineColors.presence;
+        if (states.contains(WidgetState.hovered)) return PineColors.paper;
+        return PineColors.surface;
+      }
+      if (danger) {
+        if (states.contains(WidgetState.pressed)) {
+          return PineColors.dangerPressed;
+        }
+        if (states.contains(WidgetState.hovered)) return PineColors.dangerHover;
+        return PineColors.crimson;
+      }
+      if (background != null && background != PineColors.accent) {
+        return background;
+      }
+      if (states.contains(WidgetState.pressed)) return PineColors.actionPressed;
+      if (states.contains(WidgetState.hovered)) return PineColors.actionHover;
+      return PineColors.accent;
+    }),
+    foregroundColor: WidgetStateProperty.resolveWith((states) =>
+        states.contains(WidgetState.disabled) && !loading
+            ? PineColors.textAuxiliary
+            : foreground ??
+                (neutral ? PineColors.textSecondary : Colors.white)),
+    side: WidgetStateProperty.resolveWith((states) =>
+        (states.contains(WidgetState.disabled) && !loading) || neutral
+            ? const BorderSide(color: PineColors.line)
+            : BorderSide.none),
+    shape: WidgetStateProperty.resolveWith((states) =>
+        PineButtonBorder(focused: states.contains(WidgetState.focused))),
   );
 }

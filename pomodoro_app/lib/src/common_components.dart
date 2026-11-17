@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -9,11 +11,11 @@ import 'theme.dart';
 /// 形态变体归属（对照 `p4-component-inventory.md` 第一节）：
 ///
 /// - [PineVariant.active] 进行中变体：开放式几何组织、陪驻底色（[PinePalette.presence]）与
-///   进行中边界（[PineRadius.active] = 16）；三阶段完全相同，不作形态区分。
+///   进行中边界（[PineRadius.active] = 24）；三阶段完全相同，不作形态区分。
 ///   适用于：会话陪驻条、外部会话陪驻、完成归属回执、阶段直选、当前会话读数、会话控制、会话准备。
 /// - [PineVariant.settled] 沉淀变体：规整事实组、承载底色（[PinePalette.surface]）与
-///   沉淀边界（[PineRadius.settled] = 8）；适用于记录、统计、事件、日程与资料中的已定型事实。
-/// - [PineVariant.adjudication] 裁决变体：冲突裁决与安全副本确认独立边界（[PineRadius.adjudication] = 4）。
+///   沉淀边界（[PineRadius.settled] = 16）；适用于记录、统计、事件、日程与资料中的已定型事实。
+/// - [PineVariant.adjudication] 裁决变体：冲突裁决与安全副本确认独立边界（[PineRadius.adjudication] = 8）。
 /// - [PineVariant.general] 通用 / 通用聚合：时态切换、台账分段选择、今日进度、收工动作、目标日读数等。
 ///   共享组件不得混用「进行中」与「沉淀」两种形态。
 enum PineVariant { active, settled, adjudication, general }
@@ -82,7 +84,7 @@ String pinePhaseCopy(SessionMode mode) => switch (mode) {
 
 /// 通用进行中变体表面容器。
 ///
-/// - 变体：[PineVariant.active]（进行中变体，圆角 16，陪驻底色 `palette.presence`）
+/// - 变体：[PineVariant.active]（进行中变体，圆角 24，陪驻底色 `palette.presence`）
 /// - 动效契约：语境衔接 ≤200ms（[PineMotion.maximum]）
 class ActiveVariantSurface extends StatelessWidget {
   const ActiveVariantSurface({
@@ -121,7 +123,7 @@ class ActiveVariantSurface extends StatelessWidget {
 
 /// 通用沉淀变体表面容器。
 ///
-/// - 变体：[PineVariant.settled]（沉淀变体，圆角 8，承载底色 `palette.surface`）
+/// - 变体：[PineVariant.settled]（沉淀变体，圆角 16，承载底色 `palette.surface`）
 /// - 动效契约：语境衔接 160ms（[PineMotion.standard]）
 class SettledVariantSurface extends StatelessWidget {
   const SettledVariantSurface({
@@ -129,6 +131,7 @@ class SettledVariantSurface extends StatelessWidget {
     required this.child,
     this.padding = const EdgeInsets.all(PineSpacing.section),
     this.borderColor,
+    this.borderWidth = Paper.hairline,
   });
 
   static const PineVariant variant = PineVariant.settled;
@@ -137,6 +140,7 @@ class SettledVariantSurface extends StatelessWidget {
   final Widget child;
   final EdgeInsetsGeometry padding;
   final Color? borderColor;
+  final double borderWidth;
 
   @override
   Widget build(BuildContext context) {
@@ -149,8 +153,8 @@ class SettledVariantSurface extends StatelessWidget {
         color: palette.surface,
         borderRadius: BorderRadius.circular(PineRadius.settled),
         border: Border.all(
-          color: borderColor ?? palette.divider,
-          width: Paper.hairline,
+          color: borderColor ?? PineColors.surfaceHairline,
+          width: borderWidth,
         ),
       ),
       child: child,
@@ -182,8 +186,6 @@ class LogicalDayDivider extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
       children: [
-        Container(height: Paper.hairline, color: palette.logicalDayDivider),
-        const SizedBox(height: PineSpacing.near),
         Row(
           children: [
             Expanded(
@@ -210,6 +212,8 @@ class LogicalDayDivider extends StatelessWidget {
             ],
           ],
         ),
+        const SizedBox(height: PineSpacing.near),
+        Container(height: Paper.hairline, color: palette.logicalDayDivider),
       ],
     );
   }
@@ -247,8 +251,18 @@ class TaskIdentityBadge extends StatelessWidget {
     var nearest = 0;
     var bestDistance = double.infinity;
     for (var i = 0; i < presetNames.length; i++) {
-      for (final palette in [PinePalette.light, PinePalette.dark]) {
-        final candidate = palette.taskColors[i].toARGB32();
+      for (final candidateColor in [
+        PinePalette.light.taskColors[i],
+        const [
+          Color(0xFFE89AA6),
+          Color(0xFF7CC6B3),
+          Color(0xFF8EB7ED),
+          Color(0xFFD8B36A),
+          Color(0xFFB7A0E3),
+          Color(0xFFA9C77A),
+        ][i],
+      ]) {
+        final candidate = candidateColor.toARGB32();
         if (candidate == value) return i;
         final red = ((value >> 16) & 255) - ((candidate >> 16) & 255);
         final green = ((value >> 8) & 255) - ((candidate >> 8) & 255);
@@ -282,7 +296,7 @@ class TaskIdentityBadge extends StatelessWidget {
             height: PineSize.taskGraphic,
             decoration: BoxDecoration(
               color: palette.taskColors[index],
-              borderRadius: BorderRadius.circular(PineRadius.adjudication),
+              shape: BoxShape.circle,
             ),
           ),
           const SizedBox(width: PineSpacing.near),
@@ -415,22 +429,30 @@ class _TenseTab extends StatelessWidget {
               horizontal: PineSpacing.section,
               vertical: PineSpacing.micro,
             ),
-            decoration: BoxDecoration(
-              color: selected ? palette.surface : palette.background,
-              borderRadius: BorderRadius.circular(PineRadius.settled),
-              border: Border.all(
-                color: selected ? palette.focus : Colors.transparent,
-                width: Paper.hairline,
-              ),
+            decoration: const BoxDecoration(
+              color: Colors.transparent,
             ),
-            child: Text(
-              tense.label,
-              style: PineText.sans(
-                size: PineType.body,
-                color: fg,
-                weight: selected ? FontWeight.w600 : FontWeight.w400,
-                height: PineLineHeight.body,
-              ),
+            child: Column(
+              children: [
+                Expanded(
+                  child: Center(
+                    child: Row(mainAxisSize: MainAxisSize.min, children: [
+                      Text(tense.label,
+                          style: PineText.sans(
+                            size: PineType.body,
+                            color: fg,
+                            weight:
+                                selected ? FontWeight.w600 : FontWeight.w400,
+                            height: PineLineHeight.body,
+                          )),
+                    ]),
+                  ),
+                ),
+                Container(
+                  height: 2,
+                  color: selected ? palette.action : Colors.transparent,
+                ),
+              ],
             ),
           ),
         ),
@@ -550,22 +572,25 @@ class _LedgerSegmentTab extends StatelessWidget {
             curve: Curves.easeOut,
             alignment: Alignment.center,
             padding: const EdgeInsets.symmetric(horizontal: PineSpacing.micro),
-            decoration: BoxDecoration(
-              color: selected ? palette.surface : palette.background,
-              borderRadius: BorderRadius.circular(PineRadius.settled),
-              border: Border.all(
-                color: selected ? palette.focus : Colors.transparent,
-                width: Paper.hairline,
-              ),
+            decoration: const BoxDecoration(
+              color: Colors.transparent,
             ),
-            child: Text(
-              segment.label,
-              style: PineText.sans(
-                size: PineType.body,
-                color: fg,
-                weight: selected ? FontWeight.w600 : FontWeight.w400,
-                height: PineLineHeight.body,
-              ),
+            child: Column(
+              children: [
+                Expanded(
+                    child: Center(
+                        child: Text(segment.label,
+                            style: PineText.sans(
+                              size: PineType.body,
+                              color: fg,
+                              weight:
+                                  selected ? FontWeight.w600 : FontWeight.w400,
+                              height: PineLineHeight.body,
+                            )))),
+                Container(
+                    height: 2,
+                    color: selected ? palette.action : Colors.transparent),
+              ],
             ),
           ),
         ),
@@ -580,7 +605,7 @@ class _LedgerSegmentTab extends StatelessWidget {
 
 /// 会话陪驻条：在任意应用内视图保持当前会话可读、可完成、可回到当下。
 ///
-/// - 变体：[PineVariant.active]（进行中变体：陪驻底色 `palette.presence`、进行中圆角 `16`；三阶段同形）
+/// - 变体：[PineVariant.active]（进行中变体：陪驻底色 `palette.presence`、进行中圆角 `24`；三阶段同形）
 /// - 状态：运行 / 暂停 / 超时 / 跨日 / 已收工仍运行；**完成永不禁用**；镜像接收中作为辅助加载说明
 /// - 动效契约：完成与回到当下响应 0ms（[PineMotion.immediate]）；辅助说明衔接 ≤200ms（[PineMotion.maximum]）
 /// - 布局预算：手机 72dp / 桌面 64pt（固定；仅非 V1 且会话存在时计入）
@@ -709,83 +734,43 @@ class SessionPresenceBar extends StatelessWidget {
                                   color: palette.textPrimary))))),
               const SizedBox(width: PineSpacing.near),
               _PresenceActionButton(
-                  label: '完成',
-                  minTouch: minTouch,
-                  filled: true,
-                  accentColor: stateColor,
-                  onTap: onComplete),
+                  label: '完成', minTouch: minTouch, onTap: onComplete),
             ]),
             const SizedBox(height: PineSpacing.micro),
             AnimatedSwitcher(
                 duration: _effectiveDuration(context, PineMotion.maximum),
-                child: Text(auxText,
-                    key: ValueKey<String>(auxText),
-                    style: PineText.sans(
-                        size: PineType.auxiliary,
-                        color: palette.textAuxiliary,
-                        height: PineLineHeight.auxiliary))),
+                child: Row(key: ValueKey<String>(auxText), children: [
+                  _SessionStateMarker(view: view),
+                  const SizedBox(width: PineSpacing.near),
+                  Expanded(
+                      child: Text(auxText,
+                          style: PineText.sans(
+                              size: PineType.auxiliary,
+                              color: palette.textAuxiliary,
+                              height: PineLineHeight.auxiliary))),
+                ])),
           ]),
     );
   }
 }
 
 class _PresenceActionButton extends StatelessWidget {
-  const _PresenceActionButton({
-    required this.label,
-    required this.minTouch,
-    required this.filled,
-    required this.accentColor,
-    required this.onTap,
-  });
-
+  const _PresenceActionButton(
+      {required this.label, required this.minTouch, required this.onTap});
   final String label;
   final double minTouch;
-  final bool filled;
-  final Color accentColor;
   final VoidCallback onTap;
-
   @override
-  Widget build(BuildContext context) {
-    final palette = PinePalette.of(context);
-    return Semantics(
-      button: true,
-      enabled: true,
-      label: label,
-      child: _ImmediateAction(
-        behavior: HitTestBehavior.opaque,
-        onTap: onTap,
-        child: ConstrainedBox(
-          constraints: BoxConstraints(
-            minWidth: minTouch,
-            minHeight: minTouch,
-          ),
-          child: Container(
-            padding: const EdgeInsets.symmetric(
-              horizontal: PineSpacing.section,
-              vertical: PineSpacing.micro,
-            ),
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: filled ? accentColor : palette.surface,
-              borderRadius: BorderRadius.circular(PineRadius.active),
-              border: filled
-                  ? null
-                  : Border.all(color: palette.divider, width: Paper.hairline),
-            ),
-            child: Text(
-              label,
-              style: PineText.sans(
-                size: PineType.body,
-                color: filled ? palette.background : palette.textPrimary,
-                weight: FontWeight.w600,
-                height: PineLineHeight.body,
-              ),
-            ),
-          ),
+  Widget build(BuildContext context) => FilledButton(
+        onPressed: onTap,
+        style: FilledButton.styleFrom(
+          minimumSize: Size(minTouch, minTouch),
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          padding: const EdgeInsets.symmetric(
+              horizontal: PineSpacing.section, vertical: PineSpacing.micro),
         ),
-      ),
-    );
-  }
+        child: Text(label),
+      );
 }
 
 // ============================================================================
@@ -794,7 +779,7 @@ class _PresenceActionButton extends StatelessWidget {
 
 /// 外部会话陪驻：在 Android 锁屏与通知、macOS 菜单栏与置顶计时窗呈现同一会话并直接完成。
 ///
-/// - 变体：[PineVariant.active]（进行中变体：陪驻底色 `palette.presence`、进行中圆角 `16`、常驻读数 `28/34`）
+/// - 变体：[PineVariant.active]（进行中变体：陪驻底色 `palette.presence`、进行中圆角 `24`、常驻读数 `28/34`）
 /// - 状态：运行 / 暂停 / 超时 / 跨日；**完成永不禁用**；镜像接收中作为加载说明
 /// - 动效契约：开始镜像、暂停、继续、完成均 0ms（[PineMotion.immediate]）；出现与退出 ≤200ms（[PineMotion.maximum]）
 /// - 文案契约：
@@ -876,14 +861,7 @@ class ExternalSessionPresenceCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              Container(
-                width: PineSize.stateGraphic,
-                height: PineSize.stateGraphic,
-                decoration: BoxDecoration(
-                  color: stateColor,
-                  borderRadius: BorderRadius.circular(PineRadius.adjudication),
-                ),
-              ),
+              _SessionStateMarker(view: view),
               const SizedBox(width: PineSpacing.near),
               Expanded(
                 child: Text(
@@ -931,10 +909,6 @@ class ExternalSessionPresenceCard extends StatelessWidget {
                   child: FilledButton(
                     // 完成永不禁用
                     onPressed: onComplete,
-                    style: FilledButton.styleFrom(
-                      backgroundColor: stateColor,
-                      foregroundColor: palette.background,
-                    ),
                     child: Text('完成$phase'),
                   ),
                 ),
@@ -953,7 +927,7 @@ class ExternalSessionPresenceCard extends StatelessWidget {
 
 /// 完成归属回执：完成后明确本段计入哪个逻辑日（`本段已计入〈所属日期〉`）。
 ///
-/// - 变体：[PineVariant.active]（进行中变体：陪驻底色 `palette.presence`、进行中圆角 `16`）
+/// - 变体：[PineVariant.active]（进行中变体：陪驻底色 `palette.presence`、进行中圆角 `24`）
 /// - 状态：已计入今日 / 已计入其他逻辑日（[crossDayTodayUnchanged] 为真时附带
 ///   `本段计入〈所属日期〉，今日合计不变`）；无禁用；无加载
 /// - 动效契约：落记录 0ms 后立即出现（[PineMotion.immediate]），语境衔接 160ms（[PineMotion.standard]）
@@ -1009,7 +983,7 @@ class CompletionAttributionReceipt extends StatelessWidget {
                   style: PineText.sans(
                     size: PineType.body,
                     color: palette.textPresence,
-                    weight: FontWeight.w600,
+                    weight: FontWeight.w400,
                     height: PineLineHeight.body,
                   ),
                 ),
@@ -1093,14 +1067,8 @@ class ConflictAdjudicationPanel extends StatelessWidget {
         children: [
           Row(
             children: [
-              Container(
-                width: PineSize.stateGraphic,
-                height: PineSize.stateGraphic,
-                decoration: BoxDecoration(
-                  color: palette.adjudication,
-                  borderRadius: BorderRadius.circular(PineRadius.adjudication),
-                ),
-              ),
+              Icon(Icons.warning_amber_rounded,
+                  size: PineSize.stateGraphic, color: palette.adjudication),
               const SizedBox(width: PineSpacing.near),
               Expanded(
                 child: Text(
@@ -1124,7 +1092,7 @@ class ConflictAdjudicationPanel extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(PineSpacing.section),
             decoration: BoxDecoration(
-              color: palette.presence,
+              color: palette.surface,
               borderRadius: BorderRadius.circular(PineRadius.adjudication),
               border: Border.all(
                 color: status == AdjudicationStatus.safetyCopyFailed
@@ -1152,10 +1120,6 @@ class ConflictAdjudicationPanel extends StatelessWidget {
                     onPressed: onRetrySafetyCopy,
                     style: OutlinedButton.styleFrom(
                       minimumSize: Size(PineSize.minTouchAndroid, actionHeight),
-                      shape: RoundedRectangleBorder(
-                        borderRadius:
-                            BorderRadius.circular(PineRadius.adjudication),
-                      ),
                     ),
                     child: const Text('重试'),
                   ),
@@ -1191,10 +1155,6 @@ class ConflictAdjudicationPanel extends StatelessWidget {
                     onPressed: canAdjudicate ? onKeepLocal : null,
                     style: OutlinedButton.styleFrom(
                       minimumSize: Size(PineSize.minTouchAndroid, actionHeight),
-                      shape: RoundedRectangleBorder(
-                        borderRadius:
-                            BorderRadius.circular(PineRadius.adjudication),
-                      ),
                     ),
                     child: const Text('保留本机数据'),
                   ),
@@ -1204,16 +1164,8 @@ class ConflictAdjudicationPanel extends StatelessWidget {
               Expanded(
                 child: SizedBox(
                   height: actionHeight,
-                  child: FilledButton(
+                  child: OutlinedButton(
                     onPressed: canAdjudicate ? onKeepCloud : null,
-                    style: FilledButton.styleFrom(
-                      backgroundColor: palette.adjudication,
-                      foregroundColor: palette.background,
-                      shape: RoundedRectangleBorder(
-                        borderRadius:
-                            BorderRadius.circular(PineRadius.adjudication),
-                      ),
-                    ),
                     child: const Text('保留云端数据'),
                   ),
                 ),
@@ -1282,20 +1234,141 @@ class _ImmediateAction extends StatelessWidget {
   final Widget child;
   final HitTestBehavior behavior;
   @override
-  Widget build(BuildContext context) => FocusableActionDetector(
-      enabled: onTap != null,
-      shortcuts: const {
-        SingleActivator(LogicalKeyboardKey.enter): ActivateIntent(),
-        SingleActivator(LogicalKeyboardKey.space): ActivateIntent(),
-      },
-      actions: {
-        ActivateIntent: CallbackAction<ActivateIntent>(onInvoke: (_) {
-          onTap?.call();
-          return null;
-        })
-      },
-      child: Semantics(
-          onTap: onTap,
-          child:
-              GestureDetector(behavior: behavior, onTap: onTap, child: child)));
+  Widget build(BuildContext context) => PineFocusRing(
+        child: FocusableActionDetector(
+          enabled: onTap != null,
+          shortcuts: const {
+            SingleActivator(LogicalKeyboardKey.enter): ActivateIntent(),
+            SingleActivator(LogicalKeyboardKey.space): ActivateIntent(),
+          },
+          actions: {
+            ActivateIntent: CallbackAction<ActivateIntent>(onInvoke: (_) {
+              onTap?.call();
+              return null;
+            })
+          },
+          child: Semantics(
+              onTap: onTap,
+              child: GestureDetector(
+                  behavior: behavior, onTap: onTap, child: child)),
+        ),
+      );
+}
+
+/// 陪驻只使用同源小标识，完整开放弧留给当前会话读数。
+class _SessionStateMarker extends StatelessWidget {
+  const _SessionStateMarker({required this.view});
+  final SessionView view;
+  @override
+  Widget build(BuildContext context) {
+    final palette = PinePalette.of(context);
+    final phase = switch (view.mode) {
+      SessionMode.focus => palette.focus,
+      SessionMode.shortBreak => palette.shortBreak,
+      SessionMode.longBreak => palette.longBreak,
+    };
+    return Row(mainAxisSize: MainAxisSize.min, children: [
+      Icon(Icons.circle, size: PineSize.taskGraphic, color: phase),
+      if (!view.running)
+        Icon(Icons.pause, size: PineSize.stateGraphic, color: palette.paused),
+      if (view.targetReached)
+        Icon(Icons.add, size: PineSize.stateGraphic, color: palette.overtime),
+    ]);
+  }
+}
+
+/// 无业务状态的计时弧。完整 V1 接线留待该视图迁移；本批用真实组件预览验收工艺。
+class SessionTimerArc extends StatelessWidget {
+  const SessionTimerArc(
+      {super.key, required this.view, this.size = PineTimerArc.compactBox});
+  final SessionView view;
+  final double size;
+  @override
+  Widget build(BuildContext context) {
+    final palette = PinePalette.of(context);
+    final phaseColor = switch (view.mode) {
+      SessionMode.focus => palette.focus,
+      SessionMode.shortBreak => palette.shortBreak,
+      SessionMode.longBreak => palette.longBreak,
+    };
+    return SizedBox.square(
+        dimension: size,
+        child: CustomPaint(
+          painter: _SessionArcPainter(
+            progress: view.plannedSeconds > 0
+                ? (view.elapsedSeconds / view.plannedSeconds).clamp(0.0, 1.0)
+                : null,
+            active: view.running ? phaseColor : palette.paused,
+            track: palette.divider,
+          ),
+          child: Center(
+              child: Column(mainAxisSize: MainAxisSize.min, children: [
+            Row(mainAxisSize: MainAxisSize.min, children: [
+              _SessionStateMarker(view: view),
+              const SizedBox(width: PineSpacing.micro),
+              Text(pinePhaseCopy(view.mode),
+                  style: PineText.sans(
+                      size: PineType.auxiliary, color: phaseColor)),
+              if (!view.running)
+                Text('已暂停',
+                    style: PineText.sans(
+                        size: PineType.auxiliary, color: palette.paused)),
+            ]),
+            Text('已进行',
+                style: PineText.sans(
+                    size: PineType.auxiliary, color: palette.textSecondary)),
+            Text(view.elapsedText, style: PineText.session()),
+            Text(
+                view.plannedSeconds <= 0
+                    ? '准备'
+                    : view.targetReached
+                        ? '超时 ${view.clockText}'
+                        : '剩余 ${view.clockText}',
+                style: PineText.mono(
+                    size: PineType.body,
+                    color: view.targetReached
+                        ? palette.overtime
+                        : palette.textSecondary)),
+          ])),
+        ));
+  }
+}
+
+class _SessionArcPainter extends CustomPainter {
+  const _SessionArcPainter(
+      {required this.progress, required this.active, required this.track});
+  final double? progress;
+  final Color active, track;
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = size.center(Offset.zero);
+    final radius =
+        (size.shortestSide - PineTimerArc.endDot - 2 * PineTimerArc.separator) /
+            2;
+    final rect = Rect.fromCircle(center: center, radius: radius);
+    // Flutter 以三点为零；契约以十二点为零。
+    const start = (PineTimerArc.startDegrees - 90) * math.pi / 180;
+    const sweep = PineTimerArc.sweepDegrees * math.pi / 180;
+    final paint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round
+      ..strokeWidth = PineTimerArc.stroke;
+    canvas.drawArc(rect, start, sweep, false, paint..color = track);
+    if (progress == null) return;
+    if (progress! > 0) {
+      canvas.drawArc(
+          rect, start, sweep * progress!, false, paint..color = active);
+    }
+    final end = start + sweep * progress!;
+    final dot = center + Offset(math.cos(end), math.sin(end)) * radius;
+    canvas.drawCircle(dot, PineTimerArc.endDot / 2 + PineTimerArc.separator,
+        Paint()..color = Colors.white);
+    canvas.drawCircle(dot, PineTimerArc.endDot / 2, Paint()..color = active);
+  }
+
+  @override
+  bool shouldRepaint(_SessionArcPainter oldDelegate) =>
+      progress != oldDelegate.progress ||
+      active != oldDelegate.active ||
+      track != oldDelegate.track;
 }

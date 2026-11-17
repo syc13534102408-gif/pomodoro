@@ -21,49 +21,45 @@ SessionView session(
         elapsedSeconds: 600);
 
 Future<void> show(WidgetTester tester, Widget child,
-    {double width = 360, Brightness brightness = Brightness.dark}) async {
+    {double width = 360}) async {
   await tester.binding.setSurfaceSize(Size(width, 800));
   addTearDown(() => tester.binding.setSurfaceSize(null));
   await tester.pumpWidget(MaterialApp(
-      theme: buildPineTheme(brightness: brightness),
+      theme: buildPineTheme(),
       home:
           Scaffold(body: Align(alignment: Alignment.topCenter, child: child))));
 }
 
 void main() {
-  for (final brightness in Brightness.values) {
-    testWidgets('${brightness.name} 表面与任务标识使用当前模式令牌', (tester) async {
-      await show(
-          tester,
-          const Column(mainAxisSize: MainAxisSize.min, children: [
-            ActiveVariantSurface(child: Text('会话')),
-            SettledVariantSurface(child: Text('事实')),
-            TaskIdentityBadge(taskName: '阅读', color: Color(0xFFE89AA6)),
-          ]),
-          brightness: brightness);
-      final palette =
-          brightness == Brightness.dark ? PinePalette.dark : PinePalette.light;
-      final active = tester.widget<AnimatedContainer>(find.descendant(
-          of: find.byType(ActiveVariantSurface),
-          matching: find.byType(AnimatedContainer)));
-      final settled = tester.widget<AnimatedContainer>(find.descendant(
-          of: find.byType(SettledVariantSurface),
-          matching: find.byType(AnimatedContainer)));
-      final activeBox = active.decoration! as BoxDecoration;
-      final settledBox = settled.decoration! as BoxDecoration;
-      expect(activeBox.color, palette.presence);
-      expect(activeBox.borderRadius, BorderRadius.circular(16));
-      expect((activeBox.border! as Border).right.style, BorderStyle.none);
-      expect(settledBox.color, palette.surface);
-      expect(settledBox.borderRadius, BorderRadius.circular(8));
-      final badge = tester.widget<Container>(find.descendant(
-          of: find.byType(TaskIdentityBadge),
-          matching: find.byType(Container)));
-      expect(
-          (badge.decoration! as BoxDecoration).color, palette.taskColors.first);
-      expect(find.bySemanticsLabel('阅读，标识色玫瑰'), findsOneWidget);
-    });
-  }
+  testWidgets('单浅色表面与任务标识使用令牌', (tester) async {
+    await show(
+      tester,
+      const Column(mainAxisSize: MainAxisSize.min, children: [
+        ActiveVariantSurface(child: Text('会话')),
+        SettledVariantSurface(child: Text('事实')),
+        TaskIdentityBadge(taskName: '阅读', color: Color(0xFFE89AA6)),
+      ]),
+    );
+    const palette = PinePalette.light;
+    final active = tester.widget<AnimatedContainer>(find.descendant(
+        of: find.byType(ActiveVariantSurface),
+        matching: find.byType(AnimatedContainer)));
+    final settled = tester.widget<AnimatedContainer>(find.descendant(
+        of: find.byType(SettledVariantSurface),
+        matching: find.byType(AnimatedContainer)));
+    final activeBox = active.decoration! as BoxDecoration;
+    final settledBox = settled.decoration! as BoxDecoration;
+    expect(activeBox.color, palette.presence);
+    expect(activeBox.borderRadius, BorderRadius.circular(24));
+    expect((activeBox.border! as Border).right.style, BorderStyle.none);
+    expect(settledBox.color, palette.surface);
+    expect(settledBox.borderRadius, BorderRadius.circular(16));
+    final badge = tester.widget<Container>(find.descendant(
+        of: find.byType(TaskIdentityBadge), matching: find.byType(Container)));
+    expect(
+        (badge.decoration! as BoxDecoration).color, palette.taskColors.first);
+    expect(find.bySemanticsLabel('阅读，标识色玫瑰'), findsOneWidget);
+  });
 
   testWidgets('手机与桌面共用组件正常态符合高度预算', (tester) async {
     try {
@@ -231,8 +227,8 @@ void main() {
       final enabled = status == AdjudicationStatus.readyToAdjudicate;
       final localButton = tester.widget<OutlinedButton>(
           find.widgetWithText(OutlinedButton, '保留本机数据'));
-      final cloudButton = tester
-          .widget<FilledButton>(find.widgetWithText(FilledButton, '保留云端数据'));
+      final cloudButton = tester.widget<OutlinedButton>(
+          find.widgetWithText(OutlinedButton, '保留云端数据'));
       expect(localButton.onPressed != null, enabled);
       expect(cloudButton.onPressed != null, enabled);
       if (enabled) {
@@ -274,8 +270,40 @@ void main() {
         greaterThanOrEqualTo(48));
     expect(tester.widget<FilledButton>(find.byType(FilledButton)).onPressed,
         isNull);
+    expect(find.text('保存'), findsOneWidget);
     await show(tester, PineButton(label: '保存', onPressed: () => count++));
     await tester.tap(find.text('保存'));
     expect(count, 1);
+  });
+
+  testWidgets('美术勾选框保留键盘与禁用门控，操作后立即更新且命中区不缩小', (tester) async {
+    var checked = false;
+    var calls = 0;
+    await show(
+        tester,
+        StatefulBuilder(
+            builder: (context, setState) => PineCheckbox(
+                value: checked,
+                onChanged: (value) => setState(() {
+                      checked = value!;
+                      calls++;
+                    }))));
+    final initialSize = tester.getSize(find.byType(Checkbox));
+    expect(initialSize.width, greaterThanOrEqualTo(48));
+    expect(initialSize.height, greaterThanOrEqualTo(48));
+    await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+    await tester.pump();
+    await tester.sendKeyEvent(LogicalKeyboardKey.space);
+    await tester.pump();
+    expect(checked, isTrue);
+    expect(calls, 1);
+    expect(tester.widget<Checkbox>(find.byType(Checkbox)).value, isTrue);
+    expect(tester.getSize(find.byType(Checkbox)), initialSize);
+    await show(tester, PineCheckbox(value: checked, onChanged: null));
+    await tester.tap(find.byType(Checkbox));
+    await tester.sendKeyEvent(LogicalKeyboardKey.space);
+    await tester.pump();
+    expect(calls, 1);
+    expect(tester.takeException(), isNull);
   });
 }

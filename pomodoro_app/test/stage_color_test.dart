@@ -22,11 +22,11 @@ double _contrast(Color a, Color b) {
 }
 
 void main() {
-  group('阶段色两档规则（2026-10-25 决策 B1）', () {
-    test('gold 只作实底：长休的 color 是 gold，线条色换成 goldInk', () {
+  group('单浅色阶段令牌', () {
+    test('长休使用同一可读状态色', () {
       expect(SessionMode.longBreak.color, PineColors.gold);
       expect(SessionMode.longBreak.lineColor, PineColors.goldInk);
-      expect(SessionMode.longBreak.lineColor, isNot(PineColors.gold));
+      expect(SessionMode.longBreak.lineColor, PineColors.gold);
     });
 
     test('专注/短休两档不变（原本就达标，不需要第二档）', () {
@@ -51,8 +51,8 @@ void main() {
           greaterThanOrEqualTo(4.5));
     });
 
-    test('主行动 ink on gold / ink on paper 都 ≥ 4.5:1', () {
-      expect(_contrast(PineColors.ink, PineColors.gold),
+    test('主行动白字与正文对纸面均 ≥ 4.5:1', () {
+      expect(_contrast(Colors.white, PinePalette.light.action),
           greaterThanOrEqualTo(4.5));
       expect(_contrast(PineColors.ink, PineColors.paper),
           greaterThanOrEqualTo(4.5));
@@ -67,12 +67,9 @@ void main() {
     });
   });
 
-  group('P4 双模式令牌', () {
-    test('明暗两套文本色对三种底色均 ≥ 4.5:1', () {
-      for (final palette in <PinePalette>[
-        PinePalette.light,
-        PinePalette.dark
-      ]) {
+  group('P4 暖纸单浅色令牌', () {
+    test('单浅色文本色对三种底色均 ≥ 4.5:1', () {
+      for (final palette in <PinePalette>[PinePalette.light]) {
         final backgrounds = <Color>[
           palette.background,
           palette.surface,
@@ -92,11 +89,8 @@ void main() {
       }
     });
 
-    test('明暗两套状态、分隔与六色任务标识均 ≥ 3.0:1', () {
-      for (final palette in <PinePalette>[
-        PinePalette.light,
-        PinePalette.dark
-      ]) {
+    test('浅色状态、分隔与六色任务标识均 ≥ 3.0:1', () {
+      for (final palette in <PinePalette>[PinePalette.light]) {
         expect(palette.taskColors, hasLength(6));
         final graphics = <Color>[
           palette.focus,
@@ -122,13 +116,13 @@ void main() {
       }
     });
 
-    test('暗色主题使用暗色语义底且不设置阴影', () {
-      final theme = buildPineTheme(brightness: Brightness.dark);
-      expect(theme.brightness, Brightness.dark);
-      expect(theme.scaffoldBackgroundColor, PinePalette.dark.background);
+    test('主题固定使用暖纸浅色与两级阴影', () {
+      final theme = buildPineTheme();
+      expect(theme.brightness, Brightness.light);
+      expect(theme.scaffoldBackgroundColor, PinePalette.light.background);
       expect(theme.cardTheme.elevation, 0);
-      expect(PineShadow.card, isEmpty);
-      expect(PineShadow.composer, isEmpty);
+      expect(PineShadow.card.single.blurRadius, 8);
+      expect(PineShadow.composer.single.blurRadius, 24);
     });
   });
 }

@@ -33,7 +33,7 @@ class RecordFactTile extends StatelessWidget {
               Wrap(
                   spacing: PineSpacing.section,
                   runSpacing: PineSpacing.near,
-                  alignment: WrapAlignment.spaceBetween,
+                  alignment: WrapAlignment.start,
                   children: [
                     Text(formatHoursMinutes(record.minutes),
                         style: PineText.sans(
@@ -56,16 +56,16 @@ class RecordFactTile extends StatelessWidget {
                       size: PineType.auxiliary,
                       color: palette.textSecondary,
                       height: PineLineHeight.auxiliary)),
-              const SizedBox(height: PineSpacing.near),
+              const SizedBox(height: PineSpacing.section),
               Text('所属日期：${record.dayKey}',
                   style: PineText.sans(
                       size: PineType.auxiliary,
-                      color: palette.textSecondary,
+                      color: palette.textAuxiliary,
                       height: PineLineHeight.auxiliary)),
               Text('完成时刻：${recordTimestamp(record.at)}',
                   style: PineText.mono(
                       size: PineType.auxiliary,
-                      color: palette.textSecondary,
+                      color: palette.textAuxiliary,
                       height: PineLineHeight.auxiliary)),
               if (crossDay) ...[
                 const SizedBox(height: PineSpacing.near),
@@ -100,11 +100,16 @@ class RecordsPanel extends StatelessWidget {
     final days = groups.keys.toList()..sort((a, b) => b.compareTo(a));
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       Padding(
-          padding: const EdgeInsets.all(PineSpacing.section),
+          padding: const EdgeInsets.fromLTRB(PineSpacing.section,
+              PineSpacing.section, PineSpacing.section, PineSpacing.near),
           child: Row(children: [
             Expanded(
                 child: Text('全部记录',
-                    style: PineText.aggregate(color: palette.textPrimary))),
+                    style: PineText.serif(
+                        size: PineType.aggregate,
+                        color: palette.textPrimary,
+                        weight: FontWeight.w600,
+                        height: PineLineHeight.aggregate))),
             TextButton.icon(
                 onPressed: onAdd,
                 icon: const Icon(Icons.add, size: PineSize.stateGraphic),
@@ -141,9 +146,10 @@ class RecordsPanel extends StatelessWidget {
                       data: data,
                       record: record,
                       onTap: () => onEdit(record)),
-                  const SizedBox(height: PineSpacing.near),
+                  if (record != groups[day]!.last)
+                    const SizedBox(height: PineSpacing.near),
                 ],
-                const SizedBox(height: PineSpacing.section),
+                const SizedBox(height: PineSpacing.far),
               ],
             ],
           ])),
@@ -246,7 +252,10 @@ class _RecordEditorState extends State<RecordEditor> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
               Text(widget.record == null ? '补记记录' : '编辑记录',
-                  style: PineText.aggregate(color: palette.textPrimary)),
+                  style: PineText.serif(
+                      size: PineType.aggregate,
+                      color: palette.textPrimary,
+                      height: PineLineHeight.aggregate)),
               const SizedBox(height: PineSpacing.section),
               TextField(
                   controller: _minutes,

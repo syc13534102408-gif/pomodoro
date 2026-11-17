@@ -32,3 +32,15 @@ flutter:
 
   assets:
     - assets/sounds/
+    - assets/fonts/OFL.txt
+    - assets/fonts/NotoSansSC-OFL.txt
+
+  fonts:
+    - family: Noto Serif SC
+      fonts:
+        - asset: assets/fonts/NotoSerifSC-wght.ttf
+          style: normal
+    - family: Noto Sans SC
+      fonts:
+        - asset: assets/fonts/NotoSansSC-wght.ttf
+          style: normal
